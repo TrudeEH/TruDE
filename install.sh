@@ -16,6 +16,11 @@ if [[ ${ID:-} != debian || ${VERSION_CODENAME:-} != trixie ]]; then
     exit 1
 fi
 
+# Enable Debian's 32-bit package archive for Steam and other multilib apps.
+if ! dpkg --print-foreign-architectures | grep -qx i386; then
+    sudo dpkg --add-architecture i386
+fi
+
 # This file is managed by this script. Its presence makes repeated runs safe.
 if ! sudo test -f "$backports"; then
     sudo tee "$backports" >/dev/null <<'EOF'
@@ -74,6 +79,5 @@ for quickshell_file in shell.qml Bar.qml LauncherButton.qml NetworkButton.qml Ne
 done
 link_config "$repo_dir/fuzzel/fuzzel.ini" "$config_dir/fuzzel/fuzzel.ini"
 link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
-link_config "$repo_dir/gtk/settings-gtk4.ini" "$config_dir/gtk-4.0/settings.ini"
 
 echo "Done. Log out and back in to start Quickshell with Wayland support."
