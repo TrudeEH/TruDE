@@ -18,6 +18,14 @@ Item {
     readonly property var wifiDevice: findWifiDevice()
     readonly property var connectedDevice: findConnectedDevice()
     readonly property var connectedNetwork: findConnectedNetwork(connectedDevice)
+    readonly property var focusedScreen: {
+        const focused = Hyprland.focusedMonitor;
+        if (!focused) return null;
+        for (const screen of Quickshell.screens) {
+            if (screen.name === focused.name) return screen;
+        }
+        return null;
+    }
     readonly property string statusText: {
         if (!connectedDevice) return "Not connected";
         if (connectedNetwork && connectedNetwork.name) return connectedNetwork.name;
@@ -96,15 +104,9 @@ Item {
         }
     }
 
-    Variants {
-        model: Quickshell.screens
-        delegate: Component {
-            PanelWindow {
-                required property var modelData
-                screen: modelData
-                readonly property var monitor: Hyprland.monitorFor(screen)
-                visible: network.popupOpen && Hyprland.focusedMonitor
-                    && monitor && Hyprland.focusedMonitor.id === monitor.id
+    PanelWindow {
+                screen: network.focusedScreen
+                visible: network.popupOpen && network.focusedScreen !== null
                 color: Theme.transparent
                 implicitWidth: 390
                 implicitHeight: 560
@@ -456,7 +458,5 @@ Item {
                     focus: true
                     Keys.onEscapePressed: network.closePopup()
                 }
-            }
-        }
     }
 }
