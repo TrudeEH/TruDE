@@ -50,7 +50,7 @@ if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]
     gsettings set org.gnome.desktop.interface gtk-theme Adwaita || true
     gsettings set org.gnome.desktop.interface icon-theme Adwaita || true
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
-    gsettings set org.gnome.desktop.interface accent-color orange || true
+    gsettings set org.gnome.desktop.interface accent-color blue || true
 fi
 
 link_config() {
@@ -74,6 +74,6 @@ for quickshell_file in shell.qml Bar.qml LauncherButton.qml NetworkButton.qml Ne
 done
 link_config "$repo_dir/fuzzel/fuzzel.ini" "$config_dir/fuzzel/fuzzel.ini"
 link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
-link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-4.0/settings.ini"
+link_config "$repo_dir/gtk/settings-gtk4.ini" "$config_dir/gtk-4.0/settings.ini"
 
 echo "Done. Log out and back in to start Quickshell with Wayland support."

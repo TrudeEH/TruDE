@@ -397,9 +397,6 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("command -v gsettings >/dev/null && "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1")
-    hl.exec_cmd("command -v gsettings >/dev/null && "
-        .. "gsettings set org.gnome.desktop.interface accent-color orange "
-        .. ">/dev/null 2>&1")
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland quickshell --no-duplicate")
     hl.exec_cmd("hyprpolkitagent")
 end)

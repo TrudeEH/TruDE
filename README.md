@@ -21,8 +21,8 @@ screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit ag
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
 Adwaita's GTK and Qt themes are installed and configured for dark mode. GTK3
-uses the linked settings files; GTK4/libadwaita uses the desktop color-scheme
-preference and the orange accent.
+uses its dark variant setting; GTK4/libadwaita uses the desktop color-scheme
+preference, leaving the native Adwaita palette and controls intact.
 The installer also adds the per-user Flathub remote when it is missing.
 
 Existing files at managed symlink destinations are backed up to dated
