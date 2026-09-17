@@ -1,0 +1,77 @@
+# Hyprland + Quickshell
+
+For Debian 13 (trixie). Run from a terminal as your desktop user:
+
+```sh
+./install.sh
+```
+
+The script uses sudo for APT, so run it in an interactive terminal where you
+can enter your password.
+It works from any working directory. Configs are symlinked into `~/.config`;
+keep this repository in place and customize the files here. A normal non-root
+invocation also honors `XDG_CONFIG_HOME`.
+
+The installer manages one `trixie-backports` source file and leaves it in
+place on later runs. It installs Hyprland, Quickshell, their portal, and a
+small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Thunar, PipeWire/WirePlumber,
+brightness and media-key utilities, the Qt Wayland plugin, and a Polkit agent.
+APT resolves required and recommended dependencies. All packages are installed
+in one transaction so linked components such as PipeWire stay compatible.
+`gvfs`, Thunar's volume manager and thumbnailer, `udisks2`, and
+`brightness-udev` are named because they provide the file-manager drive,
+thumbnail, and brightness-key features this desktop expects; APT does not add
+an already-installed package's old recommendations on a later run.
+
+Existing files at the two symlink destinations are backed up to dated
+`.backup-*` files. Repeated runs preserve the correct symlinks and edits here.
+Other configuration files are left alone.
+
+After installation, log out and select **Hyprland** in your existing login
+screen, or log into a local text console and run `start-hyprland` as your user.
+No display manager or automatic login is installed. **After upgrading from
+the original setup, log out and back in:** a Quickshell process started using
+X11 cannot switch to Wayland through a QML reload.
+
+## Configuration
+
+`hypr/hyprland.lua` starts from the
+[upstream 0.55.2 default](https://github.com/hyprwm/Hyprland/blob/v0.55.2/example/hyprland.lua).
+It keeps the default appearance and layout, uses Foot/Thunar/Fuzzel, and starts
+Quickshell explicitly on Wayland plus the Polkit agent. The keyboard layout
+is `us`; change `kb_layout` if needed.
+
+| Shortcut | Action |
+| --- | --- |
+| Super+Enter | Foot terminal |
+| Tap Super (left or right) | Fuzzel application launcher |
+| Super+R | Alternative launcher shortcut |
+| Super+E | Thunar file manager |
+| Super+C | Close window |
+| Super+M | Exit Hyprland |
+| Super+1…0 | Switch workspace |
+| Super+Shift+1…0 | Move window to workspace |
+
+The monitor section matches this machine:
+
+- `DP-1`: AOC, 1920×1080 at 300 Hz, scale 1, at `0x0`.
+- `HDMI-A-1`: LG, 1920×1080 at approximately 75 Hz, scale 1, rotated
+  clockwise (`transform = 1`), positioned at `-1080x0` to the left with top
+  edges aligned. Its logical dimensions after rotation are 1080×1920.
+- Other monitors retain the upstream preferred-mode/automatic-position fallback.
+
+`quickshell/shell.qml` provides a 34-pixel Hyprland layer-shell panel on every monitor. It has
+an Apps button, clickable workspaces 1–10 with an active indicator, a system tray, and a clock. Left-click tray icons to activate, right-click
+for menus, middle-click for secondary actions, or scroll for app-specific
+controls. The tray fills as applications register icons; it doesn't start
+network/Bluetooth applets itself.
+
+The Wayland panel reserves its height so tiled and maximized windows do not
+sit underneath it. Fullscreen windows may cover the bar. Quickshell normally
+reloads QML edits live; `hyprctl configerrors` reports Hyprland config errors.
+Review upstream changes when upgrading Hyprland because this repository
+preserves your configuration rather than replacing it with package defaults.
+
+References: [Debian Backports](https://backports.debian.org/Instructions/),
+[Quickshell guide](https://quickshell.org/docs/guide/introduction/),
+[Hyprland monitor configuration](https://wiki.hypr.land/Configuring/Basics/Monitors/).
