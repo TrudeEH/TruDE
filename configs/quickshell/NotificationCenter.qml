@@ -74,7 +74,8 @@ Item {
         }
 
         function dismissAll(): void {
-            while (center.notifications.length > 0) center.notifications[0].dismiss();
+            for (const notification of notificationServer.trackedNotifications.values.slice())
+                notification.dismiss();
         }
     }
 
@@ -110,8 +111,6 @@ Item {
                     color: Theme.surface
                     border.color: Theme.border
                     border.width: 1
-
-
                     ColumnLayout {
                         id: content
                         anchors.fill: parent
@@ -135,18 +134,31 @@ Item {
                                 font.pixelSize: 12
                             }
 
-                            AppText {
+                            Rectangle {
                                 visible: center.count > 0
-                                text: "Clear all"
+                                implicitWidth: clearLabel.implicitWidth + 16
+                                implicitHeight: 26
+                                radius: 6
                                 color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
-                                font.pixelSize: 12
+                                z: 3
+
+                                AppText {
+                                    id: clearLabel
+                                    anchors.centerIn: parent
+                                    text: "Clear all"
+                                    color: Theme.accentText
+                                    font.pixelSize: 11
+                                }
 
                                 MouseArea {
                                     id: clearMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: center.dismissAll()
+                                    onClicked: {
+                                        mouse.accepted = true;
+                                        center.dismissAll();
+                                    }
                                 }
                             }
                         }
