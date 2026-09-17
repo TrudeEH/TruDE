@@ -33,10 +33,15 @@ sudo apt-get update
 # desktop component in this one transaction so backported PipeWire stays matched.
 sudo apt-get install -y -t trixie-backports \
     hyprland hyprland-guiutils quickshell xdg-desktop-portal-hyprland \
-    foot fuzzel thunar pipewire-audio wireplumber \
+    foot fuzzel nautilus gnome-software gnome-software-plugin-flatpak \
+    flatpak gnome-control-center gnome-text-editor gnome-calculator \
+    gnome-disk-utility pipewire-audio wireplumber \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
-    gvfs thunar-volman tumbler udisks2 \
+    gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
+
+flatpak --user remote-add --if-not-exists flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
 
 link_config() {
     local source=$1 target=$2

@@ -53,7 +53,7 @@ hl.monitor({
 
 -- Set programs that you use
 local terminal    = "foot"
-local fileManager = "thunar"
+local fileManager = "nautilus"
 local menu        = "fuzzel"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 

@@ -14,16 +14,14 @@ invocation also honors `XDG_CONFIG_HOME`.
 
 The installer manages one `trixie-backports` source file and leaves it in
 place on later runs. It installs Hyprland, Quickshell, their portal, and a
-small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Thunar, PipeWire/WirePlumber,
-brightness and media-key utilities, screenshot selection and clipboard tools,
-the Qt Wayland plugin, and a Polkit agent.
+small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Nautilus,
+GNOME Software with Flatpak support, GNOME Control Center, Text Editor,
+Calculator, and Disks, PipeWire/WirePlumber, brightness and media-key utilities,
+screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit agent.
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
 Adwaita's GTK and Qt themes are installed and configured for dark mode.
-`gvfs`, Thunar's volume manager and thumbnailer, `udisks2`, and
-`brightness-udev` are named because they provide the file-manager drive,
-thumbnail, and brightness-key features this desktop expects; APT does not add
-an already-installed package's old recommendations on a later run.
+The installer also adds the per-user Flathub remote when it is missing.
 
 Existing files at managed symlink destinations are backed up to dated
 `.backup-*` files. Repeated runs preserve the correct symlinks and edits here.
@@ -39,7 +37,7 @@ X11 cannot switch to Wayland through a QML reload.
 
 `hypr/hyprland.lua` starts from the
 [upstream 0.55.2 default](https://github.com/hyprwm/Hyprland/blob/v0.55.2/example/hyprland.lua).
-It keeps the default appearance and layout, uses Foot/Thunar/Fuzzel, and starts
+It keeps the default appearance and layout, uses Foot/Nautilus/Fuzzel, and starts
 Quickshell explicitly on Wayland plus the Polkit agent. The keyboard layout
 is `us`; change `kb_layout` if needed.
 
@@ -48,7 +46,7 @@ is `us`; change `kb_layout` if needed.
 | Super+Enter | Foot terminal |
 | Tap Super (left or right) | Fuzzel application launcher |
 | Super+R | Alternative launcher shortcut |
-| Super+E | Thunar file manager |
+| Super+E | Nautilus file manager |
 | Super+C | Close window |
 | Super+M | Exit Hyprland |
 | Super+1…0 | Switch workspace |
