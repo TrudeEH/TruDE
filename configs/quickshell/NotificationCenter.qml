@@ -256,36 +256,36 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        id: clearButton
-                        visible: center.count > 0
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.topMargin: 14
-                        anchors.rightMargin: 14
-                        width: 78
-                        height: 26
-                        radius: 6
-                        color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
-                        z: 10
+                }
+                Rectangle {
+                    id: clearButton
+                    visible: center.count > 0
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.horizontalCenterOffset: Math.min(parent.width - 28, 520) / 2 - 14 - width / 2
+                    anchors.topMargin: 58
+                    width: 78
+                    height: 26
+                    radius: 6
+                    color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
+                    z: 10
 
-                        AppText {
-                            anchors.centerIn: parent
-                            text: "Clear all"
-                            color: Theme.accentText
-                            font.pixelSize: 11
-                        }
+                    AppText {
+                        anchors.centerIn: parent
+                        text: "Clear all"
+                        color: Theme.accentText
+                        font.pixelSize: 11
+                    }
 
-                        MouseArea {
-                            id: clearMouse
-                            anchors.fill: parent
-                            acceptedButtons: Qt.LeftButton
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                mouse.accepted = true;
-                                center.dismissAll();
-                            }
+                    MouseArea {
+                        id: clearMouse
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            mouse.accepted = true;
+                            center.dismissAll();
                         }
                     }
                 }
