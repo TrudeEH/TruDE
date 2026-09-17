@@ -12,3 +12,5 @@ PowerButton 1.0 PowerButton.qml
 PowerMenu 1.0 PowerMenu.qml
 Shortcuts 1.0 Shortcuts.qml
 singleton Theme 1.0 Theme.qml
+TrayMenu 1.0 TrayMenu.qml
+TrayMenuView 1.0 TrayMenuView.qml
