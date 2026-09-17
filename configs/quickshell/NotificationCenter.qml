@@ -74,8 +74,9 @@ Item {
         }
 
         function dismissAll(): void {
-            for (const notification of notificationServer.trackedNotifications.values.slice())
-                notification.dismiss();
+            const activeNotifications = notificationServer.trackedNotifications.values.slice();
+            for (const notification of activeNotifications) notification.tracked = false;
+            center.close();
         }
     }
 
@@ -102,6 +103,7 @@ Item {
 
                 Rectangle {
                     id: card
+                    z: 1
                     width: Math.min(parent.width - 28, 520)
                     height: Math.min(parent.height - 58, 600)
                     anchors.top: parent.top
