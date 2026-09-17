@@ -3,6 +3,8 @@ pragma Singleton
 import QtQuick
 
 QtObject {
+    readonly property string fontFamily: "JetBrainsMono Nerd Font"
+
     // Palette from trude.dev's Adwaita dark stylesheet.
     readonly property color window: "#222226"
     readonly property color surface: "#38383c"

@@ -115,7 +115,7 @@ Item {
                         Layout.fillWidth: true
                         implicitHeight: 34
 
-                        Text {
+                        AppText {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                             text: "Applications"
@@ -124,7 +124,7 @@ Item {
                             font.bold: true
                         }
 
-                        Text {
+                        AppText {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             text: launcher.filteredEntries.length + " apps"
@@ -141,11 +141,11 @@ Item {
                         border.color: searchField.activeFocus ? Theme.accent : Theme.border
                         border.width: 1
 
-                        Text {
+                        AppText {
                             anchors.left: parent.left
                             anchors.leftMargin: 14
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "⌕"
+                            text: "󰍉"
                             color: Theme.textDim
                             font.pixelSize: 21
                         }
@@ -161,6 +161,7 @@ Item {
                             selectionColor: Theme.accent
                             selectedTextColor: Theme.accentText
                             font.pixelSize: 14
+                            font.family: Theme.fontFamily
                             focus: launcherWindow.visible
                             onTextChanged: launcher.searchText = text
                             Keys.onEscapePressed: launcher.close()
@@ -169,7 +170,7 @@ Item {
                             Keys.onReturnPressed: launcher.launchSelection()
                         }
 
-                        Text {
+                        AppText {
                             anchors.left: searchField.left
                             anchors.verticalCenter: searchField.verticalCenter
                             visible: searchField.text.length === 0
@@ -216,14 +217,14 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
 
-                                Text {
+                                AppText {
                                     Layout.fillWidth: true
                                     text: modelData.name
                                     color: Theme.text
                                     font.pixelSize: 14
                                     elide: Text.ElideRight
                                 }
-                                Text {
+                                AppText {
                                     Layout.fillWidth: true
                                     visible: text.length > 0
                                     text: modelData.genericName || modelData.comment || ""
@@ -244,7 +245,7 @@ Item {
                         }
                     }
 
-                    Text {
+                    AppText {
                         Layout.fillWidth: true
                         visible: list.count === 0
                         text: launcher.entries.length === 0

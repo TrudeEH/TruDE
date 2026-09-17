@@ -8,6 +8,10 @@ Rectangle {
     property var devices: Networking.devices.values
     readonly property var connectedDevice: findConnectedDevice()
     readonly property var connectedNetwork: findConnectedNetwork(connectedDevice)
+    readonly property string icon: {
+        if (!connectedDevice) return "󰤭";
+        return connectedDevice.type === DeviceType.Wifi ? "󰤨" : "󰈀";
+    }
     readonly property string label: {
         if (!connectedDevice) return "Offline";
         if (connectedNetwork && connectedNetwork.name) return connectedNetwork.name;
@@ -40,13 +44,13 @@ Rectangle {
     border.color: networkMouse.containsMouse ? Theme.border : Theme.transparent
     border.width: 1
 
-    Text {
+    AppText {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: 10
         anchors.rightMargin: 10
         anchors.verticalCenter: parent.verticalCenter
-        text: "Network  ·  " + button.label
+        text: button.icon + "  " + button.label
         color: Theme.text
         font.pixelSize: 12
         elide: Text.ElideRight

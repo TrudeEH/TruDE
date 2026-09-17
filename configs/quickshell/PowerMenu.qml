@@ -11,10 +11,10 @@ Item {
     property bool popupOpen: false
     property int popupMonitorId: -1
     readonly property var actions: [
-        { label: "Log out", subtitle: "End this Hyprland session", icon: "⇥", command: ["hyprctl", "dispatch", "exit"] },
-        { label: "Suspend", subtitle: "Keep this session ready", icon: "◐", command: ["systemctl", "suspend"] },
-        { label: "Restart", subtitle: "Reboot the computer", icon: "↻", command: ["systemctl", "reboot"] },
-        { label: "Shut down", subtitle: "Turn off the computer", icon: "⏻", command: ["systemctl", "poweroff"] },
+        { label: "Log out", subtitle: "End this Hyprland session", icon: "󰍃", command: ["hyprctl", "dispatch", "exit"] },
+        { label: "Suspend", subtitle: "Keep this session ready", icon: "󰒲", command: ["systemctl", "suspend"] },
+        { label: "Restart", subtitle: "Reboot the computer", icon: "󰜉", command: ["systemctl", "reboot"] },
+        { label: "Shut down", subtitle: "Turn off the computer", icon: "󰐥", command: ["systemctl", "poweroff"] },
     ]
 
     function close() {
@@ -105,31 +105,11 @@ Item {
                                     width: 20
                                     height: 20
 
-                                    Text {
+                                    AppText {
                                         anchors.centerIn: parent
-                                        visible: modelData.label !== "Shut down"
                                         text: modelData.icon
-                                        color: Theme.text
+                                        color: modelData.label === "Shut down" ? Theme.accent : Theme.text
                                         font.pixelSize: 20
-                                    }
-                                    Rectangle {
-                                        visible: modelData.label === "Shut down"
-                                        x: 4
-                                        y: 6
-                                        width: 12
-                                        height: 12
-                                        radius: 6
-                                        color: Theme.transparent
-                                        border.color: Theme.accent
-                                        border.width: 2
-                                    }
-                                    Rectangle {
-                                        visible: modelData.label === "Shut down"
-                                        x: 9
-                                        y: 1
-                                        width: 2
-                                        height: 9
-                                        color: Theme.accent
                                     }
                                 }
                                 ColumnLayout {
@@ -139,14 +119,14 @@ Item {
                                     anchors.rightMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 1
-                                    Text {
+                                    AppText {
                                         Layout.fillWidth: true
                                         text: modelData.label
                                         color: Theme.text
                                         font.pixelSize: 13
                                         font.bold: true
                                     }
-                                    Text {
+                                    AppText {
                                         Layout.fillWidth: true
                                         text: modelData.subtitle
                                         color: Theme.textDim

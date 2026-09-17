@@ -1,4 +1,5 @@
 module Dotfiles
+AppText 1.0 AppText.qml
 Bar 1.0 Bar.qml
 LauncherButton 1.0 LauncherButton.qml
 Launcher 1.0 Launcher.qml

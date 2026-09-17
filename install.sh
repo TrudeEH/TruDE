@@ -36,6 +36,7 @@ sudo apt-get install -y -t trixie-backports \
 
 # The rest of the desktop uses Debian Trixie's normal package priorities.
 sudo apt-get install -y \
+    curl \
     foot nautilus gnome-software gnome-software-plugin-flatpak \
     flatpak gnome-text-editor gnome-calculator \
     gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
@@ -43,6 +44,17 @@ sudo apt-get install -y \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard swaybg hyprpolkitagent
+
+font_dir="$HOME/.local/share/fonts/JetBrainsMonoNerdFont"
+if [[ $(fc-match "JetBrainsMono Nerd Font" -f '%{family}') != *"JetBrainsMono Nerd Font"* ]]; then
+    mkdir -p "$font_dir"
+    font_archive=$(mktemp)
+    curl --fail --location --output "$font_archive" \
+        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz
+    tar -xJf "$font_archive" -C "$font_dir"
+    rm -f "$font_archive"
+    fc-cache -f "$font_dir"
+fi
 
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -103,7 +115,7 @@ link_config "$repo_dir/assets/wallpapers/wallpaper.jpg" "$HOME/.local/share/back
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
-for quickshell_file in shell.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml qmldir; do
+for quickshell_file in shell.qml AppText.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
 link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"

@@ -148,7 +148,7 @@ Item {
                         anchors.margins: 18
                         spacing: 10
 
-                        Text {
+                        AppText {
                             Layout.fillWidth: true
                             text: network.statusText
                             color: Theme.text
@@ -166,7 +166,7 @@ Item {
                                 anchors.fill: parent
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 8
-                                Text {
+                                AppText {
                                     Layout.fillWidth: true
                                     text: network.available
                                         ? "Connection · " + NetworkConnectivity.toString(Networking.connectivity)
@@ -183,7 +183,7 @@ Item {
                                     color: disconnectMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
                                     border.color: Theme.border
                                     border.width: 1
-                                    Text {
+                                    AppText {
                                         anchors.centerIn: parent
                                         text: "Disconnect"
                                         color: Theme.textDim
@@ -203,7 +203,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             visible: network.wifiDevice !== null
-                            Text {
+                            AppText {
                                 Layout.fillWidth: true
                                 text: network.wifiDevice ? "Wi-Fi  ·  " + network.wifiDevice.name : ""
                                 color: Theme.text
@@ -214,7 +214,7 @@ Item {
                                 implicitHeight: 28
                                 radius: 14
                                 color: Networking.wifiEnabled ? Theme.accent : Theme.surfaceRaised
-                                Text {
+                                AppText {
                                     anchors.centerIn: parent
                                     text: Networking.wifiEnabled ? "On" : "Off"
                                     color: Networking.wifiEnabled ? Theme.accentText : Theme.textDim
@@ -232,7 +232,7 @@ Item {
                                 implicitHeight: 28
                                 radius: 14
                                 color: scanMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceRaised
-                                Text {
+                                AppText {
                                     anchors.centerIn: parent
                                     text: "Scan"
                                     color: Theme.text
@@ -248,7 +248,7 @@ Item {
                             }
                         }
 
-                        Text {
+                        AppText {
                             Layout.fillWidth: true
                             visible: network.wifiDevice !== null
                             text: "Available networks"
@@ -278,7 +278,7 @@ Item {
                                     anchors.rightMargin: 8
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 1
-                                    Text {
+                                    AppText {
                                         Layout.fillWidth: true
                                         text: modelData.name
                                         color: Theme.text
@@ -286,7 +286,7 @@ Item {
                                         font.bold: modelData.connected
                                         elide: Text.ElideRight
                                     }
-                                    Text {
+                                    AppText {
                                         Layout.fillWidth: true
                                         text: modelData.known ? "Saved network" : WifiSecurityType.toString(modelData.security)
                                         color: Theme.textDim
@@ -294,7 +294,7 @@ Item {
                                         elide: Text.ElideRight
                                     }
                                 }
-                                Text {
+                                AppText {
                                     id: signalText
                                     anchors.right: parent.right
                                     anchors.rightMargin: 10
@@ -322,7 +322,7 @@ Item {
                             }
                         }
 
-                        Text {
+                        AppText {
                             Layout.fillWidth: true
                             visible: network.wifiDevice === null
                             text: network.available ? "No Wi-Fi adapter found" : "Install NetworkManager to manage networks"
@@ -335,7 +335,7 @@ Item {
                             Layout.fillWidth: true
                             visible: network.selectedNetwork !== null
                             spacing: 8
-                            Text {
+                            AppText {
                                 text: "Connect to " + (network.selectedNetwork ? network.selectedNetwork.name : "")
                                 color: Theme.text
                                 font.bold: true
@@ -355,11 +355,12 @@ Item {
                                     verticalAlignment: TextInput.AlignVCenter
                                     color: Theme.text
                                     echoMode: TextInput.Password
+                                    font.family: Theme.fontFamily
                                     focus: network.selectedNetwork !== null
                                     onTextChanged: network.passwordText = text
                                     Keys.onReturnPressed: network.connectSelected()
                                 }
-                                Text {
+                                AppText {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
@@ -376,7 +377,7 @@ Item {
                                     implicitHeight: 30
                                     radius: 15
                                     color: connectMouse.containsMouse ? Theme.accentStrong : Theme.accent
-                                    Text {
+                                    AppText {
                                         anchors.centerIn: parent
                                         text: "Connect"
                                         color: Theme.accentText
@@ -397,7 +398,7 @@ Item {
                                     radius: 15
                                     visible: network.selectedNetwork && network.selectedNetwork.known
                                     color: forgetMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceRaised
-                                    Text {
+                                    AppText {
                                         anchors.centerIn: parent
                                         text: "Forget"
                                         color: Theme.textDim
@@ -415,7 +416,7 @@ Item {
                                     }
                                 }
                             }
-                            Text {
+                            AppText {
                                 Layout.fillWidth: true
                                 visible: network.errorText.length > 0
                                 text: network.errorText
@@ -425,7 +426,7 @@ Item {
                             }
                         }
 
-                        Text {
+                        AppText {
                             Layout.fillWidth: true
                             visible: network.connectedDevice !== null
                             text: network.connectedDevice

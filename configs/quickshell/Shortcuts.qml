@@ -107,13 +107,13 @@ Item {
                                     anchors.rightMargin: 10
                                     spacing: 2
 
-                                    Text {
+                                    AppText {
                                         text: "Hyprland shortcuts"
                                         color: Theme.text
                                         font.pixelSize: 22
                                         font.bold: true
                                     }
-                                    Text {
+                                    AppText {
                                         text: "Live bindings from hyprctl"
                                         color: Theme.textDim
                                         font.pixelSize: 12
@@ -129,9 +129,9 @@ Item {
                                     radius: 16
                                     color: closeMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
 
-                                    Text {
+                                    AppText {
                                         anchors.centerIn: parent
-                                        text: "×"
+                                        text: "󰅖"
                                         color: Theme.text
                                         font.pixelSize: 22
                                     }
@@ -162,12 +162,13 @@ Item {
                                     color: Theme.text
                                     selectionColor: Theme.accent
                                     selectedTextColor: Theme.accentText
+                                    font.family: Theme.fontFamily
                                     focus: shortcuts.popupOpen && Hyprland.focusedMonitor
                                         && monitor && Hyprland.focusedMonitor.id === monitor.id
                                     onTextChanged: shortcuts.searchText = text
                                     Keys.onEscapePressed: shortcuts.popupOpen = false
                                 }
-                                Text {
+                                AppText {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
@@ -203,7 +204,7 @@ Item {
                                         radius: 6
                                         color: Theme.surfaceHover
 
-                                        Text {
+                                        AppText {
                                             anchors.left: parent.left
                                             anchors.leftMargin: 8
                                             anchors.right: parent.right
@@ -211,12 +212,11 @@ Item {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: modelData.keys
                                             color: Theme.accent
-                                            font.family: "monospace"
                                             font.bold: true
                                             elide: Text.ElideRight
                                         }
                                     }
-                                    Text {
+                                    AppText {
                                         anchors.left: keyBadge.right
                                         anchors.leftMargin: 12
                                         anchors.right: parent.right
@@ -228,7 +228,7 @@ Item {
                                     }
                                 }
                             }
-                            Text {
+                            AppText {
                                 Layout.fillWidth: true
                                 visible: list.count === 0
                                 text: "No shortcuts found"

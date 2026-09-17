@@ -11,28 +11,11 @@ Rectangle {
     border.color: buttonMouse.containsMouse ? Theme.border : Theme.transparent
     border.width: 1
 
-    Item {
+    AppText {
         anchors.centerIn: parent
-        width: 16
-        height: 18
-
-        Rectangle {
-            x: 2
-            y: 5
-            width: 12
-            height: 12
-            radius: 6
-            color: Theme.transparent
-            border.color: Theme.text
-            border.width: 2
-        }
-        Rectangle {
-            x: 7
-            y: 0
-            width: 2
-            height: 8
-            color: Theme.text
-        }
+        text: "󰐥"
+        color: Theme.text
+        font.pixelSize: 16
     }
 
     MouseArea {
