@@ -75,11 +75,25 @@ PanelWindow {
             }
         }
 
-        AppText {
-            anchors.centerIn: parent
-            text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
-            color: Theme.text
-            font.pixelSize: 12
+        Rectangle {
+            id: clockBadge
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            width: clockText.implicitWidth + 18
+            height: 26
+            radius: 8
+            color: Theme.window
+            border.color: Theme.border
+            border.width: 1
+            z: 2
+
+            AppText {
+                id: clockText
+                anchors.centerIn: parent
+                text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
+                color: Theme.text
+                font.pixelSize: 12
+            }
         }
 
         Row {
@@ -88,6 +102,8 @@ PanelWindow {
             spacing: 8
 
             NetworkButton {}
+
+            AudioButton {}
 
             PowerButton {}
 

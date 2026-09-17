@@ -79,12 +79,17 @@ fi
 
 sudo systemctl enable lightdm.service
 
+# Use Hyprland's UWSM-managed session for this account. It supplies the
+# Wayland session environment and avoids the raw start-hyprland watchdog.
+cat > "$HOME/.dmrc" <<'EOF'
+[Desktop]
+Session=hyprland-uwsm
+EOF
+chmod 644 "$HOME/.dmrc"
+
 # Clear theme overrides left by previous versions, then request dark mode.
 # These settings are harmless to repeat and are skipped outside a user bus.
 if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
-    gsettings reset org.gnome.desktop.interface gtk-theme || true
-    gsettings reset org.gnome.desktop.interface icon-theme || true
-    gsettings reset org.gnome.desktop.interface accent-color || true
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 fi
 
@@ -115,7 +120,7 @@ link_config "$repo_dir/assets/wallpapers/wallpaper.jpg" "$HOME/.local/share/back
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
-for quickshell_file in shell.qml AppText.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml qmldir; do
+for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
 link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"

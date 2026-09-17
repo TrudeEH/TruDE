@@ -1,6 +1,8 @@
 module Dotfiles
 AppText 1.0 AppText.qml
 Bar 1.0 Bar.qml
+AudioButton 1.0 AudioButton.qml
+AudioPanel 1.0 AudioPanel.qml
 LauncherButton 1.0 LauncherButton.qml
 Launcher 1.0 Launcher.qml
 NetworkButton 1.0 NetworkButton.qml
