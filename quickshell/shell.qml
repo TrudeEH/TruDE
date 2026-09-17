@@ -14,6 +14,9 @@ ShellRoot {
     NetworkPanel {
     }
 
+    Launcher {
+    }
+
     Shortcuts {
     }
 }

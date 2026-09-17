@@ -36,7 +36,7 @@ sudo apt-get install -y -t trixie-backports \
 
 # The rest of the desktop uses Debian Trixie's normal package priorities.
 sudo apt-get install -y \
-    foot fuzzel nautilus gnome-software gnome-software-plugin-flatpak \
+    foot nautilus gnome-software gnome-software-plugin-flatpak \
     flatpak gnome-text-editor gnome-calculator \
     gnome-disk-utility pipewire-audio wireplumber \
     network-manager \
@@ -47,12 +47,16 @@ sudo apt-get install -y \
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
 
-# GTK3 reads settings.ini; GTK4/libadwaita reads the desktop color scheme.
+# Clear theme overrides left by previous versions, then request dark mode.
 # These settings are harmless to repeat and are skipped outside a user bus.
 if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+    gsettings reset org.gnome.desktop.interface gtk-theme || true
+    gsettings reset org.gnome.desktop.interface icon-theme || true
+    gsettings reset org.gnome.desktop.interface accent-color || true
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 fi
 
+# ======= LINK CONFIG =======
 link_config() {
     local source=$1 target=$2
 
@@ -69,10 +73,9 @@ link_config() {
 link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
 link_config "$repo_dir/scripts/launcher" "$HOME/.local/bin/dotfiles-launcher"
-for quickshell_file in shell.qml Bar.qml LauncherButton.qml NetworkButton.qml NetworkPanel.qml Shortcuts.qml Theme.qml qmldir; do
+for quickshell_file in shell.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
-link_config "$repo_dir/fuzzel/fuzzel.ini" "$config_dir/fuzzel/fuzzel.ini"
 link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
 
 echo "Done. Log out and back in to start Quickshell with Wayland support."

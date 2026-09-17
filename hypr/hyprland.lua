@@ -83,6 +83,11 @@ local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
+local xdgDataDirs = os.getenv("XDG_DATA_DIRS")
+if not xdgDataDirs or xdgDataDirs == "" then
+    xdgDataDirs = "/usr/local/share:/usr/share"
+end
+hl.env("XDG_DATA_DIRS", os.getenv("HOME") .. "/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:" .. xdgDataDirs)
 
 
 -----------------------
@@ -394,9 +399,12 @@ hl.window_rule({
 hl.on("hyprland.start", function ()
     -- Libadwaita follows the desktop color-scheme preference. Set it for
     -- sessions started outside GNOME so GTK4 apps use native Adwaita dark.
-    hl.exec_cmd("command -v gsettings >/dev/null && "
+    hl.exec_cmd("if command -v gsettings >/dev/null; then "
+        .. "gsettings reset org.gnome.desktop.interface gtk-theme >/dev/null 2>&1; "
+        .. "gsettings reset org.gnome.desktop.interface icon-theme >/dev/null 2>&1; "
+        .. "gsettings reset org.gnome.desktop.interface accent-color >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
-        .. ">/dev/null 2>&1")
+        .. ">/dev/null 2>&1; fi")
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland quickshell --no-duplicate")
     hl.exec_cmd("hyprpolkitagent")
 end)

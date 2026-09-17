@@ -14,7 +14,8 @@ invocation also honors `XDG_CONFIG_HOME`.
 
 The installer manages one `trixie-backports` source file and leaves it in
 place on later runs. It installs Hyprland, Quickshell, their portal, and a
-small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Nautilus,
+small set of desktop programs: Hyprland GUI utilities, Foot, the Quickshell
+application launcher, Nautilus,
 GNOME Software with Flatpak support, Text Editor, Calculator, and Disks,
 NetworkManager, PipeWire/WirePlumber, brightness and media-key utilities,
 screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit agent.
@@ -71,8 +72,10 @@ The monitor section matches this machine:
   edges aligned. Its logical dimensions after rotation are 1080×1920.
 - Other monitors retain the upstream preferred-mode/automatic-position fallback.
 
-`quickshell/shell.qml` loads separate `Bar.qml`, `LauncherButton.qml`, and
-`Shortcuts.qml`, `NetworkButton.qml`, and `NetworkPanel.qml` components.
+`quickshell/shell.qml` loads separate `Bar.qml`, `Launcher.qml`,
+`LauncherButton.qml`, `Shortcuts.qml`, `NetworkButton.qml`, and `NetworkPanel.qml`
+components. The application launcher is a focused Hyprland layer surface, with
+searchable desktop entries from Debian and Flatpak exports.
 `Theme.qml` contains the shared Adwaita dark
 palette. The bar is a 34-pixel Hyprland layer-shell panel on every monitor. It has
 Apps and Network buttons, clickable workspaces 1–10 with an active indicator,
@@ -86,8 +89,6 @@ sit underneath it. Fullscreen windows may cover the bar. Quickshell normally
 reloads QML edits live; `hyprctl configerrors` reports Hyprland config errors.
 Screenshots are saved as timestamped PNG files in `~/Pictures/Screenshots` and
 copied to the Wayland clipboard.
-Fuzzel uses a matching dark Adwaita-style configuration in
-`fuzzel/fuzzel.ini`.
 The Network button opens a focused-monitor panel backed by Quickshell's
 NetworkManager integration. It shows connectivity, interface details, Wi-Fi
 networks, signal strength, saved-network state, and controls for scanning,
