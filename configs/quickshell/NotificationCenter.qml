@@ -52,6 +52,16 @@ Item {
         }
     }
 
+    function activate(notification) {
+        for (const action of notification.actions) {
+            if (action.identifier === "default") {
+                action.invoke();
+                center.close();
+                return;
+            }
+        }
+    }
+
     IpcHandler {
         target: "notifications"
 
@@ -64,7 +74,7 @@ Item {
         }
 
         function dismissAll(): void {
-            for (const notification of center.notifications) notification.dismiss();
+            while (center.notifications.length > 0) center.notifications[0].dismiss();
         }
     }
 
@@ -101,10 +111,6 @@ Item {
                     border.color: Theme.border
                     border.width: 1
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: mouse.accepted = true
-                    }
 
                     ColumnLayout {
                         id: content
@@ -131,9 +137,9 @@ Item {
 
                             AppText {
                                 visible: center.count > 0
-                                text: "󰎟"
+                                text: "Clear all"
                                 color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
-                                font.pixelSize: 18
+                                font.pixelSize: 12
 
                                 MouseArea {
                                     id: clearMouse
@@ -179,9 +185,17 @@ Item {
                                 border.color: Theme.border
                                 border.width: 1
 
+                                MouseArea {
+                                    anchors.fill: parent
+                                    z: 0
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: center.activate(modelData)
+                                }
+
                                 RowLayout {
                                     id: notificationContent
                                     anchors.fill: parent
+                                    z: 1
                                     anchors.margins: 12
                                     spacing: 10
 
@@ -227,44 +241,13 @@ Item {
                                             elide: Text.ElideRight
                                         }
 
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            visible: modelData.actions.length > 0
-                                            spacing: 6
-
-                                            Repeater {
-                                                model: modelData.actions
-                                                delegate: Rectangle {
-                                                    required property var modelData
-                                                    implicitWidth: actionLabel.implicitWidth + 16
-                                                    implicitHeight: 26
-                                                    radius: 6
-                                                    color: actionMouse.containsMouse ? Theme.accentStrong : Theme.accent
-
-                                                    AppText {
-                                                        id: actionLabel
-                                                        anchors.centerIn: parent
-                                                        text: modelData.text
-                                                        color: Theme.accentText
-                                                        font.pixelSize: 11
-                                                    }
-
-                                                    MouseArea {
-                                                        id: actionMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: modelData.invoke()
-                                                    }
-                                                }
-                                            }
-                                        }
                                     }
 
                                     AppText {
                                         Layout.alignment: Qt.AlignTop
                                         text: "󰅖"
                                         color: dismissMouse.containsMouse ? Theme.accentStrong : Theme.textDim
+                                        z: 2
                                         font.pixelSize: 16
 
                                         MouseArea {

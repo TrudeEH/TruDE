@@ -80,7 +80,7 @@ PanelWindow {
             id: clockBadge
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            width: clockText.implicitWidth + (bar.notificationCenter.count > 0 ? 50 : 18)
+            width: clockContent.implicitWidth + 18
             height: 26
             radius: 8
             color: clockMouse.containsMouse ? Theme.surfaceHover : Theme.window
@@ -88,22 +88,24 @@ PanelWindow {
             border.width: 1
             z: 2
 
-            AppText {
-                id: clockText
+            RowLayout {
+                id: clockContent
                 anchors.centerIn: parent
-                text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
-                color: Theme.text
-                font.pixelSize: 12
-            }
+                spacing: 8
 
-            AppText {
-                anchors.left: clockText.right
-                anchors.leftMargin: 8
-                anchors.verticalCenter: clockText.verticalCenter
-                visible: bar.notificationCenter.count > 0
-                text: "󰂚 " + bar.notificationCenter.count
-                color: Theme.accent
-                font.pixelSize: 12
+                AppText {
+                    id: clockText
+                    text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
+                    color: Theme.text
+                    font.pixelSize: 12
+                }
+
+                AppText {
+                    visible: bar.notificationCenter.count > 0
+                    text: "󰂚 " + bar.notificationCenter.count
+                    color: Theme.accent
+                    font.pixelSize: 12
+                }
             }
 
             MouseArea {
