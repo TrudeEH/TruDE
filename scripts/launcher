@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if pgrep -x fuzzel >/dev/null 2>&1; then
+    pkill -x fuzzel
+    exit 0
+fi
+
+exec fuzzel

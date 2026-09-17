@@ -44,8 +44,9 @@ is `us`; change `kb_layout` if needed.
 | Shortcut | Action |
 | --- | --- |
 | Super+Enter | Foot terminal |
-| Tap Super (left or right) | Fuzzel application launcher |
+| Tap Super (left or right) | Toggle the application launcher |
 | Super+R | Alternative launcher shortcut |
+| Super+H | Show searchable Hyprland shortcuts |
 | Super+E | Nautilus file manager |
 | Super+C | Close window |
 | Super+M | Exit Hyprland |

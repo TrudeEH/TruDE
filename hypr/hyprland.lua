@@ -54,7 +54,7 @@ hl.monitor({
 -- Set programs that you use
 local terminal    = "foot"
 local fileManager = "nautilus"
-local menu        = "fuzzel"
+local menu        = os.getenv("HOME") .. "/.local/bin/dotfiles-launcher"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 
 

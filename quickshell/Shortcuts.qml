@@ -10,12 +10,22 @@ Item {
     id: shortcuts
     property bool popupOpen: false
     property var rows: []
+    property string searchText: ""
+    readonly property var filteredRows: {
+        const query = searchText.trim().toLowerCase();
+        if (!query) return rows;
+        return rows.filter(row =>
+            (row.keys + " " + row.action).toLowerCase().includes(query));
+    }
 
     IpcHandler {
         target: "shortcuts"
         function toggle(): void {
             shortcuts.popupOpen = !shortcuts.popupOpen;
-            if (shortcuts.popupOpen) binds.running = true;
+            if (shortcuts.popupOpen) {
+                shortcuts.searchText = "";
+                binds.running = true;
+            }
         }
     }
 
@@ -58,7 +68,7 @@ Item {
                 required property var modelData
                 screen: modelData
                 readonly property var monitor: Hyprland.monitorFor(screen)
-                visible: shortcuts.popupOpen
+                visible: shortcuts.popupOpen && monitor && monitor.focused
                 color: Theme.transparent
                 anchors { top: true; bottom: true; left: true; right: true }
 
@@ -75,7 +85,7 @@ Item {
                         anchors.centerIn: parent
                         width: Math.min(parent.width - 80, 820)
                         height: Math.min(parent.height - 80, 720)
-                        radius: 10
+                        radius: 12
                         color: Theme.surface
                         border.color: Theme.border
                         border.width: 1
@@ -85,45 +95,121 @@ Item {
                             anchors.margins: 22
                             spacing: 12
 
-                            Text {
-                                text: "Hyprland shortcuts"
-                                color: Theme.text
-                                font.pixelSize: 22
-                                font.bold: true
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+
+                                    Text {
+                                        text: "Hyprland shortcuts"
+                                        color: Theme.text
+                                        font.pixelSize: 22
+                                        font.bold: true
+                                    }
+                                    Text {
+                                        text: "Live bindings from hyprctl"
+                                        color: Theme.textDim
+                                        font.pixelSize: 12
+                                    }
+                                }
+
+                                Rectangle {
+                                    implicitWidth: 32
+                                    implicitHeight: 32
+                                    radius: 16
+                                    color: closeMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "×"
+                                        color: Theme.text
+                                        font.pixelSize: 22
+                                    }
+                                    MouseArea {
+                                        id: closeMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: shortcuts.popupOpen = false
+                                    }
+                                }
                             }
-                            Text {
-                                text: "Live bindings from hyprctl · Escape closes"
-                                color: Theme.textDim
-                                font.pixelSize: 12
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 40
+                                radius: 8
+                                color: searchField.activeFocus ? Theme.surfaceHover : Theme.surfaceRaised
+                                border.color: searchField.activeFocus ? Theme.accent : Theme.border
+                                border.width: 1
+
+                                TextInput {
+                                    id: searchField
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: Theme.text
+                                    selectionColor: Theme.accent
+                                    selectedTextColor: Theme.accentText
+                                    focus: shortcuts.popupOpen && monitor && monitor.focused
+                                    onTextChanged: shortcuts.searchText = text
+                                    Keys.onEscapePressed: shortcuts.popupOpen = false
+                                }
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: searchField.text.length === 0
+                                    text: "Search shortcuts"
+                                    color: Theme.textDim
+                                    font: searchField.font
+                                }
                             }
+
                             ListView {
                                 id: list
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 clip: true
                                 spacing: 2
-                                model: shortcuts.rows
+                                model: shortcuts.filteredRows
                                 delegate: Rectangle {
                                     required property var modelData
                                     required property int index
                                     width: list.width
-                                    height: 32
-                                    radius: 4
-                                    color: index % 2 ? Theme.surfaceRaised : Theme.window
-                                    Text {
+                                    height: 36
+                                    radius: 6
+                                    color: index % 2 ? Theme.surfaceRaised : Theme.transparent
+
+                                    Rectangle {
+                                        id: keyBadge
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 10
+                                        anchors.leftMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: 220
-                                        text: modelData.keys
-                                        color: Theme.accent
-                                        font.family: "monospace"
-                                        font.bold: true
-                                        elide: Text.ElideRight
+                                        width: 210
+                                        height: 26
+                                        radius: 6
+                                        color: Theme.surfaceHover
+
+                                        Text {
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 8
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData.keys
+                                            color: Theme.accent
+                                            font.family: "monospace"
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
                                     }
                                     Text {
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 240
+                                        anchors.left: keyBadge.right
+                                        anchors.leftMargin: 12
                                         anchors.right: parent.right
                                         anchors.rightMargin: 10
                                         anchors.verticalCenter: parent.verticalCenter
@@ -132,6 +218,13 @@ Item {
                                         elide: Text.ElideRight
                                     }
                                 }
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: list.count === 0
+                                text: "No shortcuts found"
+                                color: Theme.textDim
+                                horizontalAlignment: Text.AlignHCenter
                             }
                         }
                         focus: true

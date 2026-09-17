@@ -58,6 +58,7 @@ link_config() {
 
 link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
+link_config "$repo_dir/scripts/launcher" "$HOME/.local/bin/dotfiles-launcher"
 for quickshell_file in shell.qml Bar.qml LauncherButton.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done

@@ -23,6 +23,6 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: Quickshell.execDetached(["fuzzel"])
+        onClicked: Quickshell.execDetached(["sh", "-c", "$HOME/.local/bin/dotfiles-launcher"])
     }
 }
