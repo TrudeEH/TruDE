@@ -50,7 +50,7 @@ Item {
             x: Math.max(10, Math.min(parent.width - width - 10,
                 root.barRoot.x + root.anchorItem.mapToItem(root.barRoot, 0, 0).x
                 + root.anchorItem.width - width))
-            y: 28
+            y: 9
             width: menuView.implicitWidth + 16
             height: menuView.implicitHeight + 16
             radius: 10
