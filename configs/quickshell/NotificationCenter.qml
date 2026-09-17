@@ -329,6 +329,7 @@ Item {
                 color: Theme.transparent
                 anchors { top: true; left: true; right: true }
                 implicitHeight: 132
+                exclusiveZone: 0
 
                 WlrLayershell.namespace: "hyprland-notification-toast"
                 WlrLayershell.layer: WlrLayer.Overlay
