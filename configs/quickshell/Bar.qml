@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
+import Quickshell.Widgets
 import QtQuick
 import QtQuick.Layouts
 import "."
@@ -140,16 +141,17 @@ PanelWindow {
                         radius: 4
                         color: trayMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
 
-                        Image {
+                        IconImage {
                             anchors.centerIn: parent
                             width: 18
                             height: 18
-                            source: Quickshell.iconPath(trayItem.modelData.icon, true)
-                            fillMode: Image.PreserveAspectFit
+                            source: trayItem.modelData.icon
+                            mipmap: true
                         }
                         QsMenuAnchor {
                             id: trayMenu
                             menu: trayItem.modelData.menu
+                            anchor.window: bar
                             anchor.item: trayItem
                             anchor.edges: Edges.Bottom
                             anchor.gravity: Edges.Bottom
@@ -162,8 +164,9 @@ PanelWindow {
                             onClicked: mouse => {
                                 if (mouse.button === Qt.MiddleButton) {
                                     trayItem.modelData.secondaryActivate();
-                                } else if (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu) {
-                                    if (trayItem.modelData.hasMenu) trayMenu.open();
+                                } else if (trayItem.modelData.hasMenu
+                                    && (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu)) {
+                                    trayMenu.open();
                                 } else {
                                     trayItem.modelData.activate();
                                 }
