@@ -64,6 +64,8 @@ sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
     /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
 sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
     /etc/lightdm/slick-greeter.conf
+sudo install -D -m 0644 "$repo_dir/configs/networkmanager/10-dotfiles-managed.conf" \
+    /etc/NetworkManager/conf.d/10-dotfiles-managed.conf
 sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
     /var/lib/lightdm/.config/gtk-3.0/gtk.css
 
