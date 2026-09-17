@@ -18,12 +18,13 @@ small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Thunar, Pip
 brightness and media-key utilities, the Qt Wayland plugin, and a Polkit agent.
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
+Adwaita's GTK and Qt themes are installed and configured for dark mode.
 `gvfs`, Thunar's volume manager and thumbnailer, `udisks2`, and
 `brightness-udev` are named because they provide the file-manager drive,
 thumbnail, and brightness-key features this desktop expects; APT does not add
 an already-installed package's old recommendations on a later run.
 
-Existing files at the two symlink destinations are backed up to dated
+Existing files at managed symlink destinations are backed up to dated
 `.backup-*` files. Repeated runs preserve the correct symlinks and edits here.
 Other configuration files are left alone.
 
@@ -60,7 +61,9 @@ The monitor section matches this machine:
   edges aligned. Its logical dimensions after rotation are 1080×1920.
 - Other monitors retain the upstream preferred-mode/automatic-position fallback.
 
-`quickshell/shell.qml` provides a 34-pixel Hyprland layer-shell panel on every monitor. It has
+`quickshell/shell.qml` loads separate `Bar.qml`, `LauncherButton.qml`, and
+`Shortcuts.qml` components. `Theme.qml` contains the shared Adwaita dark
+palette. The bar is a 34-pixel Hyprland layer-shell panel on every monitor. It has
 an Apps button, clickable workspaces 1–10 with an active indicator, a system tray, and a clock. Left-click tray icons to activate, right-click
 for menus, middle-click for secondary actions, or scroll for app-specific
 controls. The tray fills as applications register icons; it doesn't start

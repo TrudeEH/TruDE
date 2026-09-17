@@ -36,7 +36,7 @@ sudo apt-get install -y -t trixie-backports \
     foot fuzzel thunar pipewire-audio wireplumber \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs thunar-volman tumbler udisks2 \
-    qt6-wayland hyprpolkitagent
+    qt6-wayland adwaita-qt adwaita-qt6 hyprpolkitagent
 
 link_config() {
     local source=$1 target=$2
@@ -52,6 +52,10 @@ link_config() {
 }
 
 link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
-link_config "$repo_dir/quickshell/shell.qml" "$config_dir/quickshell/shell.qml"
+for quickshell_file in shell.qml Bar.qml LauncherButton.qml Shortcuts.qml Theme.qml qmldir; do
+    link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
+done
+link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
+link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-4.0/settings.ini"
 
 echo "Done. Log out and back in to start Quickshell with Wayland support."

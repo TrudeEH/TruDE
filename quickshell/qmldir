@@ -1,0 +1,5 @@
+module Dotfiles
+Bar 1.0 Bar.qml
+LauncherButton 1.0 LauncherButton.qml
+Shortcuts 1.0 Shortcuts.qml
+singleton Theme 1.0 Theme.qml
