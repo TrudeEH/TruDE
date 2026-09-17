@@ -38,7 +38,7 @@ sudo apt-get install -y -t trixie-backports \
 sudo apt-get install -y \
     foot nautilus gnome-software gnome-software-plugin-flatpak \
     flatpak gnome-text-editor gnome-calculator \
-    gnome-disk-utility pipewire-audio wireplumber \
+    gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
     network-manager \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
