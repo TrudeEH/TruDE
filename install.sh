@@ -34,10 +34,13 @@ fi
 
 sudo apt-get update
 
-# APT installs required and recommended dependencies. Keep every requested
-# desktop component in this one transaction so backported PipeWire stays matched.
+# Install the compositor, shell, and their related portal components
+# from backports. The -t flag is kept on this focused transaction only.
 sudo apt-get install -y -t trixie-backports \
-    hyprland hyprland-guiutils quickshell xdg-desktop-portal-hyprland \
+    hyprland hyprland-guiutils quickshell xdg-desktop-portal-hyprland
+
+# The rest of the desktop uses Debian Trixie's normal package priorities.
+sudo apt-get install -y \
     foot fuzzel nautilus gnome-software gnome-software-plugin-flatpak \
     flatpak gnome-text-editor gnome-calculator \
     gnome-disk-utility pipewire-audio wireplumber \
@@ -46,16 +49,17 @@ sudo apt-get install -y -t trixie-backports \
     gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
 
+# Steam's 32-bit runtime must use Mesa versions matching the backported
+# 64-bit graphics stack. APT resolves the rest of the runtime dependencies.
+sudo apt-get install -y -t trixie-backports steam-libs:i386
+
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # GTK3 reads settings.ini; GTK4/libadwaita reads the desktop color scheme.
 # These settings are harmless to repeat and are skipped outside a user bus.
 if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
-    gsettings set org.gnome.desktop.interface gtk-theme Adwaita || true
-    gsettings set org.gnome.desktop.interface icon-theme Adwaita || true
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
-    gsettings set org.gnome.desktop.interface accent-color blue || true
 fi
 
 link_config() {

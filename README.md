@@ -18,13 +18,15 @@ small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Nautilus,
 GNOME Software with Flatpak support, Text Editor, Calculator, and Disks,
 NetworkManager, PipeWire/WirePlumber, brightness and media-key utilities,
 screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit agent.
-APT resolves required and recommended dependencies. All packages are installed
-in one transaction so linked components such as PipeWire stay compatible.
-Adwaita's GTK and Qt themes are installed and configured for dark mode. GTK3
-uses its dark variant setting; GTK4/libadwaita uses the desktop color-scheme
-preference, leaving the native Adwaita palette and controls intact.
-It also enables Debian's `i386` architecture so Steam can install its 32-bit
-dependencies later; Steam itself is not installed by this setup.
+APT resolves required and recommended dependencies. Hyprland, Quickshell, and
+their portal use backports; the remaining desktop packages use normal Trixie
+priorities.
+Adwaita's GTK and Qt support is installed, and the desktop color-scheme is set
+to dark while leaving the native GTK theme and palette intact.
+It also enables Debian's `i386` architecture and installs Debian's
+`steam-libs:i386` runtime dependency metapackage, so Steam's 32-bit libraries
+are available with versions matched to the backported graphics stack. Steam
+itself is not installed by this setup.
 The installer also adds the per-user Flathub remote when it is missing.
 
 Existing files at managed symlink destinations are backed up to dated
