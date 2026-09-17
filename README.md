@@ -20,7 +20,9 @@ NetworkManager, PipeWire/WirePlumber, brightness and media-key utilities,
 screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit agent.
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
-Adwaita's GTK and Qt themes are installed and configured for dark mode.
+Adwaita's GTK and Qt themes are installed and configured for dark mode. GTK3
+uses the linked settings files; GTK4/libadwaita uses the desktop color-scheme
+preference and the orange accent.
 The installer also adds the per-user Flathub remote when it is missing.
 
 Existing files at managed symlink destinations are backed up to dated

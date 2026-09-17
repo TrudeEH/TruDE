@@ -44,6 +44,15 @@ sudo apt-get install -y -t trixie-backports \
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
 
+# GTK3 reads settings.ini; GTK4/libadwaita reads the desktop color scheme.
+# These settings are harmless to repeat and are skipped outside a user bus.
+if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+    gsettings set org.gnome.desktop.interface gtk-theme Adwaita || true
+    gsettings set org.gnome.desktop.interface icon-theme Adwaita || true
+    gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
+    gsettings set org.gnome.desktop.interface accent-color orange || true
+fi
+
 link_config() {
     local source=$1 target=$2
 

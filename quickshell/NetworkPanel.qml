@@ -103,7 +103,8 @@ Item {
                 required property var modelData
                 screen: modelData
                 readonly property var monitor: Hyprland.monitorFor(screen)
-                visible: network.popupOpen && monitor && monitor.focused
+                visible: network.popupOpen && Hyprland.focusedMonitor
+                    && monitor && Hyprland.focusedMonitor.id === monitor.id
                 color: Theme.transparent
                 implicitWidth: 390
                 implicitHeight: 560
@@ -214,7 +215,7 @@ Item {
                             visible: network.wifiDevice !== null
                             Text {
                                 Layout.fillWidth: true
-                                text: "Wi-Fi  ·  " + network.wifiDevice.name
+                                text: network.wifiDevice ? "Wi-Fi  ·  " + network.wifiDevice.name : ""
                                 color: Theme.text
                                 font.bold: true
                             }

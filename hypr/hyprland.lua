@@ -82,7 +82,6 @@ local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
-hl.env("GTK_THEME", "Adwaita:dark")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
 
 
@@ -393,6 +392,14 @@ hl.window_rule({
 
 -- Start the bar and authentication agent once per session.
 hl.on("hyprland.start", function ()
+    -- Libadwaita follows the desktop color-scheme preference. Set it for
+    -- sessions started outside GNOME so GTK4 apps use native Adwaita dark.
+    hl.exec_cmd("command -v gsettings >/dev/null && "
+        .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
+        .. ">/dev/null 2>&1")
+    hl.exec_cmd("command -v gsettings >/dev/null && "
+        .. "gsettings set org.gnome.desktop.interface accent-color orange "
+        .. ">/dev/null 2>&1")
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland quickshell --no-duplicate")
     hl.exec_cmd("hyprpolkitagent")
 end)

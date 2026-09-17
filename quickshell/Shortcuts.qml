@@ -68,7 +68,8 @@ Item {
                 required property var modelData
                 screen: modelData
                 readonly property var monitor: Hyprland.monitorFor(screen)
-                visible: shortcuts.popupOpen && monitor && monitor.focused
+                visible: shortcuts.popupOpen && Hyprland.focusedMonitor
+                    && monitor && Hyprland.focusedMonitor.id === monitor.id
                 color: Theme.transparent
                 anchors { top: true; bottom: true; left: true; right: true }
 
@@ -154,7 +155,8 @@ Item {
                                     color: Theme.text
                                     selectionColor: Theme.accent
                                     selectedTextColor: Theme.accentText
-                                    focus: shortcuts.popupOpen && monitor && monitor.focused
+                                    focus: shortcuts.popupOpen && Hyprland.focusedMonitor
+                                        && monitor && Hyprland.focusedMonitor.id === monitor.id
                                     onTextChanged: shortcuts.searchText = text
                                     Keys.onEscapePressed: shortcuts.popupOpen = false
                                 }
