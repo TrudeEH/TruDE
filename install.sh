@@ -16,11 +16,6 @@ if [[ ${ID:-} != debian || ${VERSION_CODENAME:-} != trixie ]]; then
     exit 1
 fi
 
-# Enable Debian's 32-bit package archive for Steam and other multilib apps.
-if ! dpkg --print-foreign-architectures | grep -qx i386; then
-    sudo dpkg --add-architecture i386
-fi
-
 # This file is managed by this script. Its presence makes repeated runs safe.
 if ! sudo test -f "$backports"; then
     sudo tee "$backports" >/dev/null <<'EOF'
@@ -48,10 +43,6 @@ sudo apt-get install -y \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
-
-# Steam's 32-bit runtime must use Mesa versions matching the backported
-# 64-bit graphics stack. APT resolves the rest of the runtime dependencies.
-sudo apt-get install -y -t trixie-backports steam-libs:i386
 
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo

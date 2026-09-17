@@ -23,11 +23,13 @@ their portal use backports; the remaining desktop packages use normal Trixie
 priorities.
 Adwaita's GTK and Qt support is installed, and the desktop color-scheme is set
 to dark while leaving the native GTK theme and palette intact.
-It also enables Debian's `i386` architecture and installs Debian's
-`steam-libs:i386` runtime dependency metapackage, so Steam's 32-bit libraries
-are available with versions matched to the backported graphics stack. Steam
-itself is not installed by this setup.
 The installer also adds the per-user Flathub remote when it is missing.
+
+Steam is kept separate from the dotfiles setup. Run `./install_steam.sh` when
+you want Steam; it enables Debian's `i386` architecture and installs Steam with
+APT-resolved 32-bit dependencies matched to the backported graphics stack.
+Repeated runs are safe, and the dotfiles installer does not install Steam or
+enable multiarch.
 
 Existing files at managed symlink destinations are backed up to dated
 `.backup-*` files. Repeated runs preserve the correct symlinks and edits here.
