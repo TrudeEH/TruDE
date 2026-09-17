@@ -25,4 +25,5 @@ else
     grim "$output"
 fi
 
+wl-copy --type image/png < "$output"
 printf 'Screenshot saved to %s\n' "$output"

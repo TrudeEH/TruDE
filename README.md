@@ -15,7 +15,8 @@ invocation also honors `XDG_CONFIG_HOME`.
 The installer manages one `trixie-backports` source file and leaves it in
 place on later runs. It installs Hyprland, Quickshell, their portal, and a
 small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Thunar, PipeWire/WirePlumber,
-brightness and media-key utilities, the Qt Wayland plugin, and a Polkit agent.
+brightness and media-key utilities, screenshot selection and clipboard tools,
+the Qt Wayland plugin, and a Polkit agent.
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
 Adwaita's GTK and Qt themes are installed and configured for dark mode.
@@ -74,7 +75,10 @@ network/Bluetooth applets itself.
 The Wayland panel reserves its height so tiled and maximized windows do not
 sit underneath it. Fullscreen windows may cover the bar. Quickshell normally
 reloads QML edits live; `hyprctl configerrors` reports Hyprland config errors.
-Screenshots are saved as timestamped PNG files in `~/Pictures/Screenshots`.
+Screenshots are saved as timestamped PNG files in `~/Pictures/Screenshots` and
+copied to the Wayland clipboard.
+Fuzzel uses a matching dark Adwaita-style configuration in
+`fuzzel/fuzzel.ini`.
 Review upstream changes when upgrading Hyprland because this repository
 preserves your configuration rather than replacing it with package defaults.
 
