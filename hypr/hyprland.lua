@@ -55,6 +55,7 @@ hl.monitor({
 local terminal    = "foot"
 local fileManager = "thunar"
 local menu        = "fuzzel"
+local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 
 
 -------------------
@@ -296,6 +297,8 @@ hl.bind(mainMod .. " + Super_L", hl.dsp.exec_cmd(menu), { release = true, descri
 hl.bind(mainMod .. " + Super_R", hl.dsp.exec_cmd(menu), { release = true, description = "Open application launcher" })
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo(), { description = "Toggle pseudo-tile" })
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"), { description = "Toggle split direction" })
+hl.bind("Print", hl.dsp.exec_cmd(screenshot .. " region"), { description = "Select area screenshot" })
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshot .. " full"), { description = "Full-screen screenshot" })
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }), { description = "Focus left" })

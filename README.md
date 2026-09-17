@@ -52,6 +52,8 @@ is `us`; change `kb_layout` if needed.
 | Super+M | Exit Hyprland |
 | Super+1…0 | Switch workspace |
 | Super+Shift+1…0 | Move window to workspace |
+| Print Screen | Select an area and save a screenshot |
+| Shift+Print Screen | Save a full-screen screenshot |
 
 The monitor section matches this machine:
 
@@ -72,6 +74,7 @@ network/Bluetooth applets itself.
 The Wayland panel reserves its height so tiled and maximized windows do not
 sit underneath it. Fullscreen windows may cover the bar. Quickshell normally
 reloads QML edits live; `hyprctl configerrors` reports Hyprland config errors.
+Screenshots are saved as timestamped PNG files in `~/Pictures/Screenshots`.
 Review upstream changes when upgrading Hyprland because this repository
 preserves your configuration rather than replacing it with package defaults.
 

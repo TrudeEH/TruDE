@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+mode=${1:-region}
+
+case "$mode" in
+    region|full) ;;
+    *)
+        echo "Usage: $(basename "$0") [region|full]" >&2
+        exit 2
+        ;;
+esac
+
+output_dir=${XDG_PICTURES_DIR:-"$HOME/Pictures"}/Screenshots
+output="$output_dir/screenshot-$(date +%Y%m%d-%H%M%S).png"
+mkdir -p "$output_dir"
+
+if [ "$mode" = region ]; then
+    if ! geometry=$(slurp); then
+        exit 0
+    fi
+    [ -n "$geometry" ] || exit 0
+    grim -g "$geometry" "$output"
+else
+    grim "$output"
+fi
+
+printf 'Screenshot saved to %s\n' "$output"
