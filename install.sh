@@ -64,8 +64,42 @@ sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
     /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
 sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
     /etc/lightdm/slick-greeter.conf
-sudo install -D -m 0644 "$repo_dir/configs/networkmanager/10-dotfiles-managed.conf" \
-    /etc/NetworkManager/conf.d/10-dotfiles-managed.conf
+
+# Keep NetworkManager as the only manager for network interfaces. Debian's
+# main configuration is loaded after conf.d, so update the authoritative
+# ifupdown setting instead of relying on a lower-priority drop-in.
+networkmanager_config=/etc/NetworkManager/NetworkManager.conf
+if sudo test -f "$networkmanager_config"; then
+    if ! sudo awk '
+        /^\[ifupdown\]$/ { in_section=1; next }
+        /^\[/ { in_section=0 }
+        in_section && /^managed=true$/ { found=1 }
+        END { exit !found }
+    ' "$networkmanager_config"; then
+        sudo cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S)"
+        if sudo grep -q '^\[ifupdown\]$' "$networkmanager_config"; then
+            sudo sed -i '/^\[ifupdown\]$/,/^\[/{s/^managed=.*/managed=true/}' \
+                "$networkmanager_config"
+        else
+            printf '\n[ifupdown]\nmanaged=true\n' | sudo tee -a "$networkmanager_config" >/dev/null
+        fi
+    fi
+fi
+
+# Do not let ifupdown start dhcpcd for Ethernet at the next boot. Preserve a
+# timestamped backup before removing non-loopback interface stanzas.
+interfaces_file=/etc/network/interfaces
+if sudo test -f "$interfaces_file" && sudo awk '$1 == "iface" && $2 != "lo" { found=1 } END { exit !found }' "$interfaces_file"; then
+    sudo cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S)"
+    sudo awk '
+        $1 == "auto" || $1 == "allow-hotplug" { if ($2 != "lo") next }
+        $1 == "iface" { skip = ($2 != "lo") }
+        skip { next }
+        { print }
+    ' "$interfaces_file" | sudo tee "$interfaces_file.tmp" >/dev/null
+    sudo mv "$interfaces_file.tmp" "$interfaces_file"
+fi
+
 sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
     /var/lib/lightdm/.config/gtk-3.0/gtk.css
 
