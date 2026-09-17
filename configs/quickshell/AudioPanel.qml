@@ -13,10 +13,9 @@ Item {
     property var popupScreen: null
     property bool showingOutputs: true
     readonly property var nodes: Pipewire.nodes.values
-    readonly property var outputDevices: nodes.filter(node => node.ready && !node.isStream
-        && (node.type & PwNodeType.AudioSink))
-    readonly property var inputDevices: nodes.filter(node => node.ready && !node.isStream
-        && (node.type & PwNodeType.AudioSource))
+    readonly property var audioDevices: nodes.filter(node => node.audio && !node.isStream)
+    readonly property var outputDevices: audioDevices.filter(node => node.ready && node.isSink)
+    readonly property var inputDevices: audioDevices.filter(node => node.ready && !node.isSink)
     readonly property var focusedScreen: {
         const focused = Hyprland.focusedMonitor;
         if (!focused) return null;
@@ -48,6 +47,10 @@ Item {
     function setVolume(node, position, width) {
         if (!node || !node.audio || width <= 0) return;
         node.audio.volume = Math.max(0, Math.min(1.5, position / width * 1.5));
+    }
+
+    PwObjectTracker {
+        objects: audio.audioDevices
     }
 
     IpcHandler {
