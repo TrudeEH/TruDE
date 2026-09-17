@@ -9,6 +9,7 @@ import "."
 Item {
     id: power
     property bool popupOpen: false
+    property int popupMonitorId: -1
     readonly property var actions: [
         { label: "Log out", subtitle: "End this Hyprland session", icon: "⇥", command: ["hyprctl", "dispatch", "exit"] },
         { label: "Suspend", subtitle: "Keep this session ready", icon: "◐", command: ["systemctl", "suspend"] },
@@ -18,6 +19,7 @@ Item {
 
     function close() {
         popupOpen = false;
+        popupMonitorId = -1;
     }
 
     function run(command) {
@@ -28,7 +30,13 @@ Item {
     IpcHandler {
         target: "power"
         function toggle(): void {
-            power.popupOpen = !power.popupOpen;
+            if (power.popupOpen) {
+                power.close();
+                return;
+            }
+            if (!Hyprland.focusedMonitor) return;
+            power.popupMonitorId = Hyprland.focusedMonitor.id;
+            power.popupOpen = true;
         }
     }
 
@@ -39,21 +47,28 @@ Item {
                 required property var modelData
                 screen: modelData
                 readonly property var monitor: Hyprland.monitorFor(screen)
-                visible: power.popupOpen && Hyprland.focusedMonitor
-                    && monitor && Hyprland.focusedMonitor.id === monitor.id
+                visible: power.popupOpen && monitor
+                    && monitor.id === power.popupMonitorId
                 color: Theme.transparent
-                implicitWidth: 320
-                implicitHeight: 310
-                anchors { top: true; right: true }
-                margins { top: 44; right: 14 }
+                anchors { top: true; bottom: true; left: true; right: true }
 
                 WlrLayershell.namespace: "hyprland-power"
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: power.close()
+                }
+
                 Rectangle {
                     id: card
-                    anchors.fill: parent
+                    width: 320
+                    height: 248
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.topMargin: 44
+                    anchors.rightMargin: 14
                     radius: 12
                     color: Theme.surface
                     border.color: Theme.border
@@ -61,59 +76,15 @@ Item {
                     focus: true
                     Keys.onEscapePressed: power.close()
 
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: mouse.accepted = true
+                    }
+
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 10
-
-                        Item {
-                            Layout.fillWidth: true
-                            implicitHeight: 34
-
-                            ColumnLayout {
-                                anchors.left: parent.left
-                                anchors.right: closeButton.left
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    text: "Power"
-                                    color: Theme.text
-                                    font.pixelSize: 21
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: "Choose a session action"
-                                    color: Theme.textDim
-                                    font.pixelSize: 12
-                                }
-                            }
-
-                            Rectangle {
-                                id: closeButton
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 32
-                                height: 32
-                                radius: 16
-                                color: closeMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "×"
-                                    color: Theme.text
-                                    font.pixelSize: 22
-                                }
-                                MouseArea {
-                                    id: closeMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: power.close()
-                                }
-                            }
-                        }
+                        anchors.margins: 12
+                        spacing: 6
 
                         Repeater {
                             model: power.actions
@@ -126,14 +97,40 @@ Item {
                                 border.color: actionMouse.containsMouse ? Theme.border : Theme.transparent
                                 border.width: 1
 
-                                Text {
+                                Item {
                                     id: actionIcon
                                     anchors.left: parent.left
                                     anchors.leftMargin: 13
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: modelData.icon
-                                    color: modelData.label === "Shut down" ? Theme.accent : Theme.text
-                                    font.pixelSize: 20
+                                    width: 20
+                                    height: 20
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        visible: modelData.label !== "Shut down"
+                                        text: modelData.icon
+                                        color: Theme.text
+                                        font.pixelSize: 20
+                                    }
+                                    Rectangle {
+                                        visible: modelData.label === "Shut down"
+                                        x: 4
+                                        y: 6
+                                        width: 12
+                                        height: 12
+                                        radius: 6
+                                        color: Theme.transparent
+                                        border.color: Theme.accent
+                                        border.width: 2
+                                    }
+                                    Rectangle {
+                                        visible: modelData.label === "Shut down"
+                                        x: 9
+                                        y: 1
+                                        width: 2
+                                        height: 9
+                                        color: Theme.accent
+                                    }
                                 }
                                 ColumnLayout {
                                     anchors.left: actionIcon.right

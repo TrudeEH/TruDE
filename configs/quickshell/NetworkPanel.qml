@@ -10,6 +10,7 @@ import "."
 Item {
     id: network
     property bool popupOpen: false
+    property var popupScreen: null
     property var devices: Networking.devices.values
     property var selectedNetwork: null
     property string passwordText: ""
@@ -68,6 +69,7 @@ Item {
 
     function closePopup() {
         popupOpen = false;
+        popupScreen = null;
         stopScan();
     }
 
@@ -81,9 +83,13 @@ Item {
     IpcHandler {
         target: "network"
         function toggle(): void {
-            network.popupOpen = !network.popupOpen;
+            if (network.popupOpen) {
+                network.closePopup();
+                return;
+            }
+            network.popupScreen = network.focusedScreen;
+            network.popupOpen = network.popupScreen !== null;
             if (network.popupOpen) network.scan();
-            else network.stopScan();
         }
     }
 
@@ -105,75 +111,50 @@ Item {
     }
 
     PanelWindow {
-                screen: network.focusedScreen
-                visible: network.popupOpen && network.focusedScreen !== null
+                screen: network.popupScreen
+                visible: network.popupOpen && network.popupScreen !== null
                 color: Theme.transparent
-                implicitWidth: 390
-                implicitHeight: 560
-                anchors { top: true; right: true }
-                margins { top: 44; right: 14 }
+                anchors { top: true; bottom: true; left: true; right: true }
 
                 WlrLayershell.namespace: "hyprland-network"
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: network.closePopup()
+                }
+
                 Rectangle {
                     id: card
-                    anchors.fill: parent
+                    width: 390
+                    height: 560
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.topMargin: 44
+                    anchors.rightMargin: 14
                     radius: 12
                     color: Theme.surface
                     border.color: Theme.border
                     border.width: 1
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: mouse.accepted = true
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 18
                         spacing: 10
 
-                        Item {
+                        Text {
                             Layout.fillWidth: true
-                            implicitHeight: 34
-                            ColumnLayout {
-                                anchors.left: parent.left
-                                anchors.right: closeButton.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.rightMargin: 10
-                                spacing: 2
-                                Text {
-                                    text: "Network"
-                                    color: Theme.text
-                                    font.pixelSize: 21
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: network.statusText
-                                    color: Theme.textDim
-                                    font.pixelSize: 12
-                                    elide: Text.ElideRight
-                                }
-                            }
-                            Rectangle {
-                                id: closeButton
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                implicitWidth: 32
-                                implicitHeight: 32
-                                radius: 16
-                                color: closeMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "×"
-                                    color: Theme.text
-                                    font.pixelSize: 22
-                                }
-                                MouseArea {
-                                    id: closeMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: network.closePopup()
-                                }
-                            }
+                            text: network.statusText
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.bold: true
+                            elide: Text.ElideRight
                         }
 
                         Rectangle {
