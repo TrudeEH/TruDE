@@ -11,6 +11,9 @@ ShellRoot {
         }
     }
 
+    NetworkPanel {
+    }
+
     Shortcuts {
     }
 }

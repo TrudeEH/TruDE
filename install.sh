@@ -34,8 +34,9 @@ sudo apt-get update
 sudo apt-get install -y -t trixie-backports \
     hyprland hyprland-guiutils quickshell xdg-desktop-portal-hyprland \
     foot fuzzel nautilus gnome-software gnome-software-plugin-flatpak \
-    flatpak gnome-control-center gnome-text-editor gnome-calculator \
+    flatpak gnome-text-editor gnome-calculator \
     gnome-disk-utility pipewire-audio wireplumber \
+    network-manager \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
@@ -59,7 +60,7 @@ link_config() {
 link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
 link_config "$repo_dir/scripts/launcher" "$HOME/.local/bin/dotfiles-launcher"
-for quickshell_file in shell.qml Bar.qml LauncherButton.qml Shortcuts.qml Theme.qml qmldir; do
+for quickshell_file in shell.qml Bar.qml LauncherButton.qml NetworkButton.qml NetworkPanel.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
 link_config "$repo_dir/fuzzel/fuzzel.ini" "$config_dir/fuzzel/fuzzel.ini"

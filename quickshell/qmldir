@@ -1,5 +1,7 @@
 module Dotfiles
 Bar 1.0 Bar.qml
 LauncherButton 1.0 LauncherButton.qml
+NetworkButton 1.0 NetworkButton.qml
+NetworkPanel 1.0 NetworkPanel.qml
 Shortcuts 1.0 Shortcuts.qml
 singleton Theme 1.0 Theme.qml

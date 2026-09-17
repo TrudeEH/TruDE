@@ -73,6 +73,9 @@ PanelWindow {
 
         Item { Layout.fillWidth: true }
 
+        NetworkButton {
+        }
+
         Row {
             spacing: 4
             Repeater {

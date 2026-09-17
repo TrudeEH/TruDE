@@ -15,8 +15,8 @@ invocation also honors `XDG_CONFIG_HOME`.
 The installer manages one `trixie-backports` source file and leaves it in
 place on later runs. It installs Hyprland, Quickshell, their portal, and a
 small set of desktop programs: Hyprland GUI utilities, Foot, Fuzzel, Nautilus,
-GNOME Software with Flatpak support, GNOME Control Center, Text Editor,
-Calculator, and Disks, PipeWire/WirePlumber, brightness and media-key utilities,
+GNOME Software with Flatpak support, Text Editor, Calculator, and Disks,
+NetworkManager, PipeWire/WirePlumber, brightness and media-key utilities,
 screenshot selection and clipboard tools, the Qt Wayland plugin, and a Polkit agent.
 APT resolves required and recommended dependencies. All packages are installed
 in one transaction so linked components such as PipeWire stay compatible.
@@ -64,9 +64,11 @@ The monitor section matches this machine:
 - Other monitors retain the upstream preferred-mode/automatic-position fallback.
 
 `quickshell/shell.qml` loads separate `Bar.qml`, `LauncherButton.qml`, and
-`Shortcuts.qml` components. `Theme.qml` contains the shared Adwaita dark
+`Shortcuts.qml`, `NetworkButton.qml`, and `NetworkPanel.qml` components.
+`Theme.qml` contains the shared Adwaita dark
 palette. The bar is a 34-pixel Hyprland layer-shell panel on every monitor. It has
-an Apps button, clickable workspaces 1–10 with an active indicator, a system tray, and a clock. Left-click tray icons to activate, right-click
+Apps and Network buttons, clickable workspaces 1–10 with an active indicator,
+a system tray, and a clock. Left-click tray icons to activate, right-click
 for menus, middle-click for secondary actions, or scroll for app-specific
 controls. The tray fills as applications register icons; it doesn't start
 network/Bluetooth applets itself.
@@ -78,6 +80,10 @@ Screenshots are saved as timestamped PNG files in `~/Pictures/Screenshots` and
 copied to the Wayland clipboard.
 Fuzzel uses a matching dark Adwaita-style configuration in
 `fuzzel/fuzzel.ini`.
+The Network button opens a focused-monitor panel backed by Quickshell's
+NetworkManager integration. It shows connectivity, interface details, Wi-Fi
+networks, signal strength, saved-network state, and controls for scanning,
+connecting, disconnecting, and forgetting networks.
 Review upstream changes when upgrading Hyprland because this repository
 preserves your configuration rather than replacing it with package defaults.
 
