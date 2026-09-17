@@ -7,10 +7,10 @@ import "."
 Item {
     id: root
 
-    required property var menu
-    required property var activateEntry
+    property var menu
+    property var activateEntry
     property bool hovered: menuMouse.containsMouse || childHover
-    property bool childHover: false
+    readonly property bool childHover: submenuLoader.item ? submenuLoader.item.hovered : false
 
     implicitWidth: 272
     implicitHeight: menuColumn.implicitHeight
@@ -122,16 +122,18 @@ Item {
                     }
                 }
 
-                TrayMenuView {
-                    id: submenu
-                    visible: menuEntry.modelData.hasChildren
-                        && (entryMouse.containsMouse || submenu.hovered)
+                Loader {
+                    id: submenuLoader
+                    active: menuEntry.modelData.hasChildren
+                        && (entryMouse.containsMouse || (item && item.hovered))
                     x: root.width - 4
                     y: 0
                     z: 10
-                    menu: menuEntry.modelData
-                    activateEntry: root.activateEntry
-                    onHoveredChanged: root.childHover = hovered
+                    source: "TrayMenuView.qml"
+                    onLoaded: {
+                        item.menu = menuEntry.modelData;
+                        item.activateEntry = root.activateEntry;
+                    }
                 }
             }
         }
