@@ -96,11 +96,15 @@ Item {
                             anchors.margins: 22
                             spacing: 12
 
-                            RowLayout {
+                            Item {
                                 Layout.fillWidth: true
+                                implicitHeight: 34
 
                                 ColumnLayout {
-                                    Layout.fillWidth: true
+                                    anchors.left: parent.left
+                                    anchors.right: closeButton.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.rightMargin: 10
                                     spacing: 2
 
                                     Text {
@@ -117,6 +121,9 @@ Item {
                                 }
 
                                 Rectangle {
+                                    id: closeButton
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
                                     implicitWidth: 32
                                     implicitHeight: 32
                                     radius: 16
