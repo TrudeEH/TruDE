@@ -7,6 +7,7 @@ Item {
     id: root
 
     required property var trayItem
+    required property var anchorItem
     required property var barRoot
     required property var barWindow
     property bool open: false
@@ -47,8 +48,8 @@ Item {
         Rectangle {
             id: card
             x: Math.max(10, Math.min(parent.width - width - 10,
-                root.barRoot.x + root.trayItem.mapToItem(root.barRoot, 0, 0).x
-                + root.trayItem.width - width))
+                root.barRoot.x + root.anchorItem.mapToItem(root.barRoot, 0, 0).x
+                + root.anchorItem.width - width))
             y: 42
             width: menuView.implicitWidth + 16
             height: menuView.implicitHeight + 16

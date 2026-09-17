@@ -152,6 +152,7 @@ PanelWindow {
                         TrayMenu {
                             id: trayMenu
                             trayItem: trayItem.modelData
+                            anchorItem: trayItem
                             barRoot: barContent
                             barWindow: bar
                         }
