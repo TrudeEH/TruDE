@@ -29,6 +29,7 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     Item {
+        id: barContent
         anchors.fill: parent
         anchors.leftMargin: 10
         anchors.rightMargin: 10
@@ -148,13 +149,11 @@ PanelWindow {
                             source: trayItem.modelData.icon
                             mipmap: true
                         }
-                        QsMenuAnchor {
+                        TrayMenu {
                             id: trayMenu
-                            menu: trayItem.modelData.menu
-                            anchor.window: bar
-                            anchor.item: trayItem
-                            anchor.edges: Edges.Bottom
-                            anchor.gravity: Edges.Bottom
+                            trayItem: trayItem.modelData
+                            barRoot: barContent
+                            barWindow: bar
                         }
                         MouseArea {
                             id: trayMouse
@@ -166,7 +165,7 @@ PanelWindow {
                                     trayItem.modelData.secondaryActivate();
                                 } else if (trayItem.modelData.hasMenu
                                     && (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu)) {
-                                    trayMenu.open();
+                                    trayMenu.open = true;
                                 } else {
                                     trayItem.modelData.activate();
                                 }
