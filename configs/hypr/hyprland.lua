@@ -56,6 +56,7 @@ local terminal    = "foot"
 local fileManager = "nautilus"
 local menu        = "quickshell ipc call launcher toggle"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
+local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg"
 
 
 -------------------
@@ -402,6 +403,7 @@ hl.on("hyprland.start", function ()
         .. "gsettings reset org.gnome.desktop.interface accent-color >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
+    hl.exec_cmd("swaybg -i " .. wallpaper .. " -m fill")
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland quickshell --no-duplicate")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
     hl.exec_cmd("hyprpolkitagent")

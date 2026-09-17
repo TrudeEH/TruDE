@@ -42,15 +42,15 @@ sudo apt-get install -y \
     network-manager lightdm slick-greeter \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
-    qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
+    qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard swaybg hyprpolkitagent
 
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # Configure LightDM's Slick Greeter without changing desktop GTK settings.
-sudo install -D -m 0644 "$repo_dir/lightdm/slick-greeter.conf" \
+sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
     /etc/lightdm/slick-greeter.conf
-sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/lightdm/gtk.css" \
+sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
     /var/lib/lightdm/.config/gtk-3.0/gtk.css
 
 # Let LightDM pass the login password to GNOME Keyring. Appending these lines
@@ -96,13 +96,14 @@ remove_obsolete_link() {
     fi
 }
 
-link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
+link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
+link_config "$repo_dir/assets/wallpapers/wallpaper.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
 remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 for quickshell_file in shell.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml Shortcuts.qml Theme.qml qmldir; do
-    link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
+    link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
-link_config "$repo_dir/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
+link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
 
 echo "Done. Log out and back in to start Quickshell with Wayland support."
