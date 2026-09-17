@@ -9,11 +9,11 @@
 -- Create your files separately and then require them like this:
 -- require("myColors")
 
--- Adwaita dark palette, shared by the Hyprland appearance settings below.
+-- Adwaita dark palette from https://trude.dev/css/style.css.
 local adwaita = {
     accent        = "ffbe6f",
-    accent_strong = "ff9d4d",
-    border        = "5e5c64",
+    accent_strong = "ffa348",
+    border        = "ffffff1a",
 }
 
 
@@ -119,7 +119,7 @@ hl.config({
         col = {
             -- Adwaita dark palette with the light-orange orange_1 accent.
             active_border   = { colors = {"rgb(" .. adwaita.accent .. ")", "rgb(" .. adwaita.accent_strong .. ")"}, angle = 45 },
-            inactive_border = "rgb(" .. adwaita.border .. ")",
+            inactive_border = "rgba(" .. adwaita.border .. ")",
         },
 
         -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
