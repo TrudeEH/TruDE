@@ -12,6 +12,9 @@ Item {
 
     property bool popupOpen: false
     property var popupScreen: null
+    property var toastNotification: null
+    property var toastScreen: null
+    property bool toastOpen: false
     readonly property var notifications: notificationServer.trackedNotifications.values
     readonly property int count: notifications.length
     readonly property var focusedScreen: {
@@ -28,6 +31,17 @@ Item {
         popupScreen = null;
     }
 
+    function closeToast() {
+        toastOpen = false;
+        toastNotification = null;
+        toastScreen = null;
+    }
+
+    function activateToast() {
+        if (toastNotification) center.activate(toastNotification);
+        else closeToast();
+    }
+
     function toggle() {
         if (popupOpen) {
             close();
@@ -35,6 +49,13 @@ Item {
         }
         popupScreen = focusedScreen;
         popupOpen = popupScreen !== null;
+    }
+
+    Timer {
+        id: toastTimer
+        interval: 5000
+        repeat: false
+        onTriggered: center.closeToast()
     }
 
     NotificationServer {
@@ -49,6 +70,10 @@ Item {
 
         onNotification: notification => {
             notification.tracked = true;
+            center.toastNotification = notification;
+            center.toastScreen = center.focusedScreen;
+            center.toastOpen = center.toastScreen !== null;
+            toastTimer.restart();
         }
     }
 
@@ -286,6 +311,124 @@ Item {
                         onClicked: {
                             mouse.accepted = true;
                             Quickshell.execDetached(["quickshell", "ipc", "call", "notifications", "dismissAll"]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+        delegate: Component {
+            PanelWindow {
+                required property var modelData
+                screen: modelData
+                visible: center.toastOpen && center.toastScreen
+                    && modelData.name === center.toastScreen.name
+                color: Theme.transparent
+                anchors { top: true; left: true; right: true }
+                implicitHeight: 132
+
+                WlrLayershell.namespace: "hyprland-notification-toast"
+                WlrLayershell.layer: WlrLayer.Overlay
+                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+
+                Rectangle {
+                    id: toast
+                    width: Math.min(parent.width - 28, 520)
+                    height: Math.min(parent.height - 16, 104)
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.topMargin: 8
+                    radius: 12
+                    color: Theme.surface
+                    border.color: Theme.border
+                    border.width: 1
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: center.activateToast()
+                    }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        spacing: 10
+
+                        Image {
+                            Layout.alignment: Qt.AlignTop
+                            Layout.preferredWidth: 38
+                            Layout.preferredHeight: 38
+                            visible: center.toastNotification
+                                && (center.toastNotification.image !== ""
+                                    || center.toastNotification.appIcon !== "")
+                            source: center.toastNotification
+                                && center.toastNotification.image !== ""
+                                ? center.toastNotification.image
+                                : Quickshell.iconPath(center.toastNotification
+                                    ? center.toastNotification.appIcon : "", true)
+                            fillMode: Image.PreserveAspectFit
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
+
+                            AppText {
+                                Layout.fillWidth: true
+                                text: center.toastNotification
+                                    ? (center.toastNotification.appName !== ""
+                                        ? center.toastNotification.appName : "Notification")
+                                    : "Notification"
+                                color: Theme.textDim
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                            }
+
+                            AppText {
+                                Layout.fillWidth: true
+                                text: center.toastNotification
+                                    ? center.toastNotification.summary : ""
+                                color: Theme.text
+                                font.pixelSize: 13
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+
+                            AppText {
+                                Layout.fillWidth: true
+                                visible: center.toastNotification
+                                    && center.toastNotification.body !== ""
+                                text: center.toastNotification
+                                    ? center.toastNotification.body : ""
+                                color: Theme.textSecondary
+                                font.pixelSize: 12
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        AppText {
+                            Layout.alignment: Qt.AlignTop
+                            text: "󰅖"
+                            color: toastDismissMouse.containsMouse
+                                ? Theme.accentStrong : Theme.textDim
+                            font.pixelSize: 16
+
+                            MouseArea {
+                                id: toastDismissMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    mouse.accepted = true;
+                                    if (center.toastNotification)
+                                        center.toastNotification.dismiss();
+                                    center.closeToast();
+                                }
+                            }
                         }
                     }
                 }
