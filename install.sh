@@ -39,13 +39,31 @@ sudo apt-get install -y \
     foot nautilus gnome-software gnome-software-plugin-flatpak \
     flatpak gnome-text-editor gnome-calculator \
     gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
-    network-manager \
+    network-manager lightdm slick-greeter \
     xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
     gvfs udisks2 \
     qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard hyprpolkitagent
 
 flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
+
+# Configure LightDM's Slick Greeter without changing desktop GTK settings.
+sudo install -D -m 0644 "$repo_dir/lightdm/slick-greeter.conf" \
+    /etc/lightdm/slick-greeter.conf
+sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/lightdm/gtk.css" \
+    /var/lib/lightdm/.config/gtk-3.0/gtk.css
+
+# Let LightDM pass the login password to GNOME Keyring. Appending these lines
+# is safe on repeated runs and preserves Debian's PAM configuration.
+pam_file=/etc/pam.d/lightdm
+if ! sudo grep -Fqx "auth optional pam_gnome_keyring.so" "$pam_file"; then
+    echo "auth optional pam_gnome_keyring.so" | sudo tee -a "$pam_file" >/dev/null
+fi
+if ! sudo grep -Fqx "session optional pam_gnome_keyring.so auto_start" "$pam_file"; then
+    echo "session optional pam_gnome_keyring.so auto_start" | sudo tee -a "$pam_file" >/dev/null
+fi
+
+sudo systemctl enable lightdm.service
 
 # Clear theme overrides left by previous versions, then request dark mode.
 # These settings are harmless to repeat and are skipped outside a user bus.

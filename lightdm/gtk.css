@@ -1,0 +1,74 @@
+@define-color window_bg_color #222226;
+@define-color view_bg_color #222226;
+@define-color card_bg_color #38383c;
+@define-color accent_bg_color #ffbe6f;
+@define-color accent_fg_color #222226;
+@define-color accent_color #ffbe6f;
+@define-color theme_fg_color #ffffff;
+@define-color theme_text_color #ffffff;
+@define-color theme_selected_bg_color #ffbe6f;
+@define-color theme_selected_fg_color #222226;
+
+window,
+.lightdm {
+    background-color: @window_bg_color;
+    color: @theme_fg_color;
+}
+
+button {
+    min-height: 30px;
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 9px;
+    background-image: none;
+    background-color: @card_bg_color;
+    color: @theme_fg_color;
+    text-shadow: none;
+    box-shadow: none;
+}
+
+button:hover,
+button:focus {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 190, 111, 0.80);
+}
+
+button:active,
+button:checked,
+button.suggested-action {
+    background-color: @accent_bg_color;
+    border-color: @accent_bg_color;
+    color: @accent_fg_color;
+}
+
+entry {
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 9px;
+    background-image: none;
+    background-color: @card_bg_color;
+    color: @theme_fg_color;
+    caret-color: @accent_bg_color;
+    box-shadow: none;
+}
+
+entry:focus {
+    border-color: @accent_bg_color;
+    box-shadow: 0 0 0 1px @accent_bg_color;
+}
+
+menu,
+popover,
+.menu {
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    background-color: @card_bg_color;
+    color: @theme_fg_color;
+}
+
+menuitem:hover,
+menuitem:focus {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+}
