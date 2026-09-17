@@ -2,6 +2,15 @@
 set -eu
 
 mode=${1:-region}
+lock_dir=${XDG_RUNTIME_DIR:-/tmp}/dotfiles-screenshot.lock
+
+# slurp keeps the selector open until the user confirms or cancels it. Make
+# that interaction single-instance so repeated PrintScreen presses cannot
+# create overlapping selectors.
+if ! mkdir "$lock_dir" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$lock_dir"' 0 1 2 3 15
 
 case "$mode" in
     region|full) ;;
