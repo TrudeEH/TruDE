@@ -54,9 +54,8 @@ hl.monitor({
 -- Set programs that you use
 local terminal    = "foot"
 local fileManager = "nautilus"
-local menu        = os.getenv("HOME") .. "/.local/bin/dotfiles-launcher"
+local menu        = "quickshell ipc call launcher toggle"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
-local quickshell  = os.getenv("HOME") .. "/.local/bin/dotfiles-quickshell"
 
 
 -------------------
@@ -84,6 +83,8 @@ local quickshell  = os.getenv("HOME") .. "/.local/bin/dotfiles-quickshell"
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
+local xdgDataDirs = os.getenv("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
+hl.env("XDG_DATA_DIRS", os.getenv("HOME") .. "/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:" .. xdgDataDirs)
 
 
 -----------------------
@@ -401,7 +402,7 @@ hl.on("hyprland.start", function ()
         .. "gsettings reset org.gnome.desktop.interface accent-color >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
-    hl.exec_cmd("env QT_QPA_PLATFORM=wayland " .. quickshell .. " --no-duplicate")
+    hl.exec_cmd("env QT_QPA_PLATFORM=wayland quickshell --no-duplicate")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
     hl.exec_cmd("hyprpolkitagent")
 end)

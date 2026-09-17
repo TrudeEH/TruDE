@@ -88,10 +88,18 @@ link_config() {
     ln -s "$source" "$target"
 }
 
+remove_obsolete_link() {
+    local target=$1 source=$2
+
+    if [[ -L $target && $(readlink "$target") == "$source" ]]; then
+        rm "$target"
+    fi
+}
+
 link_config "$repo_dir/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
 link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
-link_config "$repo_dir/scripts/launcher" "$HOME/.local/bin/dotfiles-launcher"
-link_config "$repo_dir/scripts/quickshell" "$HOME/.local/bin/dotfiles-quickshell"
+remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
+remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 for quickshell_file in shell.qml Bar.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml Shortcuts.qml Theme.qml qmldir; do
     link_config "$repo_dir/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
 done
