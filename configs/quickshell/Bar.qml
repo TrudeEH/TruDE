@@ -9,6 +9,7 @@ import "."
 PanelWindow {
     id: bar
     required property var modelData
+    required property var notificationCenter
     screen: modelData
     readonly property var hyprMonitor: Hyprland.monitorFor(screen)
 
@@ -79,10 +80,10 @@ PanelWindow {
             id: clockBadge
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            width: clockText.implicitWidth + 18
+            width: clockText.implicitWidth + (bar.notificationCenter.count > 0 ? 50 : 18)
             height: 26
             radius: 8
-            color: Theme.window
+            color: clockMouse.containsMouse ? Theme.surfaceHover : Theme.window
             border.color: Theme.border
             border.width: 1
             z: 2
@@ -93,6 +94,24 @@ PanelWindow {
                 text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
                 color: Theme.text
                 font.pixelSize: 12
+            }
+
+            AppText {
+                anchors.left: clockText.right
+                anchors.leftMargin: 8
+                anchors.verticalCenter: clockText.verticalCenter
+                visible: bar.notificationCenter.count > 0
+                text: "󰂚 " + bar.notificationCenter.count
+                color: Theme.accent
+                font.pixelSize: 12
+            }
+
+            MouseArea {
+                id: clockMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: bar.notificationCenter.toggle()
             }
         }
 
