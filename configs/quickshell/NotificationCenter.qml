@@ -114,7 +114,7 @@ Item {
                     height: Math.min(parent.height - 58, 600)
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.topMargin: 44
+                    anchors.topMargin: 8
                     radius: 12
                     color: Theme.surface
                     border.color: Theme.border
@@ -263,7 +263,7 @@ Item {
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.horizontalCenterOffset: Math.min(parent.width - 28, 520) / 2 - 14 - width / 2
-                    anchors.topMargin: 58
+                    anchors.topMargin: 22
                     width: 78
                     height: 26
                     radius: 6

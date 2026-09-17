@@ -131,7 +131,7 @@ Item {
                     height: 560
                     anchors.top: parent.top
                     anchors.right: parent.right
-                    anchors.topMargin: 44
+                    anchors.topMargin: 8
                     anchors.rightMargin: 14
                     radius: 12
                     color: Theme.surface
