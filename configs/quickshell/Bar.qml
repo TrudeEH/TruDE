@@ -128,8 +128,6 @@ PanelWindow {
 
             AudioButton {}
 
-            PowerButton {}
-
             Row {
                 spacing: 4
                 Repeater {
@@ -175,6 +173,8 @@ PanelWindow {
                     }
                 }
             }
+
+            PowerButton {}
         }
     }
 }
