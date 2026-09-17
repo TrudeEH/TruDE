@@ -11,6 +11,7 @@ Item {
 
     property bool popupOpen: false
     property string searchText: ""
+    property int selectedIndex: 0
     readonly property var entries: DesktopEntries.applications.values
     readonly property var focusedScreen: {
         const focused = Hyprland.focusedMonitor;
@@ -40,6 +41,7 @@ Item {
         else {
             popupOpen = true;
             searchText = "";
+            selectedIndex = 0;
         }
     }
 
@@ -47,6 +49,20 @@ Item {
         entry.execute();
         close();
     }
+
+    function moveSelection(direction) {
+        if (filteredEntries.length === 0) return;
+        selectedIndex = (selectedIndex + direction + filteredEntries.length)
+            % filteredEntries.length;
+        list.positionViewAtIndex(selectedIndex, ListView.Contain);
+    }
+
+    function launchSelection() {
+        if (filteredEntries.length > 0)
+            launch(filteredEntries[selectedIndex]);
+    }
+
+    onSearchTextChanged: selectedIndex = 0
 
     IpcHandler {
         target: "launcher"
@@ -148,10 +164,9 @@ Item {
                             focus: launcherWindow.visible
                             onTextChanged: launcher.searchText = text
                             Keys.onEscapePressed: launcher.close()
-                            Keys.onReturnPressed: {
-                                if (launcher.filteredEntries.length > 0)
-                                    launcher.launch(launcher.filteredEntries[0]);
-                            }
+                            Keys.onDownPressed: launcher.moveSelection(1)
+                            Keys.onUpPressed: launcher.moveSelection(-1)
+                            Keys.onReturnPressed: launcher.launchSelection()
                         }
 
                         Text {
@@ -171,6 +186,7 @@ Item {
                         clip: true
                         spacing: 3
                         model: launcher.filteredEntries
+                        currentIndex: launcher.selectedIndex
 
                         delegate: Rectangle {
                             required property var modelData
@@ -178,7 +194,8 @@ Item {
                             width: list.width
                             height: 58
                             radius: 9
-                            color: itemMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
+                            color: index === launcher.selectedIndex || itemMouse.containsMouse
+                                ? Theme.surfaceHover : Theme.transparent
 
                             Image {
                                 anchors.left: parent.left
@@ -221,6 +238,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
+                                onEntered: launcher.selectedIndex = index
                                 onClicked: launcher.launch(modelData)
                             }
                         }

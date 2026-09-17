@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+# Quickshell reads desktop entries from XDG_DATA_DIRS at startup. Flatpak
+# exports user and system applications through these two directories.
+flatpak_data_dirs="$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share"
+export XDG_DATA_DIRS="$flatpak_data_dirs:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
+exec quickshell "$@"
