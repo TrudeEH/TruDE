@@ -74,9 +74,15 @@ Item {
         }
 
         function dismissAll(): void {
-            const activeNotifications = notificationServer.trackedNotifications.values.slice();
-            for (const notification of activeNotifications) notification.tracked = false;
+            const activeNotifications = [];
+            const trackedNotifications = notificationServer.trackedNotifications.values;
+            for (let index = 0; index < trackedNotifications.length; index++)
+                activeNotifications.push(trackedNotifications[index]);
             center.close();
+            for (const notification of activeNotifications) {
+                notification.dismiss();
+                notification.tracked = false;
+            }
         }
     }
 
