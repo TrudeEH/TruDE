@@ -4,5 +4,7 @@ LauncherButton 1.0 LauncherButton.qml
 Launcher 1.0 Launcher.qml
 NetworkButton 1.0 NetworkButton.qml
 NetworkPanel 1.0 NetworkPanel.qml
+PowerButton 1.0 PowerButton.qml
+PowerMenu 1.0 PowerMenu.qml
 Shortcuts 1.0 Shortcuts.qml
 singleton Theme 1.0 Theme.qml

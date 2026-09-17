@@ -76,6 +76,9 @@ PanelWindow {
         NetworkButton {
         }
 
+        PowerButton {
+        }
+
         Row {
             spacing: 4
             Repeater {
