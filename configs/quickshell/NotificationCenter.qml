@@ -136,33 +136,6 @@ Item {
                                 font.pixelSize: 12
                             }
 
-                            Rectangle {
-                                visible: center.count > 0
-                                implicitWidth: clearLabel.implicitWidth + 16
-                                implicitHeight: 26
-                                radius: 6
-                                color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
-                                z: 3
-
-                                AppText {
-                                    id: clearLabel
-                                    anchors.centerIn: parent
-                                    text: "Clear all"
-                                    color: Theme.accentText
-                                    font.pixelSize: 11
-                                }
-
-                                MouseArea {
-                                    id: clearMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        mouse.accepted = true;
-                                        center.dismissAll();
-                                    }
-                                }
-                            }
                         }
 
                         Rectangle {
@@ -273,6 +246,39 @@ Item {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: clearButton
+                        visible: center.count > 0
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.topMargin: 14
+                        anchors.rightMargin: 14
+                        width: 78
+                        height: 26
+                        radius: 6
+                        color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
+                        z: 10
+
+                        AppText {
+                            anchors.centerIn: parent
+                            text: "Clear all"
+                            color: Theme.accentText
+                            font.pixelSize: 11
+                        }
+
+                        MouseArea {
+                            id: clearMouse
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                mouse.accepted = true;
+                                center.dismissAll();
                             }
                         }
                     }
