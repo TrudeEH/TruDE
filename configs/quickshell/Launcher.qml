@@ -152,6 +152,7 @@ Item {
 
                         TextInput {
                             id: searchField
+                            text: launcher.searchText
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
@@ -163,7 +164,7 @@ Item {
                             font.pixelSize: 14
                             font.family: Theme.fontFamily
                             focus: launcherWindow.visible
-                            onTextChanged: launcher.searchText = text
+                            onTextEdited: launcher.searchText = text
                             Keys.onEscapePressed: launcher.close()
                             Keys.onDownPressed: launcher.moveSelection(1)
                             Keys.onUpPressed: launcher.moveSelection(-1)
