@@ -32,7 +32,7 @@ sudo apt-get update
 # Install the compositor, shell, and their related portal components
 # from backports. The -t flag is kept on this focused transaction only.
 sudo apt-get install -y -t trixie-backports \
-    hyprland hyprland-guiutils quickshell xdg-desktop-portal-hyprland
+    hyprland hyprland-guiutils quickshell uwsm xdg-desktop-portal-hyprland
 
 # The rest of the desktop uses Debian Trixie's normal package priorities.
 sudo apt-get install -y \
@@ -48,6 +48,8 @@ flatpak --user remote-add --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # Configure LightDM's Slick Greeter without changing desktop GTK settings.
+sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
+    /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
 sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
     /etc/lightdm/slick-greeter.conf
 sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
