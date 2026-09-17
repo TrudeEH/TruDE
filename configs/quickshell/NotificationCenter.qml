@@ -285,7 +285,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             mouse.accepted = true;
-                            center.dismissAll();
+                            Quickshell.execDetached(["quickshell", "ipc", "call", "notifications", "dismissAll"]);
                         }
                     }
                 }
