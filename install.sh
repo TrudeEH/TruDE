@@ -59,7 +59,7 @@ install_packages() {
     # Install the compositor, shell, and their related portal components
     # from backports. The -t flag is kept on this focused transaction only.
     sudo apt-get install -y -t "$backports_suite" \
-        hyprland hyprland-guiutils quickshell uwsm xdg-desktop-portal-hyprland
+        hyprland hyprland-guiutils hypridle hyprlock quickshell uwsm xdg-desktop-portal-hyprland
 
     # The rest of the desktop uses the release's normal package priorities.
     sudo apt-get install -y \
@@ -195,6 +195,8 @@ remove_obsolete_link() {
 
 link_configs() {
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
+    link_config "$repo_dir/configs/hypr/hypridle.conf" "$config_dir/hypr/hypridle.conf"
+    link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
     link_config "$repo_dir/assets/wallpapers/wallpaper.png" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png"
     link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/quickshell-network-details" "$HOME/.local/bin/dotfiles-network-details"

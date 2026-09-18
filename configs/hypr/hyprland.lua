@@ -55,6 +55,7 @@ hl.monitor({
 local terminal    = "foot"
 local fileManager = "nautilus"
 local menu        = "quickshell ipc call launcher toggle"
+local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png"
 
@@ -292,6 +293,7 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { desc
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"), { description = "Exit Hyprland" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle floating" })
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu), { description = "Open application launcher" })
 -- Launch on release so Super can still be used as a modifier for other binds.
@@ -405,6 +407,7 @@ hl.on("hyprland.start", function ()
         .. ">/dev/null 2>&1; fi")
     hl.exec_cmd("swaybg -i " .. wallpaper .. " -m fill")
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland QT_STYLE_OVERRIDE=Adwaita-Dark quickshell --no-duplicate")
+    hl.exec_cmd("hypridle")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
     hl.exec_cmd("hyprpolkitagent")
 end)
