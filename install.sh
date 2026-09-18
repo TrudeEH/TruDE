@@ -4,6 +4,7 @@ set -euo pipefail
 repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
+backports_suite=stable-backports
 
 check_platform() {
     if [[ ${EUID} -eq 0 ]]; then
@@ -12,20 +13,21 @@ check_platform() {
     fi
 
     . /etc/os-release
-    if [[ ${ID:-} != debian || ${VERSION_CODENAME:-} != trixie ]]; then
-        echo "This installer supports Debian 13 (trixie)." >&2
+    local debian_major=${VERSION_ID:-}; debian_major=${debian_major%%.*}
+    if [[ ${ID:-} != debian || ! ${debian_major:-} =~ ^[0-9]+$ || $debian_major -lt 13 || -z ${VERSION_CODENAME:-} ]]; then
+        echo "This installer supports Debian 13 (trixie) and newer Debian releases." >&2
         exit 1
     fi
 }
 
 configure_backports() {
-    # This file is managed by this script. Its presence makes repeated runs safe.
-    if ! sudo test -f "$backports"; then
-        sudo tee "$backports" >/dev/null <<'BACKPORTS'
+    # This file follows Debian stable, so upgrades do not require a script change.
+    if ! sudo test -f "$backports" || ! sudo grep -Fqx "Suites: $backports_suite" "$backports" || ! sudo grep -Fqx "Components: main contrib non-free non-free-firmware" "$backports"; then
+        sudo tee "$backports" >/dev/null <<BACKPORTS
 Types: deb
 URIs: https://deb.debian.org/debian
-Suites: trixie-backports
-Components: main
+Suites: $backports_suite
+Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 BACKPORTS
     fi
@@ -36,10 +38,10 @@ install_packages() {
 
     # Install the compositor, shell, and their related portal components
     # from backports. The -t flag is kept on this focused transaction only.
-    sudo apt-get install -y -t trixie-backports \
+    sudo apt-get install -y -t "$backports_suite" \
         hyprland hyprland-guiutils quickshell uwsm xdg-desktop-portal-hyprland
 
-    # The rest of the desktop uses Debian Trixie's normal package priorities.
+    # The rest of the desktop uses the release's normal package priorities.
     sudo apt-get install -y \
         curl \
         foot nautilus gnome-software gnome-software-plugin-flatpak \
