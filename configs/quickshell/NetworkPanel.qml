@@ -36,12 +36,16 @@ Item {
         if (connectedNetwork && connectedNetwork.name) return connectedNetwork.name;
         return connectedDevice.type === DeviceType.Wifi ? "Wi-Fi connected" : "Wired connected";
     }
-    readonly property string connectionDetailsCommand:
-        "iface=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: '$2 ~ /connected/ {print $1; exit}'); "
-        + "printf 'interface\\t%s\\n' \"${iface:-Unavailable}\"; "
-        + "printf 'ip\\t%s\\n' \"$(if [ -n \"$iface\" ]; then ip -o -4 addr show dev \"$iface\" scope global 2>/dev/null | awk '{print $4}' | paste -sd ', ' -; else printf 'Unavailable'; fi)\"; "
-        + "printf 'gateway\\t%s\\n' \"$(if [ -n \"$iface\" ]; then ip route show default dev \"$iface\" 2>/dev/null | awk '{print $3; exit}'; else printf 'Unavailable'; fi)\"; "
-        + "printf 'dns\\t%s\\n' \"$(if [ -n \"$iface\" ]; then nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -; else printf 'Unavailable'; fi)\""
+    readonly property string connectionDetailsCommand: {
+        const iface = connectedDevice ? connectedDevice.name : "";
+        if (!iface) return "printf 'interface\\tUnavailable\\n'; printf 'ip\\tUnavailable\\n'; printf 'gateway\\tUnavailable\\n'; printf 'dns\\tUnavailable\\n'";
+        const quotedInterface = JSON.stringify(iface);
+        return "iface=" + quotedInterface + "; "
+            + "printf 'interface\\t%s\\n' \"$iface\"; "
+            + "printf 'ip\\t%s\\n' \"$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"; "
+            + "printf 'gateway\\t%s\\n' \"$(nmcli -g IP4.GATEWAY device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"; "
+            + "printf 'dns\\t%s\\n' \"$(nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"";
+    }
 
     function findWifiDevice() {
         for (const device of devices) {
