@@ -67,14 +67,14 @@ Rectangle {
         MetricPill {
             Layout.fillWidth: true
             icon: "󰍛"
-            label: "CPU"
+            label: ""
             value: Math.round(button.cpuUsage) + "%"
         }
 
         MetricPill {
             Layout.fillWidth: true
             icon: ""
-            label: "RAM"
+            label: ""
             value: Math.round(button.memoryUsage) + "%"
         }
     }
