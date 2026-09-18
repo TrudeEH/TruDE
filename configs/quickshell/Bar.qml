@@ -119,20 +119,21 @@ PanelWindow {
             }
         }
 
-        Row {
+        RowLayout {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
 
-            SystemMonitorButton {}
+            SystemMonitorButton { Layout.alignment: Qt.AlignVCenter }
 
-            MaintenanceButton {}
+            MaintenanceButton { Layout.alignment: Qt.AlignVCenter }
 
-            NetworkButton {}
+            NetworkButton { Layout.alignment: Qt.AlignVCenter }
 
-            AudioButton {}
+            AudioButton { Layout.alignment: Qt.AlignVCenter }
 
             Row {
+                Layout.alignment: Qt.AlignVCenter
                 spacing: 4
                 Repeater {
                     model: SystemTray.items
