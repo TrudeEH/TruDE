@@ -36,9 +36,15 @@ Item {
         searchText = "";
     }
 
+    function closeOtherPopups() {
+        for (const target of ["network", "audio", "power", "notifications"])
+            Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+    }
+
     function toggle() {
         if (popupOpen) close();
         else {
+            launcher.closeOtherPopups();
             popupOpen = true;
             searchText = "";
             selectedIndex = 0;
@@ -68,6 +74,10 @@ Item {
         target: "launcher"
         function toggle(): void {
             launcher.toggle();
+        }
+
+        function close(): void {
+            launcher.close();
         }
     }
 

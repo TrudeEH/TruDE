@@ -30,11 +30,19 @@ Item {
         popupScreen = null;
     }
 
+    function closeOtherPopups() {
+        for (const target of ["network", "audio", "power", "notifications", "launcher"]) {
+            if (target !== "audio")
+                Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+        }
+    }
+
     function toggle() {
         if (popupOpen) {
             close();
             return;
         }
+        audio.closeOtherPopups();
         popupScreen = focusedScreen;
         popupOpen = popupScreen !== null;
     }
@@ -57,6 +65,10 @@ Item {
         target: "audio"
         function toggle(): void {
             audio.toggle();
+        }
+
+        function close(): void {
+            audio.close();
         }
     }
 

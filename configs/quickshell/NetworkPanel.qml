@@ -67,6 +67,13 @@ Item {
         if (wifiDevice) wifiDevice.scannerEnabled = false;
     }
 
+    function closeOtherPopups() {
+        for (const target of ["network", "audio", "power", "notifications", "launcher"]) {
+            if (target !== "network")
+                Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+        }
+    }
+
     function closePopup() {
         popupOpen = false;
         popupScreen = null;
@@ -82,11 +89,16 @@ Item {
 
     IpcHandler {
         target: "network"
+        function close(): void {
+            network.closePopup();
+        }
+
         function toggle(): void {
             if (network.popupOpen) {
                 network.closePopup();
                 return;
             }
+            network.closeOtherPopups();
             network.popupScreen = network.focusedScreen;
             network.popupOpen = network.popupScreen !== null;
             if (network.popupOpen) network.scan();

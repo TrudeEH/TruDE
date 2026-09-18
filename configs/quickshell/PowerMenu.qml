@@ -22,6 +22,13 @@ Item {
         popupMonitorId = -1;
     }
 
+    function closeOtherPopups() {
+        for (const target of ["network", "audio", "power", "notifications", "launcher"]) {
+            if (target !== "power")
+                Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+        }
+    }
+
     function run(command) {
         close();
         Quickshell.execDetached(command);
@@ -29,11 +36,16 @@ Item {
 
     IpcHandler {
         target: "power"
+        function close(): void {
+            power.close();
+        }
+
         function toggle(): void {
             if (power.popupOpen) {
                 power.close();
                 return;
             }
+            power.closeOtherPopups();
             if (!Hyprland.focusedMonitor) return;
             power.popupMonitorId = Hyprland.focusedMonitor.id;
             power.popupOpen = true;

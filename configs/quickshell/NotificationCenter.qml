@@ -37,6 +37,11 @@ Item {
         toastScreen = null;
     }
 
+    function closeOtherPopups() {
+        for (const target of ["network", "audio", "power", "launcher"])
+            Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+    }
+
     function activateToast() {
         if (toastNotification) center.activate(toastNotification);
         else closeToast();
@@ -47,6 +52,7 @@ Item {
             close();
             return;
         }
+        center.closeOtherPopups();
         popupScreen = focusedScreen;
         popupOpen = popupScreen !== null;
     }
@@ -96,6 +102,7 @@ Item {
 
         function close(): void {
             center.close();
+            center.closeToast();
         }
 
         function dismissAll(): void {
