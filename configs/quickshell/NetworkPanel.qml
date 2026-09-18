@@ -15,7 +15,7 @@ Item {
     property var selectedNetwork: null
     property string passwordText: ""
     property string errorText: ""
-    property string interfaceText: "—"
+    property string interfaceText: connectedDevice ? connectedDevice.name : "—"
     property string ipText: "—"
     property string gatewayText: "—"
     property string dnsText: "—"
@@ -42,9 +42,9 @@ Item {
         const quotedInterface = JSON.stringify(iface);
         return "iface=" + quotedInterface + "; "
             + "printf 'interface\\t%s\\n' \"$iface\"; "
-            + "printf 'ip\\t%s\\n' \"$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"; "
-            + "printf 'gateway\\t%s\\n' \"$(nmcli -g IP4.GATEWAY device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"; "
-            + "printf 'dns\\t%s\\n' \"$(nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -)\"";
+            + "ip=\$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$ip\" ] || ip=\$(ip -o -4 addr show dev \"$iface\" scope global 2>/dev/null | awk '{print $4}' | paste -sd ', ' -); printf 'ip\\t%s\\n' \"\${ip:-Unavailable}\"; "
+            + "gateway=\$(nmcli -g IP4.GATEWAY device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$gateway\" ] || gateway=\$(ip route show default dev \"$iface\" 2>/dev/null | awk '{print $3; exit}'); printf 'gateway\\t%s\\n' \"\${gateway:-Unavailable}\"; "
+            + "dns=\$(nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$dns\" ] || dns=\$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | paste -sd ', ' -); printf 'dns\\t%s\\n' \"\${dns:-Unavailable}\"";
     }
 
     function findWifiDevice() {

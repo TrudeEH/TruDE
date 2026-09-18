@@ -35,7 +35,7 @@ Item {
         + "printf 'memory\\t%s\\n' \"$(free -h | awk '/^Mem:/ {print $3 \" / \" $2}')\"; "
         + "printf 'swap\\t%s\\n' \"$(free -h | awk '/^Swap:/ {print $3 \" / \" $2}')\"; "
         + "printf 'disk\\t%s\\n' \"$(df -h / | awk 'NR==2 {print $3 \" / \" $2 \" (\" $5 \" used)\"}')\"; "
-        + "printf 'gpu\\t%s\\n' \"$(if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi --query-gpu=name --format=csv,noheader | paste -sd ';' -; elif command -v lspci >/dev/null 2>&1; then lspci | grep -Ei 'vga|3d|display' | sed 's/^[^:]*: //' | paste -sd ';' -; else printf 'Unavailable'; fi)\"; "
+        + "gpuFound=0; for card in /sys/class/drm/card[0-9]; do busy=\$(cat \"\$card/device/gpu_busy_percent\" 2>/dev/null) || continue; used=\$(cat \"\$card/device/mem_info_vram_used\" 2>/dev/null); total=\$(cat \"\$card/device/mem_info_vram_total\" 2>/dev/null); slot=\$(awk -F= '/^PCI_SLOT_NAME=/ {print \$2; exit}' \"\$card/device/uevent\" 2>/dev/null); name=\$(if [ -n \"\$slot\" ] && command -v lspci >/dev/null 2>&1; then lspci -s \"\$slot\" 2>/dev/null | sed 's/^[^:]*: //'; else basename \"\$card\"; fi); [ -n \"\$name\" ] || name=\$(basename \"\$card\"); usedGiB=\$(awk -v bytes=\"\$used\" 'BEGIN {printf \"%.1f\", bytes / 1073741824}'); totalGiB=\$(awk -v bytes=\"\$total\" 'BEGIN {printf \"%.1f\", bytes / 1073741824}'); printf 'gpu\\t%s · %s%% · %s / %s GiB VRAM\\n' \"\$name\" \"\$busy\" \"\$usedGiB\" \"\$totalGiB\"; gpuFound=1; done; [ \"\$gpuFound\" -eq 1 ] || printf 'gpu\\tUnavailable\\n'; "
         + "printf 'battery\\t%s\\n' \"$(if command -v upower >/dev/null 2>&1; then battery=\$(upower -e 2>/dev/null | grep -m1 battery); [ -n \"\$battery\" ] && upower -i \"\$battery\" | awk -F: '/percentage/ {gsub(/^[ \\t]+/, \"\", $2); print $2}'; else printf 'Unavailable'; fi)\""
 
     function close() {
@@ -48,6 +48,7 @@ Item {
     }
 
     function applyDetails(output) {
+        gpuText = "—";
         const lines = output.trim().split("\n");
         for (const line of lines) {
             const separator = line.indexOf("\t");
@@ -60,7 +61,7 @@ Item {
             else if (key === "memory") memoryText = value;
             else if (key === "swap") swapText = value;
             else if (key === "disk") diskText = value;
-            else if (key === "gpu") gpuText = value.split(";").join("\n");
+            else if (key === "gpu") gpuText = gpuText === "—" ? value : gpuText + "\n" + value;
             else if (key === "battery") batteryText = value;
         }
     }
