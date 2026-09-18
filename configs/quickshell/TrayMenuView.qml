@@ -51,7 +51,7 @@ Item {
                     radius: 7
                     color: menuEntry.modelData.enabled && entryMouse.containsMouse
                         ? Theme.accentStrong
-                        : Theme.transparent
+                        : Theme.surfaceRaised
                 }
 
                 IconImage {

@@ -54,7 +54,7 @@ Item {
             width: menuView.implicitWidth + 16
             height: menuView.implicitHeight + 16
             radius: 10
-            color: Theme.window
+            color: Theme.surface
             border.color: Theme.border
             border.width: 1
 
