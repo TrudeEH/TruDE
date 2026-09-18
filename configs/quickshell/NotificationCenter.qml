@@ -339,7 +339,7 @@ Item {
 
                 WlrLayershell.namespace: "hyprland-notification-toast"
                 WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+                WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
                 Rectangle {
                     id: toast
