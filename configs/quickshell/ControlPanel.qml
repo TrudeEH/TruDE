@@ -32,9 +32,9 @@ Rectangle {
     readonly property var bluetoothDevices: Bluetooth.devices.values
     readonly property var connectedBluetoothDevices: bluetoothDevices.filter(device => device.connected)
     readonly property var audioNodes: Pipewire.nodes.values
-    readonly property var audioDevices: audioNodes.filter(node => node.audio && node.ready && !node.isStream)
-    readonly property var outputDevices: audioDevices.filter(node => node.isSink)
-    readonly property var inputDevices: audioDevices.filter(node => !node.isSink)
+    readonly property var audioDevices: audioNodes.filter(node => node.audio && !node.isStream)
+    readonly property var outputDevices: audioDevices.filter(node => node.ready && node.isSink)
+    readonly property var inputDevices: audioDevices.filter(node => node.ready && !node.isSink)
     readonly property var defaultSink: Pipewire.defaultAudioSink
     readonly property var defaultSource: Pipewire.defaultAudioSource
     readonly property var activeAudioNode: showingAudioOutputs ? defaultSink : defaultSource
