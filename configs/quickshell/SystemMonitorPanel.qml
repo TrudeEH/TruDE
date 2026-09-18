@@ -141,20 +141,19 @@ Item {
                     spacing: 10
 
                     Rectangle {
-                        implicitWidth: 40
-                        implicitHeight: 40
-                        radius: 12
+                        implicitWidth: 32
+                        implicitHeight: 32
+                        radius: 10
                         color: Theme.accent
                         AppText {
                             anchors.centerIn: parent
                             text: "󰍛"
                             color: Theme.accentText
-                            font.pixelSize: 21
+                            font.pixelSize: 17
                         }
                     }
 
                     ColumnLayout {
-                        Layout.fillWidth: true
                         spacing: 2
                         AppText {
                             text: "System monitor"
@@ -162,14 +161,12 @@ Item {
                             font.pixelSize: 20
                             font.bold: true
                         }
-                        AppText {
-                            text: "Hardware and resource overview"
-                            color: Theme.textDim
-                            font.pixelSize: 12
-                        }
                     }
 
+                    Item { Layout.fillWidth: true }
+
                     Rectangle {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         implicitWidth: 34
                         implicitHeight: 34
                         radius: 17
