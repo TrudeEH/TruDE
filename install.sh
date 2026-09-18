@@ -45,7 +45,7 @@ install_packages() {
         foot nautilus gnome-software gnome-software-plugin-flatpak \
         flatpak gnome-text-editor gnome-calculator \
         gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
-        network-manager lightdm slick-greeter \
+        network-manager avahi-daemon libnss-mdns lightdm slick-greeter \
         xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
         gvfs udisks2 \
         qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard swaybg hyprpolkitagent
@@ -83,6 +83,7 @@ configure_lightdm() {
 }
 
 configure_networking() {
+    sudo systemctl enable --now avahi-daemon.service
     # Keep NetworkManager as the only manager for network interfaces. Debian's
     # main configuration is loaded after conf.d, so update the authoritative
     # ifupdown setting instead of relying on a lower-priority drop-in.
@@ -172,7 +173,7 @@ remove_obsolete_link() {
 
 link_configs() {
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
-    link_config "$repo_dir/assets/wallpapers/wallpaper.png" "/.local/share/backgrounds/dotfiles-wallpaper.png"
+    link_config "$repo_dir/assets/wallpapers/wallpaper.png" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png"
     link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/quickshell-network-details" "$HOME/.local/bin/dotfiles-network-details"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
