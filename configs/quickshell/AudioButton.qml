@@ -10,6 +10,12 @@ Rectangle {
     readonly property string icon: !sink || !sink.audio || sink.audio.muted
         ? "󰖁" : percentage === 0 ? "󰕿" : percentage < 50 ? "󰖀" : "󰕾"
 
+    function adjustVolume(delta) {
+        if (!sink || !sink.audio || delta === 0) return;
+        const step = delta > 0 ? 0.05 : -0.05;
+        sink.audio.volume = Math.max(0, Math.min(1.5, sink.audio.volume + step));
+    }
+
     width: 76
     height: 28
     radius: 8
@@ -29,6 +35,10 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onWheel: wheel => {
+            button.adjustVolume(wheel.angleDelta.y);
+            wheel.accepted = true;
+        }
         onClicked: Quickshell.execDetached(["quickshell", "ipc", "call", "audio", "toggle"])
     }
 }
