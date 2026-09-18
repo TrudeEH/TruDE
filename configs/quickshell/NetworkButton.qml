@@ -37,7 +37,7 @@ Rectangle {
         return null;
     }
 
-    width: 120
+    width: Math.max(92, networkLabel.implicitWidth + 20)
     height: 28
     radius: 8
     color: networkMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
@@ -45,6 +45,7 @@ Rectangle {
     border.width: 1
 
     AppText {
+        id: networkLabel
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: 10

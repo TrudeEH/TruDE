@@ -15,6 +15,10 @@ Item {
     property var selectedNetwork: null
     property string passwordText: ""
     property string errorText: ""
+    property string interfaceText: "—"
+    property string ipText: "—"
+    property string gatewayText: "—"
+    property string dnsText: "—"
     readonly property bool available: Networking.backend === NetworkBackendType.NetworkManager
     readonly property var wifiDevice: findWifiDevice()
     readonly property var connectedDevice: findConnectedDevice()
@@ -32,6 +36,12 @@ Item {
         if (connectedNetwork && connectedNetwork.name) return connectedNetwork.name;
         return connectedDevice.type === DeviceType.Wifi ? "Wi-Fi connected" : "Wired connected";
     }
+    readonly property string connectionDetailsCommand:
+        "iface=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: '$2 ~ /connected/ {print $1; exit}'); "
+        + "printf 'interface\\t%s\\n' \"${iface:-Unavailable}\"; "
+        + "printf 'ip\\t%s\\n' \"$(if [ -n \"$iface\" ]; then ip -o -4 addr show dev \"$iface\" scope global 2>/dev/null | awk '{print $4}' | paste -sd ', ' -; else printf 'Unavailable'; fi)\"; "
+        + "printf 'gateway\\t%s\\n' \"$(if [ -n \"$iface\" ]; then ip route show default dev \"$iface\" 2>/dev/null | awk '{print $3; exit}'; else printf 'Unavailable'; fi)\"; "
+        + "printf 'dns\\t%s\\n' \"$(if [ -n \"$iface\" ]; then nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -; else printf 'Unavailable'; fi)\""
 
     function findWifiDevice() {
         for (const device of devices) {
@@ -61,6 +71,19 @@ Item {
 
     function scan() {
         if (popupOpen && wifiDevice) wifiDevice.scannerEnabled = true;
+    }
+
+    function applyConnectionDetails(output) {
+        for (const line of output.trim().split("\n")) {
+            const separator = line.indexOf("\t");
+            if (separator < 0) continue;
+            const key = line.slice(0, separator);
+            const value = line.slice(separator + 1).trim() || "Unavailable";
+            if (key === "interface") interfaceText = value;
+            else if (key === "ip") ipText = value;
+            else if (key === "gateway") gatewayText = value;
+            else if (key === "dns") dnsText = value;
+        }
     }
 
     function stopScan() {
@@ -98,14 +121,20 @@ Item {
             network.closeOtherPopups();
             network.popupScreen = network.focusedScreen;
             network.popupOpen = network.popupScreen !== null;
-            if (network.popupOpen) network.scan();
+            if (network.popupOpen) {
+                network.scan();
+                network.connectionDetails.running = true;
+            }
         }
     }
 
     Connections {
         target: Networking.devices
         function onValuesChanged() {
-            if (network.popupOpen) network.scan();
+            if (network.popupOpen) {
+                network.scan();
+                network.connectionDetails.running = true;
+            }
         }
     }
 
@@ -115,7 +144,19 @@ Item {
             network.errorText = ConnectionFailReason.toString(reason);
         }
         function onConnectedChanged() {
-            if (target && target.connected) network.selectedNetwork = null;
+            if (target && target.connected) {
+                network.selectedNetwork = null;
+                network.connectionDetails.running = true;
+            }
+        }
+    }
+
+    Process {
+        id: connectionDetails
+        command: ["sh", "-c", network.connectionDetailsCommand]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: network.applyConnectionDetails(this.text)
         }
     }
 
@@ -137,7 +178,7 @@ Item {
                 Rectangle {
                     id: card
                     width: 390
-                    height: 560
+                    height: Math.min(parent.height - 24, 620)
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.topMargin: 8
@@ -206,6 +247,43 @@ Item {
                                         onClicked: network.connectedDevice.disconnect()
                                     }
                                 }
+                            }
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            columns: 2
+                            columnSpacing: 8
+                            rowSpacing: 8
+                            visible: network.connectedDevice !== null
+
+                            InfoCard {
+                                Layout.fillWidth: true
+                                icon: "󰈀"
+                                title: "Interface"
+                                value: network.interfaceText
+                                detail: network.connectedDevice ? network.connectedDevice.address : ""
+                            }
+                            InfoCard {
+                                Layout.fillWidth: true
+                                icon: "󰩟"
+                                title: "Address"
+                                value: network.ipText
+                                detail: "IPv4 address"
+                            }
+                            InfoCard {
+                                Layout.fillWidth: true
+                                icon: "󰒍"
+                                title: "Gateway"
+                                value: network.gatewayText
+                                detail: "Default route"
+                            }
+                            InfoCard {
+                                Layout.fillWidth: true
+                                icon: "󰇖"
+                                title: "DNS"
+                                value: network.dnsText
+                                detail: "Name servers"
                             }
                         }
 
