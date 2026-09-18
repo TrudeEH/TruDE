@@ -21,14 +21,14 @@ Rectangle {
 
     Process {
         id: stats
-        command: ["sh", "-c", "awk '/^cpu / && !seen { idle=$5+$6; total=$2+$3+$4+$5+$6+$7+$8+$9+$10; printf \\\"%.0f %.0f\\\\n\\\", idle, total; seen=1 } /^MemTotal:/ { memTotal=$2 } /^MemAvailable:/ { memAvailable=$2 } END { printf \\\"%.0f %.0f\\\\n\\\", memTotal, memAvailable }' /proc/stat /proc/meminfo"]
+        command: ["sh", "-c", "awk '/^cpu / && !seen { print $5+$6, $2+$3+$4+$5+$6+$7+$8+$9+$10; seen=1 } /^MemTotal:/ { print $2 } /^MemAvailable:/ { print $2 }' /proc/stat /proc/meminfo"]
         running: false
 
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = this.text.trim().split("\n")
                     .map(row => row.trim().split(/\s+/).map(Number));
-                if (rows.length < 2 || rows[0].length < 2 || rows[1].length < 2)
+                if (rows.length < 3 || rows[0].length < 2 || rows[1].length < 1 || rows[2].length < 1)
                     return;
 
                 const idle = rows[0][0];
@@ -43,7 +43,7 @@ Rectangle {
                 button.previousTotal = total;
 
                 const memoryTotal = rows[1][0];
-                const memoryAvailable = rows[1][1];
+                const memoryAvailable = rows[2][0];
                 button.memoryUsage = memoryTotal > 0
                     ? 100 * (memoryTotal - memoryAvailable) / memoryTotal : 0;
             }

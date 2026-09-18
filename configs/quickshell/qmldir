@@ -20,3 +20,4 @@ MaintenanceButton 1.0 MaintenanceButton.qml
 MaintenancePanel 1.0 MaintenancePanel.qml
 MetricPill 1.0 MetricPill.qml
 singleton PopupManager 1.0 PopupManager.qml
+InfoCard 1.0 InfoCard.qml
