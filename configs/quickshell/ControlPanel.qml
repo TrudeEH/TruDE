@@ -24,6 +24,12 @@ Rectangle {
     property var availableProfiles: []
     property bool showingAudioOutputs: true
 
+    readonly property int maxVisibleListItems: 5
+    readonly property int deviceRowHeight: 54
+    readonly property int deviceRowSpacing: 6
+    readonly property int maxDeviceListHeight: maxVisibleListItems * deviceRowHeight
+        + (maxVisibleListItems - 1) * deviceRowSpacing
+
     readonly property var networkDevices: Networking.devices.values
     readonly property var wifiDevice: findWifiDevice()
     readonly property var connectedNetworkDevice: findConnectedNetworkDevice()
@@ -520,7 +526,8 @@ Rectangle {
         Rectangle {
             id: card
             width: Math.min(410, parent.width - 24)
-            height: Math.min(650, parent.height - 52)
+            height: Math.min(parent.height - 16, 74
+                + (control.powerMenuOpen ? 82 : 0) + settingsColumn.implicitHeight)
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.topMargin: 8
@@ -635,6 +642,7 @@ Rectangle {
                 }
 
                 Flickable {
+                    id: settingsViewport
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     contentHeight: settingsColumn.implicitHeight
@@ -672,23 +680,39 @@ Rectangle {
                                 font.pixelSize: 11
                             }
 
-                            Repeater {
-                                model: control.wifiDevice && Networking.wifiEnabled
-                                    ? control.wifiDevice.networks.values : []
-                                delegate: DeviceRow {
-                                    required property var modelData
-                                    icon: modelData.signalStrength < 0.25 ? "󰤟"
-                                        : modelData.signalStrength < 0.5 ? "󰤢"
-                                        : modelData.signalStrength < 0.75 ? "󰤥" : "󰤨"
-                                    title: modelData.name
-                                    subtitle: modelData.connected ? "Connected"
-                                        : modelData.stateChanging ? "Connecting…"
-                                        : modelData.known ? "Saved network" : "Secured network"
-                                    selected: modelData.connected
-                                    busy: modelData.stateChanging
-                                    actionText: modelData.connected ? "Disconnect" : "Connect"
-                                    onActionTriggered: control.connectNetwork(modelData)
-                                    onActivated: control.connectNetwork(modelData)
+                            Flickable {
+                                Layout.fillWidth: true
+                                implicitHeight: Math.min(networkListColumn.implicitHeight,
+                                    control.maxDeviceListHeight)
+                                contentHeight: networkListColumn.implicitHeight
+                                clip: true
+                                interactive: contentHeight > height
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                ColumnLayout {
+                                    id: networkListColumn
+                                    width: parent.width
+                                    spacing: control.deviceRowSpacing
+
+                                    Repeater {
+                                        model: control.wifiDevice && Networking.wifiEnabled
+                                            ? control.wifiDevice.networks.values : []
+                                        delegate: DeviceRow {
+                                            required property var modelData
+                                            icon: modelData.signalStrength < 0.25 ? "󰤟"
+                                                : modelData.signalStrength < 0.5 ? "󰤢"
+                                                : modelData.signalStrength < 0.75 ? "󰤥" : "󰤨"
+                                            title: modelData.name
+                                            subtitle: modelData.connected ? "Connected"
+                                                : modelData.stateChanging ? "Connecting…"
+                                                : modelData.known ? "Saved network" : "Secured network"
+                                            selected: modelData.connected
+                                            busy: modelData.stateChanging
+                                            actionText: modelData.connected ? "Disconnect" : "Connect"
+                                            onActionTriggered: control.connectNetwork(modelData)
+                                            onActivated: control.connectNetwork(modelData)
+                                        }
+                                    }
                                 }
                             }
 
@@ -792,32 +816,48 @@ Rectangle {
                                 font.pixelSize: 11
                             }
 
-                            Repeater {
-                                model: control.bluetoothAdapter && control.bluetoothAdapter.enabled
-                                    ? control.bluetoothDevices : []
-                                delegate: DeviceRow {
-                                    required property var modelData
-                                    icon: modelData.icon && modelData.icon.indexOf("head") >= 0 ? "󰋋"
-                                        : modelData.icon && modelData.icon.indexOf("input") >= 0 ? "󰌌" : "󰂯"
-                                    title: modelData.name || modelData.deviceName || modelData.address
-                                    subtitle: modelData.connected
-                                        ? (modelData.batteryAvailable ? "Connected · " + Math.round(modelData.battery * 100) + "%" : "Connected")
-                                        : modelData.pairing ? "Pairing…"
-                                        : modelData.paired ? "Paired" : "Available"
-                                    selected: modelData.connected
-                                    busy: modelData.state === BluetoothDeviceState.Connecting
-                                        || modelData.state === BluetoothDeviceState.Disconnecting || modelData.pairing
-                                    actionText: modelData.connected ? "Disconnect"
-                                        : modelData.paired ? "Connect" : "Pair"
-                                    onActionTriggered: {
-                                        if (modelData.connected) modelData.disconnect();
-                                        else if (modelData.paired) modelData.connect();
-                                        else modelData.pair();
-                                    }
-                                    onActivated: {
-                                        if (modelData.connected) modelData.disconnect();
-                                        else if (modelData.paired) modelData.connect();
-                                        else modelData.pair();
+                            Flickable {
+                                Layout.fillWidth: true
+                                implicitHeight: Math.min(bluetoothListColumn.implicitHeight,
+                                    control.maxDeviceListHeight)
+                                contentHeight: bluetoothListColumn.implicitHeight
+                                clip: true
+                                interactive: contentHeight > height
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                ColumnLayout {
+                                    id: bluetoothListColumn
+                                    width: parent.width
+                                    spacing: control.deviceRowSpacing
+
+                                    Repeater {
+                                        model: control.bluetoothAdapter && control.bluetoothAdapter.enabled
+                                            ? control.bluetoothDevices : []
+                                        delegate: DeviceRow {
+                                            required property var modelData
+                                            icon: modelData.icon && modelData.icon.indexOf("head") >= 0 ? "󰋋"
+                                                : modelData.icon && modelData.icon.indexOf("input") >= 0 ? "󰌌" : "󰂯"
+                                            title: modelData.name || modelData.deviceName || modelData.address
+                                            subtitle: modelData.connected
+                                                ? (modelData.batteryAvailable ? "Connected · " + Math.round(modelData.battery * 100) + "%" : "Connected")
+                                                : modelData.pairing ? "Pairing…"
+                                                : modelData.paired ? "Paired" : "Available"
+                                            selected: modelData.connected
+                                            busy: modelData.state === BluetoothDeviceState.Connecting
+                                                || modelData.state === BluetoothDeviceState.Disconnecting || modelData.pairing
+                                            actionText: modelData.connected ? "Disconnect"
+                                                : modelData.paired ? "Connect" : "Pair"
+                                            onActionTriggered: {
+                                                if (modelData.connected) modelData.disconnect();
+                                                else if (modelData.paired) modelData.connect();
+                                                else modelData.pair();
+                                            }
+                                            onActivated: {
+                                                if (modelData.connected) modelData.disconnect();
+                                                else if (modelData.paired) modelData.connect();
+                                                else modelData.pair();
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -983,21 +1023,37 @@ Rectangle {
                                 font.bold: true
                             }
 
-                            Repeater {
-                                model: control.visibleAudioDevices
-                                delegate: DeviceRow {
-                                    required property var modelData
-                                    readonly property bool isDefault: control.showingAudioOutputs
-                                        ? control.defaultSink === modelData : control.defaultSource === modelData
-                                    icon: control.showingAudioOutputs ? "󰓃" : "󰍬"
-                                    title: modelData.nickname || modelData.description || modelData.name
-                                    subtitle: isDefault
-                                        ? (control.showingAudioOutputs ? "Default output" : "Default input")
-                                        : Math.round(modelData.audio.volume * 100) + "%"
-                                    selected: isDefault
-                                    actionText: isDefault ? "Active" : "Select"
-                                    onActionTriggered: control.selectAudioDevice(modelData)
-                                    onActivated: control.selectAudioDevice(modelData)
+                            Flickable {
+                                Layout.fillWidth: true
+                                implicitHeight: Math.min(audioListColumn.implicitHeight,
+                                    control.maxDeviceListHeight)
+                                contentHeight: audioListColumn.implicitHeight
+                                clip: true
+                                interactive: contentHeight > height
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                ColumnLayout {
+                                    id: audioListColumn
+                                    width: parent.width
+                                    spacing: control.deviceRowSpacing
+
+                                    Repeater {
+                                        model: control.visibleAudioDevices
+                                        delegate: DeviceRow {
+                                            required property var modelData
+                                            readonly property bool isDefault: control.showingAudioOutputs
+                                                ? control.defaultSink === modelData : control.defaultSource === modelData
+                                            icon: control.showingAudioOutputs ? "󰓃" : "󰍬"
+                                            title: modelData.nickname || modelData.description || modelData.name
+                                            subtitle: isDefault
+                                                ? (control.showingAudioOutputs ? "Default output" : "Default input")
+                                                : Math.round(modelData.audio.volume * 100) + "%"
+                                            selected: isDefault
+                                            actionText: isDefault ? "Active" : "Select"
+                                            onActionTriggered: control.selectAudioDevice(modelData)
+                                            onActivated: control.selectAudioDevice(modelData)
+                                        }
+                                    }
                                 }
                             }
 
