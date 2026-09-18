@@ -58,9 +58,10 @@ install_packages() {
     sudo apt-get update
 
     # Install the compositor, shell, and their related portal components
-    # from backports. The -t flag is kept on this focused transaction only.
+    # from backports. libdw1t64 keeps the backported libelf1t64 dependency
+    # consistent when stable packages such as bluez are installed afterward.
     sudo apt-get install -y -t "$backports_suite" \
-        hyprland hyprland-guiutils hypridle hyprlock quickshell uwsm xdg-desktop-portal-hyprland
+        hyprland hyprland-guiutils hypridle hyprlock libdw1t64 quickshell uwsm xdg-desktop-portal-hyprland
 
     # The rest of the desktop uses the release's normal package priorities.
     sudo apt-get install -y \
