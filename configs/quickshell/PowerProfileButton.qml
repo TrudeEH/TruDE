@@ -6,6 +6,7 @@ import "."
 Rectangle {
     id: button
 
+    property bool available: false
     property string profile: "balanced"
     readonly property string profileLabel: profile === "power-saver" ? "Power saver"
         : profile.charAt(0).toUpperCase() + profile.slice(1)
@@ -19,12 +20,13 @@ Rectangle {
 
     Process {
         id: currentProfile
-        command: ["powerprofilesctl", "get"]
+        command: ["sh", "-c", "if command -v powerprofilesctl >/dev/null 2>&1; then powerprofilesctl get; else printf 'missing\n'; fi"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
                 const value = this.text.trim();
-                if (value.length > 0) button.profile = value;
+                button.available = value !== "missing";
+                if (button.available && value.length > 0) button.profile = value;
             }
         }
     }
@@ -45,8 +47,8 @@ Rectangle {
         anchors.leftMargin: 10
         anchors.rightMargin: 10
         anchors.verticalCenter: parent.verticalCenter
-        text: "󰾅  " + button.profileLabel
-        color: Theme.text
+        text: "󰾅  " + (button.available ? button.profileLabel : "Power profiles unavailable")
+        color: button.available ? Theme.text : Theme.textDim
         font.pixelSize: 12
         elide: Text.ElideRight
     }

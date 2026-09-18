@@ -11,6 +11,7 @@ Item {
 
     property bool popupOpen: false
     property int popupMonitorId: -1
+    property bool available: false
     property string current: "balanced"
     readonly property var availableProfiles: [
         { name: "power-saver", label: "Power saver", subtitle: "Extend battery life", icon: "󰌪" },
@@ -39,12 +40,13 @@ Item {
 
     Process {
         id: currentProfile
-        command: ["powerprofilesctl", "get"]
+        command: ["sh", "-c", "if command -v powerprofilesctl >/dev/null 2>&1; then powerprofilesctl get; else printf 'missing\n'; fi"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
                 const value = this.text.trim();
-                if (value.length > 0) profiles.current = value;
+                profiles.available = value !== "missing";
+                if (profiles.available && value.length > 0) profiles.current = value;
             }
         }
     }
@@ -100,6 +102,11 @@ Item {
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+                Rectangle {
+                    anchors.fill: parent
+                    color: Theme.overlay
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     onClicked: profiles.close()
@@ -107,7 +114,7 @@ Item {
 
                 Rectangle {
                     id: card
-                    width: 360
+                    width: Math.min(360, parent.width - 24)
                     height: 224
                     anchors.top: parent.top
                     anchors.right: parent.right
@@ -140,13 +147,15 @@ Item {
 
                         AppText {
                             Layout.fillWidth: true
-                            text: "Choose how the computer balances speed and battery life"
+                            text: profiles.available ? "Choose how the computer balances speed and battery life"
+                                : "Install power-profiles-daemon to enable these controls"
                             color: Theme.textDim
                             font.pixelSize: 11
                             wrapMode: Text.WordWrap
                         }
 
                         Repeater {
+                            visible: profiles.available
                             model: profiles.availableProfiles
                             delegate: Rectangle {
                                 required property var modelData
@@ -198,6 +207,15 @@ Item {
                                     onClicked: profiles.setProfile(modelData.name)
                                 }
                             }
+                        }
+
+                        AppText {
+                            visible: !profiles.available
+                            Layout.fillWidth: true
+                            text: "Power profiles are unavailable"
+                            color: Theme.textDim
+                            font.pixelSize: 12
+                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
                 }

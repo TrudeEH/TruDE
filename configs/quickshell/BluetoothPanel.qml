@@ -11,6 +11,7 @@ Item {
 
     property bool popupOpen: false
     property int popupMonitorId: -1
+    property bool available: false
     property bool powered: false
     property string errorText: ""
     property var devices: []
@@ -45,10 +46,13 @@ Item {
 
     Process {
         id: status
-        command: ["sh", "-c", "bluetoothctl show 2>/dev/null | awk -F': ' '/Powered:/ { print $2; exit }'"]
+        command: ["sh", "-c", "if command -v bluetoothctl >/dev/null 2>&1; then bluetoothctl show 2>/dev/null | awk -F': ' '/Powered:/ { print $2; exit }'; else printf 'missing\n'; fi"]
         running: false
         stdout: StdioCollector {
-            onStreamFinished: bluetooth.powered = this.text.trim() === "yes"
+            onStreamFinished: {
+                bluetooth.available = this.text.trim() !== "missing";
+                bluetooth.powered = this.text.trim() === "yes";
+            }
         }
     }
 
@@ -122,6 +126,11 @@ Item {
                 WlrLayershell.layer: WlrLayer.Overlay
                 WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+                Rectangle {
+                    anchors.fill: parent
+                    color: Theme.overlay
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     onClicked: bluetooth.close()
@@ -129,7 +138,7 @@ Item {
 
                 Rectangle {
                     id: card
-                    width: 360
+                    width: Math.min(360, parent.width - 24)
                     height: Math.min(430, 158 + bluetooth.devices.length * 58)
                     anchors.top: parent.top
                     anchors.right: parent.right
@@ -165,18 +174,19 @@ Item {
                                 implicitWidth: 76
                                 implicitHeight: 28
                                 radius: 8
-                                color: bluetooth.powered ? Theme.accent : Theme.surfaceRaised
+                                color: bluetooth.available && bluetooth.powered ? Theme.accent : Theme.surfaceRaised
                                 border.color: bluetooth.powered ? Theme.accent : Theme.border
                                 border.width: 1
                                 AppText {
                                     anchors.centerIn: parent
-                                    text: bluetooth.powered ? "On" : "Off"
-                                    color: bluetooth.powered ? Theme.accentText : Theme.textDim
+                                    text: !bluetooth.available ? "N/A" : bluetooth.powered ? "On" : "Off"
+                                    color: bluetooth.available && bluetooth.powered ? Theme.accentText : Theme.textDim
                                     font.pixelSize: 12
                                 }
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
+                                    enabled: bluetooth.available
                                     onClicked: bluetooth.run(["bluetoothctl", "power", bluetooth.powered ? "off" : "on"])
                                 }
                             }
@@ -184,7 +194,8 @@ Item {
 
                         AppText {
                             Layout.fillWidth: true
-                            text: bluetooth.powered ? "Paired and nearby devices" : "Turn Bluetooth on to manage devices"
+                            text: !bluetooth.available ? "Install bluez to manage Bluetooth devices"
+                                : bluetooth.powered ? "Paired and nearby devices" : "Turn Bluetooth on to manage devices"
                             color: Theme.textDim
                             font.pixelSize: 11
                         }
@@ -251,7 +262,7 @@ Item {
                         Item { Layout.fillHeight: true }
 
                         AppText {
-                            visible: bluetooth.devices.length === 0
+                            visible: bluetooth.available && bluetooth.devices.length === 0
                             Layout.fillWidth: true
                             text: "No Bluetooth devices found"
                             color: Theme.textDim

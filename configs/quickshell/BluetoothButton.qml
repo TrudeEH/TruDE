@@ -6,6 +6,7 @@ import "."
 Rectangle {
     id: button
 
+    property bool available: false
     property bool powered: false
     property string connectedDevice: ""
 
@@ -18,11 +19,12 @@ Rectangle {
 
     Process {
         id: status
-        command: ["sh", "-c", "powered=$(bluetoothctl show 2>/dev/null | awk -F': ' '/Powered:/ { print $2; exit }'); connected=$(bluetoothctl devices Connected 2>/dev/null | sed -E 's/^Device [^ ]+ //' | head -n1); printf '%s\\t%s\\n' \"$powered\" \"$connected\""]
+        command: ["sh", "-c", "if ! command -v bluetoothctl >/dev/null 2>&1; then printf 'missing\\t\\n'; exit; fi; powered=$(bluetoothctl show 2>/dev/null | awk -F': ' '/Powered:/ { print $2; exit }'); connected=$(bluetoothctl devices Connected 2>/dev/null | sed -E 's/^Device [^ ]+ //' | head -n1); printf '%s\\t%s\\n' \"$powered\" \"$connected\""]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
                 const fields = this.text.trim().split("\t");
+                button.available = fields[0] !== "missing";
                 button.powered = fields[0] === "yes";
                 button.connectedDevice = fields.length > 1 ? fields.slice(1).join("\t") : "";
             }
@@ -45,10 +47,10 @@ Rectangle {
         anchors.leftMargin: 10
         anchors.rightMargin: 10
         anchors.verticalCenter: parent.verticalCenter
-        text: "󰂯  " + (button.powered
-            ? (button.connectedDevice.length > 0 ? button.connectedDevice : "Bluetooth")
+        text: "󰂯  " + (!button.available ? "Bluetooth unavailable"
+            : button.powered ? (button.connectedDevice.length > 0 ? button.connectedDevice : "Bluetooth")
             : "Bluetooth off")
-        color: button.powered ? Theme.text : Theme.textDim
+        color: button.available && button.powered ? Theme.text : Theme.textDim
         font.pixelSize: 12
         elide: Text.ElideRight
     }
