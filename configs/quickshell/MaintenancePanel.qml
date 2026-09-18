@@ -59,10 +59,10 @@ Item {
     }
 
     function applyDetails(output) {
-        upgrades = [];
-        backportPackages = [];
-        flatpakPackages = [];
-        failedUnits = [];
+        const parsedUpgrades = [];
+        const parsedBackportPackages = [];
+        const parsedFlatpakPackages = [];
+        const parsedFailedUnits = [];
 
         for (const line of output.trim().split("\n")) {
             const separator = line.indexOf("\t");
@@ -78,11 +78,16 @@ Item {
             else if (key === "flatpakUpdates") flatpakUpdatesText = value;
             else if (key === "reboot") rebootText = value;
             else if (key === "failed") failedText = value;
-            else if (key === "upgrade") upgrades.push(value);
-            else if (key === "backportPackage") backportPackages.push(value);
-            else if (key === "flatpakPackage") flatpakPackages.push(value);
-            else if (key === "failedUnit") failedUnits.push(value);
+            else if (key === "upgrade") parsedUpgrades.push(value);
+            else if (key === "backportPackage") parsedBackportPackages.push(value);
+            else if (key === "flatpakPackage") parsedFlatpakPackages.push(value);
+            else if (key === "failedUnit") parsedFailedUnits.push(value);
         }
+
+        upgrades = parsedUpgrades;
+        backportPackages = parsedBackportPackages;
+        flatpakPackages = parsedFlatpakPackages;
+        failedUnits = parsedFailedUnits;
     }
 
     function refresh() {
