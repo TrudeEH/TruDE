@@ -23,6 +23,8 @@ Rectangle {
     property string currentProfile: "balanced"
     property var availableProfiles: []
     property bool showingAudioOutputs: true
+    property bool captureActive: false
+    property string captureApplication: ""
 
     readonly property int maxVisibleListItems: 5
     readonly property int deviceRowHeight: 54
@@ -190,6 +192,36 @@ Rectangle {
         else Pipewire.preferredDefaultAudioSource = node;
     }
 
+    function updateCaptureState(output) {
+        try {
+            const graph = JSON.parse(output);
+            let active = false;
+            let application = "";
+            for (const object of graph) {
+                if (object.type !== "PipeWire:Interface:Node" || !object.info
+                        || object.info.state !== "running") continue;
+                const properties = object.info.props || {};
+                const mediaClass = properties["media.class"] || "";
+                const nodeName = properties["node.name"] || "";
+                const videoConsumer = mediaClass === "Stream/Input/Video"
+                    || mediaClass === "Stream/Output/Video";
+                const portalSource = mediaClass === "Video/Source"
+                    && /portal|screencast|screen/i.test(nodeName);
+                if (!videoConsumer && !portalSource) continue;
+                active = true;
+                const candidate = properties["application.name"]
+                    || properties["node.description"] || "";
+                if (candidate.length > 0 && candidate !== "xdg-desktop-portal-hyprland")
+                    application = candidate;
+            }
+            captureActive = active;
+            captureApplication = application;
+        } catch (error) {
+            captureActive = false;
+            captureApplication = "";
+        }
+    }
+
     function runPowerAction(command) {
         close();
         Quickshell.execDetached(command);
@@ -221,6 +253,12 @@ Rectangle {
             visible: control.profilesAvailable
             text: control.profileIcon
             color: Theme.text
+            font.pixelSize: 14
+        }
+        AppText {
+            visible: control.captureActive
+            text: "󰑋"
+            color: "#ff4d4d"
             font.pixelSize: 14
         }
     }
@@ -276,6 +314,15 @@ Rectangle {
         }
     }
 
+    Process {
+        id: captureQuery
+        command: ["pw-dump"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: control.updateCaptureState(this.text)
+        }
+    }
+
     Timer {
         id: profileRefresh
         interval: 500
@@ -290,7 +337,17 @@ Rectangle {
         onTriggered: control.refreshProfiles()
     }
 
-    Component.onCompleted: refreshProfiles()
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        onTriggered: if (!captureQuery.running) captureQuery.running = true
+    }
+
+    Component.onCompleted: {
+        refreshProfiles();
+        captureQuery.running = true;
+    }
 
     component ToggleSwitch: Rectangle {
         id: toggleSwitch
@@ -582,6 +639,37 @@ Rectangle {
                             onClicked: {
                                 control.powerMenuOpen = !control.powerMenuOpen;
                                 control.expandedSection = "";
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        visible: control.captureActive
+                        anchors.right: powerButton.left
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: captureLabel.implicitWidth + 24
+                        height: 30
+                        radius: 15
+                        color: "#ff4d4d"
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 8
+                                height: 8
+                                radius: 4
+                                color: Theme.text
+                            }
+                            AppText {
+                                id: captureLabel
+                                text: control.captureApplication.length > 0
+                                    ? control.captureApplication + " sharing" : "Screen sharing"
+                                color: Theme.text
+                                font.pixelSize: 10
+                                font.bold: true
                             }
                         }
                     }
