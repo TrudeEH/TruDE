@@ -50,8 +50,8 @@ Item {
                     anchors.fill: parent
                     radius: 7
                     color: menuEntry.modelData.enabled && entryMouse.containsMouse
-                        ? Theme.accentStrong
-                        : Theme.surfaceRaised
+                        ? Theme.surfaceHover
+                        : Theme.transparent
                 }
 
                 IconImage {
