@@ -15,6 +15,14 @@ PanelWindow {
     screen: modelData
     readonly property var hyprMonitor: Hyprland.monitorFor(screen)
     property var occupiedWorkspaces: []
+    readonly property var physicalWorkspaceIds: {
+        if (Hyprland.monitors.values.length <= 1) return [];
+        const ids = [];
+        for (const monitor of Hyprland.monitors.values) {
+            if (monitor.activeWorkspace) ids.push(monitor.activeWorkspace.id);
+        }
+        return ids;
+    }
 
     Process {
         id: workspaceState
@@ -80,6 +88,7 @@ PanelWindow {
                             && bar.hyprMonitor.activeWorkspace
                             && bar.hyprMonitor.activeWorkspace.id === number
                         readonly property bool occupied: bar.occupiedWorkspaces.indexOf(number) >= 0
+                        readonly property bool physical: bar.physicalWorkspaceIds.indexOf(number) >= 0
 
                         Layout.alignment: Qt.AlignVCenter
                         width: 24
@@ -91,10 +100,10 @@ PanelWindow {
 
                         AppText {
                             anchors.centerIn: parent
-                            text: workspace.number === 10 ? "0" : workspace.number
+                            text: workspace.physical ? "󰍹" : (workspace.number === 10 ? "0" : workspace.number)
                             color: workspace.active ? Theme.accentText : Theme.text
                             font.bold: workspace.active
-                            font.pixelSize: 12
+                            font.pixelSize: workspace.physical ? 14 : 12
                         }
                         Rectangle {
                             visible: workspace.occupied && !workspace.active
