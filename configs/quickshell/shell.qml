@@ -23,21 +23,6 @@ ShellRoot {
     MaintenancePanel {
     }
 
-    NetworkPanel {
-    }
-
-    BluetoothPanel {
-    }
-
-    PowerProfilePanel {
-    }
-
-    AudioPanel {
-    }
-
-    PowerMenu {
-    }
-
     Launcher {
     }
 

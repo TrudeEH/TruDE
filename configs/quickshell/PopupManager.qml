@@ -5,8 +5,7 @@ import QtQuick
 
 QtObject {
     readonly property var targets: [
-        "network", "bluetooth", "power-profile", "audio", "notifications", "launcher",
-        "shortcuts", "system-monitor", "maintenance", "tray"
+        "notifications", "launcher", "shortcuts", "system-monitor", "maintenance", "tray"
     ]
 
     function closeExcept(activeTarget) {

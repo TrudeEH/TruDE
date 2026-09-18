@@ -169,13 +169,10 @@ PanelWindow {
 
             MaintenanceButton { Layout.alignment: Qt.AlignVCenter }
 
-            NetworkButton { Layout.alignment: Qt.AlignVCenter }
-
-            BluetoothButton { Layout.alignment: Qt.AlignVCenter }
-
-            PowerProfileButton { Layout.alignment: Qt.AlignVCenter }
-
-            AudioButton { Layout.alignment: Qt.AlignVCenter }
+            ControlPanel {
+                Layout.alignment: Qt.AlignVCenter
+                panelScreen: bar.screen
+            }
 
             Row {
                 Layout.alignment: Qt.AlignVCenter
@@ -224,8 +221,6 @@ PanelWindow {
                     }
                 }
             }
-
-            PowerButton {}
         }
     }
 }

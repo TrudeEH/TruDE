@@ -211,8 +211,12 @@ link_configs() {
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 
     local quickshell_file
-    for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml Bar.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml InfoCard.qml MetricPill.qml PowerProfileButton.qml PowerProfilePanel.qml PopupManager.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml NotificationCenter.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
+    for quickshell_file in shell.qml AppText.qml Bar.qml ControlPanel.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml InfoCard.qml MetricPill.qml PopupManager.qml LauncherButton.qml Launcher.qml NotificationCenter.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
         link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
+    done
+
+    for quickshell_file in AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml PowerProfileButton.qml PowerProfilePanel.qml; do
+        remove_obsolete_link "$config_dir/quickshell/$quickshell_file" "$repo_dir/configs/quickshell/$quickshell_file"
     done
 
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
