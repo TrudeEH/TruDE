@@ -14,3 +14,7 @@ Shortcuts 1.0 Shortcuts.qml
 singleton Theme 1.0 Theme.qml
 TrayMenu 1.0 TrayMenu.qml
 TrayMenuView 1.0 TrayMenuView.qml
+SystemMonitorButton 1.0 SystemMonitorButton.qml
+SystemMonitorPanel 1.0 SystemMonitorPanel.qml
+MaintenanceButton 1.0 MaintenanceButton.qml
+MaintenancePanel 1.0 MaintenancePanel.qml

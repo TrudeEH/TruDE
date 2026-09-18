@@ -126,6 +126,8 @@ PanelWindow {
 
             SystemMonitorButton {}
 
+            MaintenanceButton {}
+
             NetworkButton {}
 
             AudioButton {}

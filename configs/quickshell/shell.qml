@@ -20,6 +20,9 @@ ShellRoot {
     SystemMonitorPanel {
     }
 
+    MaintenancePanel {
+    }
+
     NetworkPanel {
     }
 

@@ -178,7 +178,7 @@ link_configs() {
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 
     local quickshell_file
-    for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml Bar.qml SystemMonitorButton.qml SystemMonitorPanel.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml NotificationCenter.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
+    for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml Bar.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml NotificationCenter.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
         link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
     done
 
