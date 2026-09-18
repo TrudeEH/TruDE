@@ -26,6 +26,12 @@ ShellRoot {
     NetworkPanel {
     }
 
+    BluetoothPanel {
+    }
+
+    PowerProfilePanel {
+    }
+
     AudioPanel {
     }
 

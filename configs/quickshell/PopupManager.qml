@@ -5,7 +5,7 @@ import QtQuick
 
 QtObject {
     readonly property var targets: [
-        "network", "audio", "power", "notifications", "launcher",
+        "network", "bluetooth", "power-profile", "audio", "notifications", "launcher",
         "shortcuts", "system-monitor", "maintenance", "tray"
     ]
 

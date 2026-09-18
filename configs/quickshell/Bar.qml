@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
@@ -13,6 +14,31 @@ PanelWindow {
     required property var notificationCenter
     screen: modelData
     readonly property var hyprMonitor: Hyprland.monitorFor(screen)
+    property var occupiedWorkspaces: []
+
+    Process {
+        id: workspaceState
+        command: ["sh", "-c", "hyprctl workspaces -j"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    bar.occupiedWorkspaces = JSON.parse(this.text).map(workspace => workspace.id);
+                } catch (error) {
+                    bar.occupiedWorkspaces = [];
+                }
+            }
+        }
+    }
+
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        onTriggered: workspaceState.running = true
+    }
+
+    Component.onCompleted: workspaceState.running = true
 
     SystemClock {
         id: clock
@@ -53,12 +79,15 @@ PanelWindow {
                         readonly property bool active: bar.hyprMonitor
                             && bar.hyprMonitor.activeWorkspace
                             && bar.hyprMonitor.activeWorkspace.id === number
+                        readonly property bool occupied: bar.occupiedWorkspaces.indexOf(number) >= 0
 
                         Layout.alignment: Qt.AlignVCenter
                         width: 24
                         height: 24
                         radius: 4
                         color: active ? Theme.accent : (workspaceMouse.containsMouse ? Theme.surfaceHover : Theme.surface)
+                        border.color: active ? Theme.accent : (occupied ? Theme.border : Theme.transparent)
+                        border.width: 1
 
                         AppText {
                             anchors.centerIn: parent
@@ -66,6 +95,16 @@ PanelWindow {
                             color: workspace.active ? Theme.accentText : Theme.text
                             font.bold: workspace.active
                             font.pixelSize: 12
+                        }
+                        Rectangle {
+                            visible: workspace.occupied && !workspace.active
+                            anchors.bottom: parent.bottom
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottomMargin: 3
+                            width: 4
+                            height: 4
+                            radius: 2
+                            color: Theme.accent
                         }
                         MouseArea {
                             id: workspaceMouse
@@ -131,6 +170,10 @@ PanelWindow {
             MaintenanceButton { Layout.alignment: Qt.AlignVCenter }
 
             NetworkButton { Layout.alignment: Qt.AlignVCenter }
+
+            BluetoothButton { Layout.alignment: Qt.AlignVCenter }
+
+            PowerProfileButton { Layout.alignment: Qt.AlignVCenter }
 
             AudioButton { Layout.alignment: Qt.AlignVCenter }
 

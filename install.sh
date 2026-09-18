@@ -69,6 +69,7 @@ install_packages() {
         gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
         network-manager avahi-daemon libnss-mdns lightdm slick-greeter \
         xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
+        bluez power-profiles-daemon \
         gvfs udisks2 \
         qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard swaybg hyprpolkitagent
 }
@@ -102,6 +103,10 @@ configure_lightdm() {
     sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
         /var/lib/lightdm/.config/gtk-3.0/gtk.css
     sudo systemctl enable lightdm.service
+}
+
+configure_hardware_services() {
+    sudo systemctl enable --now bluetooth.service power-profiles-daemon.service
 }
 
 configure_networking() {
@@ -204,7 +209,7 @@ link_configs() {
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 
     local quickshell_file
-    for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml Bar.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml InfoCard.qml MetricPill.qml PopupManager.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml NotificationCenter.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
+    for quickshell_file in shell.qml AppText.qml AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml Bar.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml InfoCard.qml MetricPill.qml PowerProfileButton.qml PowerProfilePanel.qml PopupManager.qml LauncherButton.qml Launcher.qml NetworkButton.qml NetworkPanel.qml NotificationCenter.qml PowerButton.qml PowerMenu.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
         link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
     done
 
@@ -222,6 +227,7 @@ main() {
     configure_flatpak
     configure_lightdm
     configure_networking
+    configure_hardware_services
     configure_pam
     configure_session
     configure_theme
