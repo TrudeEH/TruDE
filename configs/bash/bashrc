@@ -53,7 +53,7 @@ shopt -s no_empty_cmd_completion 2>/dev/null || true
 
 # Readline completion and history navigation
 bind 'set show-all-if-ambiguous on'
-bind 'set completion-ignore-case on'
+bind 'set completion-ignore-case off'
 bind 'set completion-map-case on'
 bind 'set mark-symlinked-directories on'
 bind 'TAB:menu-complete'
