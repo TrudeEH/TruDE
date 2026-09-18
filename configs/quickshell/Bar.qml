@@ -99,7 +99,7 @@ PanelWindow {
 
                 AppText {
                     id: clockText
-                    text: Qt.formatDateTime(clock.date, "ddd d MMM  HH:mm")
+                    text: Qt.formatDateTime(clock.date, "ddd d MMM  h:mm AP")
                     color: Theme.text
                     font.pixelSize: 12
                 }
