@@ -40,11 +40,10 @@ Item {
         const iface = connectedDevice ? connectedDevice.name : "";
         if (!iface) return "printf 'interface\\tUnavailable\\n'; printf 'ip\\tUnavailable\\n'; printf 'gateway\\tUnavailable\\n'; printf 'dns\\tUnavailable\\n'";
         const quotedInterface = JSON.stringify(iface);
-        return "iface=" + quotedInterface + "; "
-            + "printf 'interface\\t%s\\n' \"$iface\"; "
-            + "ip=\$(nmcli -g IP4.ADDRESS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$ip\" ] || ip=\$(ip -o -4 addr show dev \"$iface\" scope global 2>/dev/null | awk '{print $4}' | paste -sd ', ' -); printf 'ip\\t%s\\n' \"\${ip:-Unavailable}\"; "
-            + "gateway=\$(nmcli -g IP4.GATEWAY device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$gateway\" ] || gateway=\$(ip route show default dev \"$iface\" 2>/dev/null | awk '{print $3; exit}'); printf 'gateway\\t%s\\n' \"\${gateway:-Unavailable}\"; "
-            + "dns=\$(nmcli -g IP4.DNS device show \"$iface\" 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$dns\" ] || dns=\$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | paste -sd ', ' -); printf 'dns\\t%s\\n' \"\${dns:-Unavailable}\"";
+        return "printf 'interface\\t%s\\n' " + quotedInterface + "; "
+            + "ip=\$(nmcli -g IP4.ADDRESS device show " + quotedInterface + " 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$ip\" ] || ip=\$(ip -o -4 addr show dev " + quotedInterface + " scope global 2>/dev/null | awk '{print $4}' | paste -sd ', ' -); printf 'ip\\t%s\\n' \"\${ip:-Unavailable}\"; "
+            + "gateway=\$(nmcli -g IP4.GATEWAY device show " + quotedInterface + " 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$gateway\" ] || gateway=\$(ip route show default dev " + quotedInterface + " 2>/dev/null | awk '{print $3; exit}'); printf 'gateway\\t%s\\n' \"\${gateway:-Unavailable}\"; "
+            + "dns=\$(nmcli -g IP4.DNS device show " + quotedInterface + " 2>/dev/null | sed '/^$/d' | paste -sd ', ' -); [ -n \"$dns\" ] || dns=\$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | paste -sd ', ' -); printf 'dns\\t%s\\n' \"\${dns:-Unavailable}\"";
     }
 
     function findWifiDevice() {
