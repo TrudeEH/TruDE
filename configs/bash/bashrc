@@ -1,0 +1,97 @@
+# Interactive Bash configuration for the dotfiles environment.
+[[ $- != *i* ]] && return
+
+# Keep local dotfiles utilities available from every shell.
+export PATH="$HOME/dotfiles/scripts:$PATH"
+
+# Prefer modern tools when installed without making them required.
+if command -v batcat >/dev/null 2>&1; then
+    alias cat='batcat'
+elif command -v bat >/dev/null 2>&1; then
+    alias cat='bat'
+fi
+if command -v nvim >/dev/null 2>&1; then
+    alias v='nvim'
+fi
+if command -v lsd >/dev/null 2>&1; then
+    alias lt='lsd --tree'
+fi
+if command -v tmux >/dev/null 2>&1; then
+    alias t='tmux'
+    alias ta='tmux attach'
+fi
+
+alias l='ls -alh'
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias ll='ls -lhi'
+alias la='ls -A'
+alias df='df -h'
+alias du='du -h'
+alias free='free -h'
+alias ip='ip -color=auto'
+alias diff='diff --color=auto'
+alias mkdir='mkdir -pv'
+
+# History
+HISTSIZE=50000
+HISTFILESIZE=200000
+HISTCONTROL=ignoredups:erasedups
+HISTIGNORE='ls:ll:la:l:cd:pwd:exit:clear:history'
+
+# Shell behavior
+shopt -s histappend
+shopt -s checkwinsize
+shopt -s extglob
+shopt -s globstar
+shopt -s cdspell
+shopt -s dirspell
+shopt -s autocd
+shopt -s cmdhist
+shopt -s checkjobs
+shopt -s no_empty_cmd_completion 2>/dev/null || true
+
+# Readline completion and history navigation
+bind 'set show-all-if-ambiguous on'
+bind 'set completion-ignore-case on'
+bind 'set completion-map-case on'
+bind 'set mark-symlinked-directories on'
+bind 'TAB:menu-complete'
+bind '"\e[Z": menu-complete-backward'
+bind '"\e[A": history-search-backward'
+bind '"\e[B": history-search-forward'
+
+# Share history between open shells.
+PROMPT_COMMAND="history -a; history -n; ${PROMPT_COMMAND:-}"
+
+# Pager behavior for terminal-friendly output.
+export LESS='-FRiMX'
+export MANPAGER='less -R'
+export BAT_PAGER='less -FR'
+
+# Prefer Neovim when available.
+if command -v nvim >/dev/null 2>&1; then
+    export EDITOR="${EDITOR:-nvim}"
+else
+    export EDITOR="${EDITOR:-vi}"
+fi
+export VISUAL="${VISUAL:-$EDITOR}"
+
+# Prompt with exit status on failure, current directory, and job count.
+__bash_prompt() {
+    local exit_code=$?
+    local reset='\[\e[0m\]'
+    local bold='\[\e[1m\]'
+    local dim='\[\e[2m\]'
+    local white='\[\e[37m\]'
+    local orange='\[\e[38;5;215m\]'
+    local red='\[\e[31m\]'
+    local status=''
+
+    if [ "$exit_code" -ne 0 ]; then
+        status=" ${red}x:$exit_code${reset}"
+    fi
+
+    PS1="\n[${white}\u${reset}@${dim}\h${reset}] ${bold}${orange}\w${reset}${status} ${dim}J:${reset}\j\n\\$ "
+}
+PROMPT_COMMAND="__bash_prompt; ${PROMPT_COMMAND:-}"

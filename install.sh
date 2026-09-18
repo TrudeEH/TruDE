@@ -184,6 +184,7 @@ link_configs() {
 
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
+    link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 }
 
 main() {
