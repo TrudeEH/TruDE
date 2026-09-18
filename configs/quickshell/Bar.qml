@@ -124,6 +124,8 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
 
+            SystemMonitorButton {}
+
             NetworkButton {}
 
             AudioButton {}

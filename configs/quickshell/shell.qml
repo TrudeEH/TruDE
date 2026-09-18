@@ -17,6 +17,9 @@ ShellRoot {
         }
     }
 
+    SystemMonitorPanel {
+    }
+
     NetworkPanel {
     }
 
