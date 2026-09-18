@@ -56,7 +56,7 @@ local terminal    = "foot"
 local fileManager = "nautilus"
 local menu        = "quickshell ipc call launcher toggle"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
-local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg"
+local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png"
 
 
 -------------------

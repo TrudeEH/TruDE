@@ -172,7 +172,7 @@ remove_obsolete_link() {
 
 link_configs() {
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
-    link_config "$repo_dir/assets/wallpapers/wallpaper.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
+    link_config "$repo_dir/assets/wallpapers/wallpaper.png" "/.local/share/backgrounds/dotfiles-wallpaper.png"
     link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/quickshell-network-details" "$HOME/.local/bin/dotfiles-network-details"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
