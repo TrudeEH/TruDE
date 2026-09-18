@@ -5,6 +5,7 @@ repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
 backports_suite=stable-backports
+debian_components_sources=/etc/apt/sources.list.d/dotfiles-components.sources
 
 check_platform() {
     if [[ ${EUID} -eq 0 ]]; then
@@ -17,6 +18,25 @@ check_platform() {
     if [[ ${ID:-} != debian || ! ${debian_major:-} =~ ^[0-9]+$ || $debian_major -lt 13 || -z ${VERSION_CODENAME:-} ]]; then
         echo "This installer supports Debian 13 (trixie) and newer Debian releases." >&2
         exit 1
+    fi
+}
+
+configure_debian_sources() {
+    # Keep Debian's existing main entries and add the optional components.
+    if ! sudo test -f "$debian_components_sources" || ! sudo grep -Fqx "Components: contrib non-free non-free-firmware" "$debian_components_sources"; then
+        sudo tee "$debian_components_sources" >/dev/null <<SOURCES
+Types: deb
+URIs: https://deb.debian.org/debian
+Suites: stable stable-updates
+Components: contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://deb.debian.org/debian-security
+Suites: stable-security
+Components: contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SOURCES
     fi
 }
 
@@ -193,6 +213,7 @@ link_configs() {
 
 main() {
     check_platform
+    configure_debian_sources
     configure_backports
     install_packages
     install_font
