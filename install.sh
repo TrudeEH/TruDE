@@ -22,19 +22,20 @@ check_platform() {
 }
 
 configure_debian_sources() {
-    # Keep Debian's existing main entries and add the optional components.
-    if ! sudo test -f "$debian_components_sources" || ! sudo grep -Fqx "Components: contrib non-free non-free-firmware" "$debian_components_sources"; then
+    # Provide a complete Debian source definition. Some installations leave
+    # the original main entries commented out, so do not rely on them.
+    if ! sudo test -f "$debian_components_sources" || ! sudo grep -Fqx "Components: main contrib non-free non-free-firmware" "$debian_components_sources"; then
         sudo tee "$debian_components_sources" >/dev/null <<SOURCES
 Types: deb
 URIs: https://deb.debian.org/debian
 Suites: stable stable-updates
-Components: contrib non-free non-free-firmware
+Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
 Types: deb
 URIs: https://deb.debian.org/debian-security
 Suites: stable-security
-Components: contrib non-free non-free-firmware
+Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 SOURCES
     fi
