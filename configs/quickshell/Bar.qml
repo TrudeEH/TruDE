@@ -34,14 +34,15 @@ PanelWindow {
         anchors.leftMargin: 10
         anchors.rightMargin: 10
 
-        Row {
+        RowLayout {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
 
-            LauncherButton {}
+            LauncherButton { Layout.alignment: Qt.AlignVCenter }
 
             Row {
+                Layout.alignment: Qt.AlignVCenter
                 spacing: 4
                 Repeater {
                     model: 10
@@ -53,6 +54,7 @@ PanelWindow {
                             && bar.hyprMonitor.activeWorkspace
                             && bar.hyprMonitor.activeWorkspace.id === number
 
+                        Layout.alignment: Qt.AlignVCenter
                         width: 24
                         height: 24
                         radius: 4
