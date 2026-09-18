@@ -22,6 +22,7 @@ Rectangle {
     property bool profilesAvailable: false
     property string currentProfile: "balanced"
     property var availableProfiles: []
+    property bool showingAudioOutputs: true
 
     readonly property var networkDevices: Networking.devices.values
     readonly property var wifiDevice: findWifiDevice()
@@ -33,9 +34,18 @@ Rectangle {
     readonly property var audioNodes: Pipewire.nodes.values
     readonly property var audioDevices: audioNodes.filter(node => node.audio && node.ready && !node.isStream)
     readonly property var outputDevices: audioDevices.filter(node => node.isSink)
+    readonly property var inputDevices: audioDevices.filter(node => !node.isSink)
     readonly property var defaultSink: Pipewire.defaultAudioSink
+    readonly property var defaultSource: Pipewire.defaultAudioSource
+    readonly property var activeAudioNode: showingAudioOutputs ? defaultSink : defaultSource
+    readonly property var visibleAudioDevices: showingAudioOutputs ? outputDevices : inputDevices
     readonly property int volumePercent: defaultSink && defaultSink.audio
         ? Math.round(defaultSink.audio.volume * 100) : 0
+    readonly property int activeAudioVolumePercent: activeAudioNode && activeAudioNode.audio
+        ? Math.round(activeAudioNode.audio.volume * 100) : 0
+    readonly property string activeAudioIcon: showingAudioOutputs
+        ? (!activeAudioNode || !activeAudioNode.audio || activeAudioNode.audio.muted ? "󰖁" : "󰕾")
+        : (!activeAudioNode || !activeAudioNode.audio || activeAudioNode.audio.muted ? "󰍭" : "󰍬")
     readonly property string networkIcon: {
         if (!connectedNetworkDevice) return "󰤭";
         if (connectedNetworkDevice.type === DeviceType.Wired) return "󰈀";
@@ -164,9 +174,14 @@ Rectangle {
         return profile === "power-saver" ? "󰌪" : profile === "performance" ? "󰓅" : "󰾅";
     }
 
-    function setSinkVolume(position, width) {
-        if (!defaultSink || !defaultSink.audio || width <= 0) return;
-        defaultSink.audio.volume = Math.max(0, Math.min(1.5, position / width * 1.5));
+    function setAudioVolume(node, position, width) {
+        if (!node || !node.audio || width <= 0) return;
+        node.audio.volume = Math.max(0, Math.min(1.5, position / width * 1.5));
+    }
+
+    function selectAudioDevice(node) {
+        if (showingAudioOutputs) Pipewire.preferredDefaultAudioSink = node;
+        else Pipewire.preferredDefaultAudioSource = node;
     }
 
     function runPowerAction(command) {
@@ -174,9 +189,11 @@ Rectangle {
         Quickshell.execDetached(command);
     }
 
-    width: statusIcons.implicitWidth + 20
+    implicitWidth: Math.max(88, statusIcons.implicitWidth + 24)
+    width: implicitWidth
     height: 28
     radius: 9
+    clip: true
     color: panelMouse.containsMouse || popupOpen ? Theme.surfaceHover : Theme.surfaceRaised
     border.color: popupOpen ? Theme.accent : Theme.border
     border.width: 1
@@ -200,7 +217,6 @@ Rectangle {
             color: Theme.text
             font.pixelSize: 14
         }
-        AppText { text: "󰅀"; color: Theme.textDim; font.pixelSize: 11 }
     }
 
     MouseArea {
@@ -228,16 +244,20 @@ Rectangle {
             onStreamFinished: {
                 const rows = this.text.trim().split("\n");
                 const profiles = [];
+                const knownProfiles = ["power-saver", "balanced", "performance"];
                 let active = "balanced";
                 let available = rows.length > 0 && rows[0] !== "missing";
                 for (const row of rows) {
                     const fields = row.split("\t");
-                    if (fields[0] === "current" && fields[1]) active = fields[1];
-                    if (fields[0] === "profile" && fields[1]) profiles.push(fields[1]);
+                    if (fields[0] === "current" && knownProfiles.indexOf(fields[1]) >= 0)
+                        active = fields[1];
+                    if (fields[0] === "profile" && knownProfiles.indexOf(fields[1]) >= 0
+                            && profiles.indexOf(fields[1]) < 0)
+                        profiles.push(fields[1]);
                 }
-                control.profilesAvailable = available;
+                control.profilesAvailable = available && profiles.length > 0;
                 control.currentProfile = active;
-                control.availableProfiles = profiles;
+                control.availableProfiles = knownProfiles.filter(profile => profiles.indexOf(profile) >= 0);
             }
         }
     }
@@ -856,8 +876,74 @@ Rectangle {
 
                             RowLayout {
                                 Layout.fillWidth: true
+                                spacing: 6
+
+                                Repeater {
+                                    model: [
+                                        { label: "Output", icon: "󰕾", output: true },
+                                        { label: "Input", icon: "󰍬", output: false }
+                                    ]
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: 34
+                                        radius: 9
+                                        color: control.showingAudioOutputs === modelData.output
+                                            ? Theme.accent : (audioTabMouse.containsMouse ? Theme.surfaceHover : Theme.window)
+                                        border.color: control.showingAudioOutputs === modelData.output
+                                            ? Theme.accent : Theme.border
+                                        border.width: 1
+
+                                        AppText {
+                                            anchors.centerIn: parent
+                                            text: modelData.icon + "  " + modelData.label
+                                            color: control.showingAudioOutputs === modelData.output
+                                                ? Theme.accentText : Theme.text
+                                            font.pixelSize: 11
+                                            font.bold: control.showingAudioOutputs === modelData.output
+                                        }
+                                        MouseArea {
+                                            id: audioTabMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: control.showingAudioOutputs = modelData.output
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
                                 spacing: 9
-                                AppText { text: control.volumeIcon; color: Theme.text; font.pixelSize: 17 }
+
+                                Rectangle {
+                                    implicitWidth: 30
+                                    implicitHeight: 30
+                                    radius: 8
+                                    color: audioMuteMouse.containsMouse ? Theme.surfaceHover : Theme.window
+                                    border.color: Theme.border
+                                    border.width: 1
+                                    AppText {
+                                        anchors.centerIn: parent
+                                        text: control.activeAudioIcon
+                                        color: control.activeAudioNode && control.activeAudioNode.audio
+                                            && control.activeAudioNode.audio.muted ? Theme.accent : Theme.text
+                                        font.pixelSize: 16
+                                    }
+                                    MouseArea {
+                                        id: audioMuteMouse
+                                        anchors.fill: parent
+                                        enabled: control.activeAudioNode !== null
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (control.activeAudioNode && control.activeAudioNode.audio)
+                                                control.activeAudioNode.audio.muted = !control.activeAudioNode.audio.muted;
+                                        }
+                                    }
+                                }
+
                                 Rectangle {
                                     id: volumeTrack
                                     Layout.fillWidth: true
@@ -867,38 +953,62 @@ Rectangle {
                                     border.color: Theme.border
                                     border.width: 1
                                     Rectangle {
-                                        width: control.defaultSink && control.defaultSink.audio
-                                            ? Math.min(parent.width, control.defaultSink.audio.volume / 1.5 * parent.width) : 0
+                                        width: control.activeAudioNode && control.activeAudioNode.audio
+                                            ? Math.min(parent.width, control.activeAudioNode.audio.volume / 1.5 * parent.width) : 0
                                         height: parent.height
                                         radius: parent.radius
-                                        color: control.defaultSink && control.defaultSink.audio && control.defaultSink.audio.muted
+                                        color: control.activeAudioNode && control.activeAudioNode.audio && control.activeAudioNode.audio.muted
                                             ? Theme.textDim : Theme.accent
                                     }
                                     MouseArea {
                                         anchors.fill: parent
+                                        enabled: control.activeAudioNode !== null
                                         cursorShape: Qt.PointingHandCursor
-                                        onPressed: control.setSinkVolume(mouse.x, width)
-                                        onPositionChanged: if (pressed) control.setSinkVolume(mouse.x, width)
+                                        onPressed: control.setAudioVolume(control.activeAudioNode, mouse.x, width)
+                                        onPositionChanged: if (pressed)
+                                            control.setAudioVolume(control.activeAudioNode, mouse.x, width)
                                     }
                                 }
-                                AppText { text: control.volumePercent + "%"; color: Theme.textDim; font.pixelSize: 10 }
+                                AppText {
+                                    text: control.activeAudioVolumePercent + "%"
+                                    color: Theme.textDim
+                                    font.pixelSize: 10
+                                }
                             }
 
-                            AppText { text: "Output device"; color: Theme.textDim; font.pixelSize: 11 }
+                            AppText {
+                                text: control.showingAudioOutputs ? "Output devices" : "Input devices"
+                                color: Theme.textDim
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
 
                             Repeater {
-                                model: control.outputDevices
+                                model: control.visibleAudioDevices
                                 delegate: DeviceRow {
                                     required property var modelData
-                                    readonly property bool isDefault: control.defaultSink === modelData
-                                    icon: "󰓃"
+                                    readonly property bool isDefault: control.showingAudioOutputs
+                                        ? control.defaultSink === modelData : control.defaultSource === modelData
+                                    icon: control.showingAudioOutputs ? "󰓃" : "󰍬"
                                     title: modelData.nickname || modelData.description || modelData.name
-                                    subtitle: isDefault ? "Default output" : Math.round(modelData.audio.volume * 100) + "%"
+                                    subtitle: isDefault
+                                        ? (control.showingAudioOutputs ? "Default output" : "Default input")
+                                        : Math.round(modelData.audio.volume * 100) + "%"
                                     selected: isDefault
                                     actionText: isDefault ? "Active" : "Select"
-                                    onActionTriggered: Pipewire.preferredDefaultAudioSink = modelData
-                                    onActivated: Pipewire.preferredDefaultAudioSink = modelData
+                                    onActionTriggered: control.selectAudioDevice(modelData)
+                                    onActivated: control.selectAudioDevice(modelData)
                                 }
+                            }
+
+                            AppText {
+                                visible: control.visibleAudioDevices.length === 0
+                                Layout.fillWidth: true
+                                text: control.showingAudioOutputs
+                                    ? "No output devices available" : "No input devices available"
+                                color: Theme.textDim
+                                font.pixelSize: 11
+                                horizontalAlignment: Text.AlignHCenter
                             }
                         }
                     }
