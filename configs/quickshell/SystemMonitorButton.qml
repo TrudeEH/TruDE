@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import QtQuick.Layouts
 import "."
 
 Rectangle {
@@ -8,24 +9,19 @@ Rectangle {
 
     property real cpuUsage: 0
     property real memoryUsage: 0
-    property real memoryUsedGiB: 0
-    property real memoryTotalGiB: 0
     property real previousIdle: -1
     property real previousTotal: -1
 
-    readonly property string cpuText: Math.round(cpuUsage) + "%"
-    readonly property string memoryText: Math.round(memoryUsage) + "%"
-
-    width: 112
+    width: 132
     height: 28
     radius: 8
-    color: monitorMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
+    color: monitorMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceRaised
     border.color: monitorMouse.containsMouse ? Theme.border : Theme.transparent
     border.width: 1
 
     Process {
         id: stats
-        command: ["sh", "-c", "awk '/^cpu / && !seen { idle=$5+$6; total=$2+$3+$4+$5+$6+$7+$8+$9+$10; printf \"%.0f %.0f\\n\", idle, total; seen=1 } /^MemTotal:/ { memTotal=$2 } /^MemAvailable:/ { memAvailable=$2 } END { printf \"%.0f %.0f\\n\", memTotal, memAvailable }' /proc/stat /proc/meminfo"]
+        command: ["sh", "-c", "awk '/^cpu / && !seen { idle=$5+$6; total=$2+$3+$4+$5+$6+$7+$8+$9+$10; printf \\\"%.0f %.0f\\\\n\\\", idle, total; seen=1 } /^MemTotal:/ { memTotal=$2 } /^MemAvailable:/ { memAvailable=$2 } END { printf \\\"%.0f %.0f\\\\n\\\", memTotal, memAvailable }' /proc/stat /proc/meminfo"]
         running: false
 
         stdout: StdioCollector {
@@ -48,8 +44,6 @@ Rectangle {
 
                 const memoryTotal = rows[1][0];
                 const memoryAvailable = rows[1][1];
-                button.memoryTotalGiB = memoryTotal / 1024 / 1024;
-                button.memoryUsedGiB = (memoryTotal - memoryAvailable) / 1024 / 1024;
                 button.memoryUsage = memoryTotal > 0
                     ? 100 * (memoryTotal - memoryAvailable) / memoryTotal : 0;
             }
@@ -65,11 +59,24 @@ Rectangle {
 
     Component.onCompleted: stats.running = true
 
-    AppText {
-        anchors.centerIn: parent
-        text: "󰍛  " + button.cpuText + "    " + button.memoryText
-        color: Theme.text
-        font.pixelSize: 12
+    RowLayout {
+        anchors.fill: parent
+        anchors.margins: 2
+        spacing: 3
+
+        MetricPill {
+            Layout.fillWidth: true
+            icon: "󰍛"
+            label: "CPU"
+            value: Math.round(button.cpuUsage) + "%"
+        }
+
+        MetricPill {
+            Layout.fillWidth: true
+            icon: ""
+            label: "RAM"
+            value: Math.round(button.memoryUsage) + "%"
+        }
     }
 
     MouseArea {

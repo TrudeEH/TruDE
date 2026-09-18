@@ -23,10 +23,7 @@ Item {
     }
 
     function closeOtherPopups() {
-        for (const target of ["network", "audio", "power", "notifications", "launcher"]) {
-            if (target !== "power")
-                Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
-        }
+        PopupManager.closeExcept("power");
     }
 
     function run(command) {

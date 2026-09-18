@@ -21,7 +21,12 @@ Item {
     IpcHandler {
         target: "shortcuts"
         function toggle(): void {
-            shortcuts.popupOpen = !shortcuts.popupOpen;
+            if (shortcuts.popupOpen) {
+                shortcuts.popupOpen = false;
+                return;
+            }
+            PopupManager.closeExcept("shortcuts");
+            shortcuts.popupOpen = true;
             if (shortcuts.popupOpen) {
                 shortcuts.searchText = "";
                 binds.running = true;

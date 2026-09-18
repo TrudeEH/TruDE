@@ -32,8 +32,7 @@ Item {
     }
 
     function closeOtherPopups() {
-        for (const target of ["network", "audio", "power", "notifications", "launcher", "system-monitor"])
-            Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+        PopupManager.closeExcept("maintenance");
     }
 
     function refresh() {

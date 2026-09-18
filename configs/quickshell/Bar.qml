@@ -168,6 +168,7 @@ PanelWindow {
                                     trayItem.modelData.secondaryActivate();
                                 } else if (trayItem.modelData.hasMenu
                                     && (mouse.button === Qt.RightButton || trayItem.modelData.onlyMenu)) {
+                                    PopupManager.closeExcept("tray");
                                     trayMenu.open = true;
                                 } else {
                                     trayItem.modelData.activate();

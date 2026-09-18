@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import QtQuick.Layouts
 import "."
 
 Rectangle {
@@ -9,10 +10,10 @@ Rectangle {
     property int aptUpdates: 0
     property int flatpakUpdates: 0
 
-    width: 116
+    width: 136
     height: 28
     radius: 8
-    color: maintenanceMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
+    color: maintenanceMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceRaised
     border.color: maintenanceMouse.containsMouse ? Theme.border : Theme.transparent
     border.width: 1
 
@@ -41,11 +42,26 @@ Rectangle {
 
     Component.onCompleted: counts.running = true
 
-    AppText {
-        anchors.centerIn: parent
-        text: "󰏗  " + button.aptUpdates + "  󰏖  " + button.flatpakUpdates
-        color: button.aptUpdates > 0 || button.flatpakUpdates > 0 ? Theme.accent : Theme.text
-        font.pixelSize: 12
+    RowLayout {
+        anchors.fill: parent
+        anchors.margins: 2
+        spacing: 3
+
+        MetricPill {
+            Layout.fillWidth: true
+            icon: "󰏗"
+            label: "APT"
+            value: button.aptUpdates
+            highlighted: button.aptUpdates > 0
+        }
+
+        MetricPill {
+            Layout.fillWidth: true
+            icon: "󰏖"
+            label: "FLAT"
+            value: button.flatpakUpdates
+            highlighted: button.flatpakUpdates > 0
+        }
     }
 
     MouseArea {

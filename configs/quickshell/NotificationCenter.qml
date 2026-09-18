@@ -38,8 +38,7 @@ Item {
     }
 
     function closeOtherPopups() {
-        for (const target of ["network", "audio", "power", "launcher"])
-            Quickshell.execDetached(["quickshell", "ipc", "call", target, "close"]);
+        PopupManager.closeExcept("notifications");
     }
 
     function activateToast() {
