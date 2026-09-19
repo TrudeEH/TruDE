@@ -1,5 +1,29 @@
 #!/bin/sh
 set -u
 
-swaync-client --subscribe-waybar \
-    | sed -u 's/"text": "0"/"text": ""/'
+count=$(swaync-client --count 2>/dev/null || printf '0')
+dnd=$(swaync-client --get-dnd 2>/dev/null || printf 'false')
+
+case $count in *[!0-9]*|'') count=0 ;; esac
+
+if [ "$dnd" = true ]; then
+    if [ "$count" -gt 0 ]; then
+        state=dnd-notification
+    else
+        state=dnd-none
+    fi
+else
+    if [ "$count" -gt 0 ]; then
+        state=notification
+    else
+        state=none
+    fi
+fi
+
+if [ "$count" -gt 0 ]; then
+    text=$count
+else
+    text=
+fi
+
+printf '{"text":"%s","alt":"%s","class":"%s"}\n' "$text" "$state" "$state"

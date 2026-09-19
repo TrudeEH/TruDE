@@ -2,7 +2,7 @@
 set -u
 
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}/dotfiles
-cache_file=$cache_root/applications.tsv
+cache_file=$cache_root/applications-v2.tsv
 cache_age=300
 
 mkdir -p "$cache_root"
@@ -59,7 +59,7 @@ rebuild_cache() {
                 ' "$desktop_file")
 
                 [ -n "$entry" ] || continue
-                printf '󰀻  %s\t%s\n' "$entry" "$desktop_file" >> "$temporary"
+                printf '%s\t%s\n' "$entry" "$desktop_file" >> "$temporary"
             done
     done
     IFS=$old_ifs
@@ -75,6 +75,7 @@ selection=$(fzf \
     --delimiter='\t' \
     --with-nth=1,2 \
     --nth=1,2 \
+    --tiebreak=begin,length,index \
     --prompt='󰀻  Search apps  ' \
     --pointer='󰜴' \
     --marker='󰄬' \
