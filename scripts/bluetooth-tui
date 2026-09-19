@@ -1,0 +1,172 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+dialog() {
+    whiptail --title "Bluetooth" "$@"
+}
+
+message() {
+    dialog --msgbox "$1" 12 72
+}
+
+run_action() (
+    success_message=$1
+    shift
+    if output=$(bluetoothctl "$@" 2>&1); then
+        message "$success_message"
+    else
+        escape=$(printf '\033')
+        output=$(printf '%s\n' "$output" | sed "s/${escape}\\[[0-9;?]*m//g")
+        message "${output:-Bluetooth command failed.}"
+    fi
+)
+
+device_status() (
+    address=$1
+    status=
+    info=$(bluetoothctl info "$address" 2>/dev/null || :)
+    printf '%s\n' "$info" | grep -q 'Connected: yes' && status="${status}connected, "
+    printf '%s\n' "$info" | grep -q 'Paired: yes' && status="${status}paired, "
+    printf '%s\n' "$info" | grep -q 'Trusted: yes' && status="${status}trusted, "
+    status=${status%, }
+    printf '%s' "${status:-available}"
+)
+
+manage_device() (
+    address=$1
+    name=$2
+    while true; do
+        info=$(bluetoothctl info "$address" 2>/dev/null || :)
+        choice=$(dialog --menu "$name\n$address" 18 72 9 \
+            "󰂱 connect" "Connect" \
+            "󰂲 disconnect" "Disconnect" \
+            "󰂯 pair" "Pair" \
+            "󰄬 trust" "Trust" \
+            "󰅖 untrust" "Remove trust" \
+            "󰆴 remove" "Remove device" \
+            "󰋼 info" "Show details" \
+            "󰁍 back" "Back" 3>&1 1>&2 2>&3) || return
+
+        case $choice in
+            *" connect") run_action "Connected to $name." connect "$address" ;;
+            *" disconnect") run_action "Disconnected from $name." disconnect "$address" ;;
+            *" pair") run_action "Paired with $name." pair "$address" ;;
+            *" trust") run_action "$name is now trusted." trust "$address" ;;
+            *" untrust") run_action "$name is no longer trusted." untrust "$address" ;;
+            *" remove")
+                if dialog --yesno "Remove $name?" 9 56; then
+                    run_action "Removed $name." remove "$address"
+                    return
+                fi
+                ;;
+            *" info") message "$info" ;;
+            *" back") return ;;
+        esac
+    done
+)
+
+choose_device() (
+    set --
+    devices=$(bluetoothctl devices 2>/dev/null || :)
+    while IFS= read -r line; do
+        case $line in
+            "Device "*) ;;
+            *) continue ;;
+        esac
+        device=${line#Device }
+        address=${device%% *}
+        name=${device#"$address"}
+        name=${name# }
+        status=$(device_status "$address")
+        case $status in
+            connected*) icon="󰂱" ;;
+            *) icon="󰂯" ;;
+        esac
+        set -- "$@" "$address" "$icon  $name ($status)"
+    done <<EOF
+$devices
+EOF
+
+    if [ "$#" -eq 0 ]; then
+        message "No Bluetooth devices found. Run a scan first."
+        return
+    fi
+
+    choice=$(dialog --menu "Select a device" 22 78 14 "$@" 3>&1 1>&2 2>&3) || return
+    name=$(bluetoothctl info "$choice" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*Name: //p' | head -n 1)
+    manage_device "$choice" "${name:-$choice}"
+)
+
+scan_devices() (
+    powered=$(bluetoothctl show | awk -F': ' '/Powered:/ { print $2; exit }')
+    if [ "$powered" != yes ]; then
+        message "Bluetooth is disabled. Turn on the adapter before scanning."
+        return
+    fi
+
+    bluetoothctl --timeout 10 scan on >/dev/null 2>&1 &
+    scan_pid=$!
+    {
+        progress=0
+        while kill -0 "$scan_pid" 2>/dev/null; do
+            printf '%s\n' "$progress"
+            progress=$((progress + 10))
+            [ "$progress" -le 90 ] || progress=90
+            sleep 1
+        done
+        printf '100\n'
+    } | dialog --gauge "Scanning for Bluetooth devices…" 8 58 0
+    wait "$scan_pid" || :
+    choose_device
+)
+
+if ! bluetoothctl show >/dev/null 2>&1; then
+    message "No Bluetooth adapter is available."
+    exit 1
+fi
+
+while true; do
+    powered=$(bluetoothctl show | awk -F': ' '/Powered:/ { print $2; exit }')
+    choice=$(dialog --menu "Adapter power: ${powered:-unknown}" 16 64 6 \
+        "󰂯 devices" "Manage known devices" \
+        "󰑐 scan" "Scan for devices" \
+        "󰐥 power" "Toggle adapter power" \
+        "󰅖 quit" "Close" 3>&1 1>&2 2>&3) || exit 0
+
+    case $choice in
+        *" devices") choose_device ;;
+        *" scan") scan_devices ;;
+        *" power")
+            if [ "$powered" = yes ]; then
+                run_action "Bluetooth is disabled." power off
+            else
+                run_action "Bluetooth is enabled." power on
+            fi
+            ;;
+        *" quit") exit 0 ;;
+    esac
+done

@@ -84,6 +84,7 @@ local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wal
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
 local xdgDataDirs = os.getenv("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
 hl.env("XDG_DATA_DIRS", os.getenv("HOME") .. "/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:" .. xdgDataDirs)
@@ -395,6 +396,62 @@ hl.window_rule({
     float = true,
 })
 
+hl.window_rule({
+    name  = "network-tui",
+    match = { class = "nmtui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "bluetooth-tui",
+    match = { class = "bluetooth-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "volume-tui",
+    match = { class = "pulsemixer" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "power-profiles-tui",
+    match = { class = "power-profiles-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "power-menu-tui",
+    match = { class = "power-menu-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "system-monitor-tui",
+    match = { class = "btop" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "maintenance-tui",
+    match = { class = "maintenance-tui" },
+
+    float  = true,
+    center = true,
+})
+
 -- Start the bar and authentication agent once per session.
 hl.on("hyprland.start", function ()
     -- Libadwaita follows the desktop color-scheme preference. Set it for
@@ -409,5 +466,4 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("env QT_QPA_PLATFORM=wayland QT_STYLE_OVERRIDE=Adwaita-Dark quickshell --no-duplicate")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
-    hl.exec_cmd("hyprpolkitagent")
 end)

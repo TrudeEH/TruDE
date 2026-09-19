@@ -1,0 +1,62 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+dialog() {
+    whiptail --title "Power" "$@"
+}
+
+confirm() {
+    dialog --yesno "$1" 9 58
+}
+
+sleep 0.15
+
+choice=$(dialog --menu "Choose an action" 17 64 8 \
+    "󰌾 lock" "Lock the session" \
+    "󰒲 suspend" "Suspend the computer" \
+    "󰍃 logout" "Log out of Hyprland" \
+    "󰜉 reboot" "Restart the computer" \
+    "󰐥 poweroff" "Shut down the computer" \
+    "󰜺 cancel" "Cancel" 3>&1 1>&2 2>&3) || exit 0
+
+case $choice in
+    *" lock")
+        hyprlock --config "$HOME/.config/hypr/hyprlock.conf" >/dev/null 2>&1 &
+        ;;
+    *" suspend")
+        confirm "Suspend the computer?" && systemctl suspend
+        ;;
+    *" logout")
+        confirm "Log out of Hyprland?" && hyprctl dispatch exit
+        ;;
+    *" reboot")
+        confirm "Restart the computer?" && systemctl reboot
+        ;;
+    *" poweroff")
+        confirm "Shut down the computer?" && systemctl poweroff
+        ;;
+    *" cancel") exit 0 ;;
+esac

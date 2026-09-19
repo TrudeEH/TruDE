@@ -2,7 +2,6 @@ module Dotfiles
 AppText 1.0 AppText.qml
 Bar 1.0 Bar.qml
 NotificationCenter 1.0 NotificationCenter.qml
-ControlPanel 1.0 ControlPanel.qml
 LauncherButton 1.0 LauncherButton.qml
 Launcher 1.0 Launcher.qml
 Shortcuts 1.0 Shortcuts.qml
@@ -10,9 +9,8 @@ singleton Theme 1.0 Theme.qml
 TrayMenu 1.0 TrayMenu.qml
 TrayMenuView 1.0 TrayMenuView.qml
 SystemMonitorButton 1.0 SystemMonitorButton.qml
-SystemMonitorPanel 1.0 SystemMonitorPanel.qml
-MaintenanceButton 1.0 MaintenanceButton.qml
-MaintenancePanel 1.0 MaintenancePanel.qml
+ScreenSharingIndicator 1.0 ScreenSharingIndicator.qml
+TuiLauncherButton 1.0 TuiLauncherButton.qml
 MetricPill 1.0 MetricPill.qml
 singleton PopupManager 1.0 PopupManager.qml
 InfoCard 1.0 InfoCard.qml

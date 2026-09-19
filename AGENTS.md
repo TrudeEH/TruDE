@@ -1,5 +1,8 @@
-Commit after completing each request, so you or the user can rollback if necessary.
-Do not create or edit a README file.
+Commit after completing each request, so you or the user can rollback if necessary, unless the user says otherwise.
+Do not create or edit a README file unless the user asks.
+Assume the base system these dotfiles are meant for is a minimal debian installation.
+Always use `sh` for scripting instead of `bash`.
+You can't use sudo since it requires the user to type a password. Ask the user to run the command instead.
 
 ## Visual design
 

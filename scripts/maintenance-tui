@@ -1,0 +1,207 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+temp_dir=$(mktemp -d)
+trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
+
+apt_updates_file=$temp_dir/apt-updates
+flatpak_updates_file=$temp_dir/flatpak-updates
+held_file=$temp_dir/held
+failed_file=$temp_dir/failed
+backports_file=$temp_dir/backports
+summary_file=$temp_dir/summary
+
+dialog() {
+    whiptail --title "Debian Maintenance" "$@"
+}
+
+ensure_content() {
+    file=$1
+    empty_message=$2
+    [ -s "$file" ] || printf '%s\n' "$empty_message" > "$file"
+}
+
+show_file() {
+    title=$1
+    file=$2
+    whiptail --title "$title" --scrolltext --textbox "$file" 24 100
+}
+
+collect_status() {
+    progress_pipe=$temp_dir/progress
+    rm -f "$progress_pipe"
+    mkfifo "$progress_pipe"
+    dialog --gauge "Starting maintenance scan…" 8 64 0 < "$progress_pipe" &
+    progress_pid=$!
+    exec 3> "$progress_pipe"
+
+    progress() {
+        printf 'XXX\n%s\n%s\nXXX\n' "$1" "$2" >&3
+    }
+
+    progress 5 "Checking APT updates…"
+    apt list --upgradable 2>/dev/null \
+        | sed '1{/^Listing/d;}; /^$/d' > "$apt_updates_file"
+    apt_updates=$(wc -l < "$apt_updates_file" | tr -d ' ')
+
+    progress 20 "Counting installed Debian packages…"
+    apt_installed=$(dpkg-query -W -f='${binary:Package}\n' 2>/dev/null \
+        | sed '/^$/d' | wc -l | tr -d ' ')
+    backports_installed=$(dpkg-query -W -f='${binary:Package}\t${Version}\n' 2>/dev/null \
+        | awk '$2 ~ /~bpo[0-9]+/ { count++ } END { print count + 0 }')
+
+    progress 40 "Checking Flatpak updates…"
+    if command -v flatpak >/dev/null 2>&1; then
+        flatpak remote-ls --updates --app --columns=name,application,version \
+            2>/dev/null > "$flatpak_updates_file"
+        flatpak_updates=$(wc -l < "$flatpak_updates_file" | tr -d ' ')
+        flatpak_installed=$(flatpak list --app --columns=application 2>/dev/null \
+            | sed '/^$/d' | wc -l | tr -d ' ')
+    else
+        : > "$flatpak_updates_file"
+        flatpak_updates=0
+        flatpak_installed=0
+    fi
+
+    progress 65 "Checking held packages and failed units…"
+    apt-mark showhold 2>/dev/null | sed '/^$/d' > "$held_file"
+    held=$(wc -l < "$held_file" | tr -d ' ')
+    systemctl --failed --no-legend --plain 2>/dev/null \
+        | sed '/^$/d' > "$failed_file"
+    failed=$(wc -l < "$failed_file" | tr -d ' ')
+
+    if [ -e /var/run/reboot-required ]; then
+        reboot="required"
+    else
+        reboot="not required"
+    fi
+
+    progress 80 "Reading APT metadata timestamp…"
+    newest_list=$(find /var/lib/apt/lists -maxdepth 1 -type f -name '*InRelease' \
+        -printf '%T@\n' 2>/dev/null | sort -nr | head -n 1)
+    if [ -n "$newest_list" ]; then
+        apt_updated=$(date -d "@${newest_list%%.*}" '+%Y-%m-%d %H:%M' 2>/dev/null \
+            || printf 'unknown')
+    else
+        apt_updated=unknown
+    fi
+
+    total_updates=$((apt_updates + flatpak_updates))
+    ensure_content "$apt_updates_file" "No APT updates available."
+    ensure_content "$flatpak_updates_file" "No Flatpak updates available."
+    ensure_content "$held_file" "No packages are held."
+    ensure_content "$failed_file" "No failed systemd units."
+
+    progress 95 "Building maintenance summary…"
+    {
+        printf '󰏗  APT packages       %s installed, %s updates\n' "$apt_installed" "$apt_updates"
+        printf '󰒓  Backports          %s installed\n' "$backports_installed"
+        printf '󰏖  Flatpak apps       %s installed, %s updates\n' "$flatpak_installed" "$flatpak_updates"
+        printf '󰈇  Held packages      %s\n' "$held"
+        printf '󰅙  Failed units       %s\n' "$failed"
+        printf '󰜉  Reboot             %s\n' "$reboot"
+        printf '󰅐  APT metadata       %s\n' "$apt_updated"
+        printf '\nTotal pending updates: %s\n' "$total_updates"
+        printf '\nAPT updates\n-----------\n'
+        sed -n '1,12p' "$apt_updates_file"
+        [ "$apt_updates" -le 12 ] || printf '… and %s more\n' "$((apt_updates - 12))"
+        printf '\nFlatpak updates\n---------------\n'
+        sed -n '1,12p' "$flatpak_updates_file"
+        [ "$flatpak_updates" -le 12 ] || printf '… and %s more\n' "$((flatpak_updates - 12))"
+    } > "$summary_file"
+
+    progress 100 "Maintenance status ready."
+    exec 3>&-
+    wait "$progress_pid" || :
+    rm -f "$progress_pipe"
+}
+
+load_backports() {
+    dpkg-query -W -f='${binary:Package}\t${Version}\n' 2>/dev/null \
+        | awk '$2 ~ /~bpo[0-9]+/ { print }' > "$backports_file"
+    ensure_content "$backports_file" "No installed backport packages found."
+}
+
+update_system() {
+    dialog --yesno "Update APT package lists, upgrade Debian packages, and update Flatpaks?" 10 70 \
+        || return
+
+    clear
+    printf '󰏗  Updating APT package lists and Debian packages…\n\n'
+    update_failed=0
+    sudo apt-get update && sudo apt-get upgrade -y || update_failed=1
+
+    if command -v flatpak >/dev/null 2>&1; then
+        printf '\n󰏖  Updating Flatpaks…\n\n'
+        flatpak update -y || update_failed=1
+    fi
+
+    if [ "$update_failed" -eq 0 ]; then
+        printf '\nUpdates completed successfully.\n'
+    else
+        printf '\nOne or more update commands failed. Review the output above.\n'
+    fi
+    printf 'Press Enter to return to maintenance status.'
+    IFS= read -r _
+    collect_status
+}
+
+sleep 0.15
+
+collect_status
+
+while true; do
+    prompt=$(printf 'APT: %s updates / %s installed\nBackports: %s installed\nFlatpak: %s updates / %s installed\nHeld: %s   Failed units: %s   Reboot: %s\nAPT metadata: %s' \
+        "$apt_updates" "$apt_installed" "$backports_installed" \
+        "$flatpak_updates" "$flatpak_installed" "$held" "$failed" \
+        "$reboot" "$apt_updated")
+
+    choice=$(dialog --menu "$prompt" 25 94 10 \
+        "󰋼 summary" "Full summary and update preview" \
+        "󰏗 apt" "APT updates ($apt_updates)" \
+        "󰏖 flatpak" "Flatpak updates ($flatpak_updates)" \
+        "󰒓 backports" "Installed backport packages ($backports_installed)" \
+        "󰈇 held" "Held packages ($held)" \
+        "󰅙 failed" "Failed systemd units ($failed)" \
+        "󰚰 update" "Update Debian packages and Flatpaks" \
+        "󰑐 refresh" "Refresh displayed information" \
+        "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
+
+    case $choice in
+        *" summary") show_file "Maintenance Summary" "$summary_file" ;;
+        *" apt") show_file "APT Updates" "$apt_updates_file" ;;
+        *" flatpak") show_file "Flatpak Updates" "$flatpak_updates_file" ;;
+        *" backports")
+            load_backports
+            show_file "Installed Backport Packages" "$backports_file"
+            ;;
+        *" held") show_file "Held Packages" "$held_file" ;;
+        *" failed") show_file "Failed systemd Units" "$failed_file" ;;
+        *" update") update_system ;;
+        *" refresh") collect_status ;;
+        *" close") exit 0 ;;
+    esac
+done

@@ -71,9 +71,9 @@ install_packages() {
         gnome-disk-utility gnome-keyring pipewire-audio wireplumber \
         network-manager avahi-daemon libnss-mdns lightdm slick-greeter \
         xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
-        bluez power-profiles-daemon \
-        gvfs udisks2 \
-        qt6-wayland adwaita-qt adwaita-qt6 grim slurp wl-clipboard swaybg hyprpolkitagent
+        bluez btop pulsemixer whiptail power-profiles-daemon upower \
+        cups system-config-printer ipp-usb gvfs udisks2 \
+        qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp wl-clipboard swaybg hyprpolkitagent
 }
 
 install_font() {
@@ -108,7 +108,7 @@ configure_lightdm() {
 }
 
 configure_hardware_services() {
-    sudo systemctl enable --now bluetooth.service power-profiles-daemon.service
+    sudo systemctl enable --now bluetooth.service cups.service power-profiles-daemon.service
 }
 
 configure_networking() {
@@ -177,6 +177,16 @@ configure_theme() {
     if command -v gsettings >/dev/null 2>&1 && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
         gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
     fi
+
+    mkdir -p "$config_dir/qt6ct"
+    cat > "$config_dir/qt6ct/qt6ct.conf" <<QT6CT
+[Appearance]
+color_scheme_path=$config_dir/qt6ct/colors/dotfiles.conf
+custom_palette=true
+icon_theme=Adwaita
+standard_dialogs=default
+style=Adwaita-Dark
+QT6CT
 }
 
 link_config() {
@@ -207,15 +217,25 @@ link_configs() {
     link_config "$repo_dir/assets/wallpapers/wallpaper.png" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png"
     link_config "$repo_dir/scripts/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/quickshell-network-details" "$HOME/.local/bin/dotfiles-network-details"
+    link_config "$repo_dir/scripts/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
+    link_config "$repo_dir/scripts/bluetooth-tui" "$HOME/.local/bin/dotfiles-bluetooth-tui"
+    link_config "$repo_dir/scripts/power-profiles-tui" "$HOME/.local/bin/dotfiles-power-profiles-tui"
+    link_config "$repo_dir/scripts/power-menu-tui" "$HOME/.local/bin/dotfiles-power-menu-tui"
+    link_config "$repo_dir/scripts/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
+    link_config "$repo_dir/scripts/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
+    link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
+    link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
+    link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
+    link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
 
     local quickshell_file
-    for quickshell_file in shell.qml AppText.qml Bar.qml ControlPanel.qml SystemMonitorButton.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml InfoCard.qml MetricPill.qml PopupManager.qml LauncherButton.qml Launcher.qml NotificationCenter.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
+    for quickshell_file in shell.qml AppText.qml Bar.qml SystemMonitorButton.qml ScreenSharingIndicator.qml TuiLauncherButton.qml InfoCard.qml MetricPill.qml PopupManager.qml LauncherButton.qml Launcher.qml NotificationCenter.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
         link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
     done
 
-    for quickshell_file in AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml PowerProfileButton.qml PowerProfilePanel.qml; do
+    for quickshell_file in AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml ControlPanel.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml PowerProfileButton.qml PowerProfilePanel.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml; do
         remove_obsolete_link "$config_dir/quickshell/$quickshell_file" "$repo_dir/configs/quickshell/$quickshell_file"
     done
 
@@ -236,8 +256,13 @@ main() {
     configure_hardware_services
     configure_pam
     configure_session
-    configure_theme
     link_configs
+    configure_theme
+
+    if [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+        systemctl --user daemon-reload || true
+        systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || true
+    fi
 
     echo "Done. Log out and back in to start Quickshell with Wayland support."
 }

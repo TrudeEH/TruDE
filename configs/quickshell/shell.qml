@@ -17,12 +17,6 @@ ShellRoot {
         }
     }
 
-    SystemMonitorPanel {
-    }
-
-    MaintenancePanel {
-    }
-
     Launcher {
     }
 

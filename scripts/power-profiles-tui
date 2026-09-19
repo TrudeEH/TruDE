@@ -1,0 +1,124 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+dialog() {
+    whiptail --title "Power Profile" "$@"
+}
+
+message() {
+    dialog --msgbox "$1" 10 64
+}
+
+battery_value() {
+    field=$1
+    printf '%s\n' "$battery_info" \
+        | sed -n "s/^[[:space:]]*$field:[[:space:]]*//p" \
+        | head -n 1
+}
+
+battery_device=$(upower -e 2>/dev/null | awk '/\/battery_/ { print; exit }')
+if [ -n "$battery_device" ]; then
+    battery_info=$(upower -i "$battery_device" 2>/dev/null || :)
+    battery_present=$(battery_value present)
+else
+    battery_info=
+    battery_present=no
+fi
+
+if [ -n "$battery_info" ] && [ "${battery_present:-yes}" = yes ]; then
+    battery_model=$(battery_value model)
+    battery_percentage=$(battery_value percentage)
+    battery_state=$(battery_value state)
+    battery_health=$(battery_value capacity)
+    battery_energy=$(battery_value energy)
+    battery_energy_full=$(battery_value energy-full)
+    battery_rate=$(battery_value energy-rate)
+    battery_time=$(battery_value 'time to empty')
+    [ -n "$battery_time" ] || battery_time=$(battery_value 'time to full')
+
+    battery_summary=$(printf 'Battery: %s%s%s\nHealth: %s   Energy: %s / %s\nPower usage: %s   Remaining: %s\n\nSelect a power profile.' \
+        "${battery_model:-Battery}" \
+        "${battery_percentage:+ — $battery_percentage}" \
+        "${battery_state:+, $battery_state}" \
+        "${battery_health:-unknown}" \
+        "${battery_energy:-unknown}" \
+        "${battery_energy_full:-unknown}" \
+        "${battery_rate:-unknown}" \
+        "${battery_time:-unknown}")
+else
+    battery_summary=$(printf 'No battery detected.\n\nSelect a power profile.')
+fi
+
+current=$(powerprofilesctl get 2>/dev/null) || {
+    message "Power profiles are unavailable."
+    exit 1
+}
+
+profiles=$(powerprofilesctl list 2>/dev/null | awk '
+    /^\* (power-saver|balanced|performance):/ ||
+    /^  (power-saver|balanced|performance):/ {
+        profile = $0
+        sub(/^[* ] /, "", profile)
+        sub(/:.*/, "", profile)
+        print profile
+    }
+')
+set --
+while IFS= read -r profile; do
+    case $profile in
+        power-saver) tag="󰌪 power-saver"; description="Power Saver — prioritize efficiency" ;;
+        balanced) tag="󰾅 balanced"; description="Balanced — general use" ;;
+        performance) tag="󰓅 performance"; description="Performance — maximum speed" ;;
+        "") continue ;;
+        *) description=$profile ;;
+    esac
+    if [ "$profile" = "$current" ]; then
+        selected=ON
+    else
+        selected=OFF
+    fi
+    set -- "$@" "$tag" "$description" "$selected"
+done <<EOF
+$profiles
+EOF
+
+if [ "$#" -eq 0 ]; then
+    message "No power profiles are available."
+    exit 1
+fi
+
+dialog_prompt=$(printf '%s\n\nCurrent profile: %s' "$battery_summary" "$current")
+choice=$(dialog --radiolist "$dialog_prompt" 21 78 5 "$@" \
+    3>&1 1>&2 2>&3) || exit 0
+
+choice=${choice#* }
+
+if output=$(powerprofilesctl set "$choice" 2>&1); then
+    message "Power profile changed to $choice."
+else
+    message "${output:-Unable to change the power profile.}"
+    exit 1
+fi

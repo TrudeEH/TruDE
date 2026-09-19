@@ -1,6 +1,9 @@
 import Quickshell
+import Quickshell.Bluetooth
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Networking
+import Quickshell.Services.Pipewire
 import Quickshell.Services.SystemTray
 import Quickshell.Wayland
 import Quickshell.Widgets
@@ -13,7 +16,41 @@ PanelWindow {
     required property var modelData
     required property var notificationCenter
     screen: modelData
+    property string currentProfile: "balanced"
+    property bool batteryPresent: false
+    property int batteryPercent: 0
+    property int maintenanceUpdates: 0
     readonly property var hyprMonitor: Hyprland.monitorFor(screen)
+    readonly property var networkDevices: Networking.devices.values
+    readonly property var connectedNetworkDevice: findConnectedNetworkDevice()
+    readonly property var connectedNetwork: findConnectedNetwork(connectedNetworkDevice)
+    readonly property var bluetoothAdapter: Bluetooth.defaultAdapter
+    readonly property var bluetoothDevices: Bluetooth.devices.values
+    readonly property var connectedBluetoothDevices: bluetoothDevices.filter(device => device.connected)
+    readonly property var audioNodes: Pipewire.nodes.values
+    readonly property var audioDevices: audioNodes.filter(node => node.audio && !node.isStream)
+    readonly property var defaultSink: Pipewire.defaultAudioSink
+    readonly property int volumePercent: defaultSink && defaultSink.audio
+        ? Math.round(defaultSink.audio.volume * 100) : 0
+    readonly property string volumeIcon: {
+        if (!defaultSink || !defaultSink.audio || defaultSink.audio.muted) return "󰖁";
+        if (volumePercent <= 0) return "󰕿";
+        if (volumePercent < 35) return "󰕿";
+        if (volumePercent < 70) return "󰖀";
+        return "󰕾";
+    }
+    readonly property string bluetoothIcon: bluetoothAdapter && bluetoothAdapter.enabled
+        ? (connectedBluetoothDevices.length > 0 ? "󰂱" : "󰂯") : "󰂲"
+    readonly property string networkIcon: {
+        if (!connectedNetworkDevice) return "󰤭";
+        if (connectedNetworkDevice.type === DeviceType.Wired) return "󰈀";
+        if (!connectedNetwork) return "󰤭";
+        const strength = connectedNetwork.signalStrength || 0;
+        return strength < 0.25 ? "󰤟" : strength < 0.5 ? "󰤢"
+            : strength < 0.75 ? "󰤥" : "󰤨";
+    }
+    readonly property string profileIcon: currentProfile === "performance" ? "󰓅"
+        : currentProfile === "power-saver" ? "󰌪" : "󰾅"
     property var occupiedWorkspaces: []
     readonly property var physicalWorkspaceIds: {
         if (Hyprland.monitors.values.length <= 1) return [];
@@ -22,6 +59,29 @@ PanelWindow {
             if (monitor.activeWorkspace) ids.push(monitor.activeWorkspace.id);
         }
         return ids;
+    }
+
+    function findConnectedNetworkDevice() {
+        for (const device of networkDevices) {
+            if (device.connected) return device;
+        }
+        return null;
+    }
+
+    function findConnectedNetwork(device) {
+        if (!device) return null;
+        if (device.type === DeviceType.Wired) return device.network || null;
+        for (const network of device.networks.values) {
+            if (network.connected) return network;
+        }
+        return null;
+    }
+
+    function adjustVolume(steps) {
+        if (!defaultSink || !defaultSink.audio) return;
+        if (defaultSink.audio.muted && steps > 0) defaultSink.audio.muted = false;
+        defaultSink.audio.volume = Math.max(0, Math.min(1.5,
+            defaultSink.audio.volume + steps * 0.05));
     }
 
     Process {
@@ -39,6 +99,41 @@ PanelWindow {
         }
     }
 
+    Process {
+        id: profileQuery
+        command: ["powerprofilesctl", "get"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const profile = this.text.trim();
+                if (["power-saver", "balanced", "performance"].indexOf(profile) >= 0)
+                    bar.currentProfile = profile;
+            }
+        }
+    }
+
+    Process {
+        id: batteryQuery
+        command: ["sh", "-c", "battery=$(upower -e 2>/dev/null | awk '/\\/battery_/ { print; exit }'); [ -n \"$battery\" ] || exit 0; info=$(upower -i \"$battery\" 2>/dev/null); present=$(printf '%s\\n' \"$info\" | sed -n 's/^[[:space:]]*present:[[:space:]]*//p' | head -n 1); [ \"${present:-yes}\" = yes ] || exit 0; percentage=$(printf '%s\\n' \"$info\" | sed -n 's/^[[:space:]]*percentage:[[:space:]]*\\([0-9][0-9]*\\)%.*/\\1/p' | head -n 1); [ -n \"$percentage\" ] && printf '%s\\n' \"$percentage\""]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const percentage = Number(this.text.trim());
+                bar.batteryPresent = this.text.trim() !== "" && !isNaN(percentage);
+                bar.batteryPercent = bar.batteryPresent ? percentage : 0;
+            }
+        }
+    }
+
+    Process {
+        id: maintenanceQuery
+        command: ["sh", "-c", "apt_updates=$(apt list --upgradable 2>/dev/null | sed '1{/^Listing/d;}; /^$/d' | wc -l); flatpak_updates=$(if command -v flatpak >/dev/null 2>&1; then flatpak remote-ls --updates --app 2>/dev/null | sed '/^$/d' | wc -l; else printf '0'; fi); printf '%s\\n' $((apt_updates + flatpak_updates))"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: bar.maintenanceUpdates = Number(this.text.trim()) || 0
+        }
+    }
+
     Timer {
         interval: 2000
         running: true
@@ -46,7 +141,35 @@ PanelWindow {
         onTriggered: workspaceState.running = true
     }
 
-    Component.onCompleted: workspaceState.running = true
+    Timer {
+        interval: 3000
+        running: true
+        repeat: true
+        onTriggered: if (!profileQuery.running) profileQuery.running = true
+    }
+
+    Timer {
+        interval: 15000
+        running: true
+        repeat: true
+        onTriggered: if (!batteryQuery.running) batteryQuery.running = true
+    }
+
+    Timer {
+        interval: 30000
+        running: true
+        repeat: true
+        onTriggered: if (!maintenanceQuery.running) maintenanceQuery.running = true
+    }
+
+    Component.onCompleted: {
+        workspaceState.running = true;
+        profileQuery.running = true;
+        batteryQuery.running = true;
+        maintenanceQuery.running = true;
+    }
+
+    PwObjectTracker { objects: bar.audioDevices }
 
     SystemClock {
         id: clock
@@ -95,25 +218,16 @@ PanelWindow {
                         height: 24
                         radius: 4
                         color: active ? Theme.accent : (workspaceMouse.containsMouse ? Theme.surfaceHover : Theme.surface)
-                        border.color: active ? Theme.accent : (occupied ? Theme.border : Theme.transparent)
-                        border.width: 1
+                        border.color: occupied && !active ? Theme.accent : Theme.transparent
+                        border.width: occupied && !active ? 2 : 1
 
                         AppText {
                             anchors.centerIn: parent
-                            text: workspace.physical ? "󰍹" : (workspace.number === 10 ? "0" : workspace.number)
+                            text: workspace.physical && !workspace.active
+                                ? "󰍹" : (workspace.number === 10 ? "0" : workspace.number)
                             color: workspace.active ? Theme.accentText : Theme.text
                             font.bold: workspace.active
-                            font.pixelSize: workspace.physical ? 14 : 12
-                        }
-                        Rectangle {
-                            visible: workspace.occupied && !workspace.active
-                            anchors.bottom: parent.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            anchors.bottomMargin: 3
-                            width: 4
-                            height: 4
-                            radius: 2
-                            color: Theme.accent
+                            font.pixelSize: workspace.physical && !workspace.active ? 14 : 12
                         }
                         MouseArea {
                             id: workspaceMouse
@@ -176,11 +290,88 @@ PanelWindow {
 
             SystemMonitorButton { Layout.alignment: Qt.AlignVCenter }
 
-            MaintenanceButton { Layout.alignment: Qt.AlignVCenter }
-
-            ControlPanel {
+            RowLayout {
                 Layout.alignment: Qt.AlignVCenter
-                panelScreen: bar.screen
+                spacing: 4
+
+                TuiLauncherButton {
+                    icon: bar.volumeIcon
+                    label: bar.volumePercent + "%"
+                    command: [
+                        "foot",
+                        "--app-id=pulsemixer",
+                        "--title=Volume Mixer",
+                        "--window-size-chars=94x28",
+                        "pulsemixer"
+                    ]
+                    onScrolled: steps => bar.adjustVolume(steps)
+                }
+
+                TuiLauncherButton {
+                    icon: bar.bluetoothIcon
+                    label: bar.connectedBluetoothDevices.length > 0
+                        ? String(bar.connectedBluetoothDevices.length) : ""
+                    command: [
+                        "foot",
+                        "--app-id=bluetooth-tui",
+                        "--title=Bluetooth",
+                        "--override=colors.regular0=222226",
+                        "--window-size-chars=82x26",
+                        "dotfiles-bluetooth-tui"
+                    ]
+                }
+
+                TuiLauncherButton {
+                    icon: bar.networkIcon
+                    command: [
+                        "foot",
+                        "--app-id=nmtui",
+                        "--title=Network Settings",
+                        "--override=colors.regular0=222226",
+                        "--window-size-chars=82x24",
+                        "dotfiles-network-tui"
+                    ]
+                }
+
+                TuiLauncherButton {
+                    icon: bar.profileIcon
+                    label: bar.batteryPresent ? bar.batteryPercent + "%" : ""
+                    command: [
+                        "foot",
+                        "--app-id=power-profiles-tui",
+                        "--title=Power Profile",
+                        "--override=colors.regular0=222226",
+                        "--window-size-chars=82x24",
+                        "dotfiles-power-profiles-tui"
+                    ]
+                }
+
+                TuiLauncherButton {
+                    icon: "󰐥"
+                    command: [
+                        "foot",
+                        "--app-id=power-menu-tui",
+                        "--title=Power",
+                        "--override=colors.regular0=222226",
+                        "--window-size-chars=88x23",
+                        "dotfiles-power-menu-tui"
+                    ]
+                }
+            }
+
+            TuiLauncherButton {
+                Layout.alignment: Qt.AlignVCenter
+                icon: "󰏗"
+                label: bar.maintenanceUpdates > 0
+                    ? String(bar.maintenanceUpdates) : ""
+                command: [
+                    "foot",
+                    "--app-id=maintenance-tui",
+                    "--title=Debian Maintenance",
+                    "--override=colors.regular0=222226",
+                    "--window-size-chars=104x32",
+                    "dotfiles-maintenance-tui"
+                ]
             }
 
             Row {
@@ -230,6 +421,8 @@ PanelWindow {
                     }
                 }
             }
+
+            ScreenSharingIndicator { Layout.alignment: Qt.AlignVCenter }
         }
     }
 }
