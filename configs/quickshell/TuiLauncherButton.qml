@@ -13,7 +13,7 @@ Rectangle {
     implicitWidth: label.length > 0 ? content.implicitWidth + 22 : 28
     width: implicitWidth
     height: 28
-    radius: 8
+    radius: 0
     color: buttonMouse.containsMouse ? Theme.accentStrong : Theme.surfaceRaised
     border.color: buttonMouse.containsMouse ? Theme.accent : Theme.transparent
     border.width: 1

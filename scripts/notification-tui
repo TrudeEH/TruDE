@@ -84,7 +84,7 @@ while :; do
         --prompt='󰂚  Notifications  ' \
         --pointer='󰜴' \
         --marker='󰄬' \
-        --border=rounded \
+        --border=sharp \
         --border-label=" $active_count active · $history_count recent " \
         --info=inline-right \
         --layout=reverse \

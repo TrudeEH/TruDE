@@ -13,7 +13,7 @@ if [ ! -f "$config_dir/btop.conf" ]; then
         'color_theme = "dotfiles"' \
         'theme_background = False' \
         'truecolor = True' \
-        'rounded_corners = True' \
+        'rounded_corners = False' \
         'graph_symbol = "braille"' \
         'shown_boxes = "cpu mem net proc"' \
         'update_ms = 2000' \

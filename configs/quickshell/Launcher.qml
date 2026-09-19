@@ -105,7 +105,7 @@ Item {
                 anchors.centerIn: parent
                 width: Math.min(parent.width - 48, 620)
                 height: Math.min(parent.height - 48, 560)
-                radius: 14
+                radius: 0
                 color: Theme.surface
                 border.color: Theme.border
                 border.width: 1
@@ -145,7 +145,7 @@ Item {
                     Rectangle {
                         Layout.fillWidth: true
                         implicitHeight: 44
-                        radius: 10
+                        radius: 0
                         color: searchField.activeFocus ? Theme.surfaceHover : Theme.surfaceRaised
                         border.color: searchField.activeFocus ? Theme.accent : Theme.border
                         border.width: 1
@@ -204,7 +204,7 @@ Item {
                             required property int index
                             width: list.width
                             height: 58
-                            radius: 9
+                            radius: 0
                             color: index === launcher.selectedIndex || itemMouse.containsMouse
                                 ? Theme.surfaceHover : Theme.transparent
 

@@ -12,7 +12,7 @@ Rectangle {
 
     implicitWidth: content.implicitWidth + 18
     implicitHeight: 24
-    radius: 7
+    radius: 0
     color: highlighted ? Theme.accent : Theme.surface
     border.color: highlighted ? Theme.accent : Theme.border
     border.width: 1

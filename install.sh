@@ -229,6 +229,7 @@ link_configs() {
     link_config "$repo_dir/scripts/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
     link_config "$repo_dir/scripts/waybar-temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
+    link_config "$repo_dir/scripts/waybar-workspace" "$HOME/.local/bin/dotfiles-waybar-workspace"
     link_config "$repo_dir/scripts/waybar-notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
     link_config "$repo_dir/scripts/waybar-power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
     link_config "$repo_dir/scripts/waybar-maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"

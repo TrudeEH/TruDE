@@ -10,7 +10,7 @@ Rectangle {
     visible: captureActive
     width: visible ? 28 : 0
     height: 28
-    radius: 8
+    radius: 0
     color: Theme.surfaceRaised
     border.color: "#ff7b72"
     border.width: 1

@@ -19,7 +19,7 @@ button {
     min-height: 30px;
     padding: 6px 12px;
     border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 9px;
+    border-radius: 0;
     background-image: none;
     background-color: @card_bg_color;
     color: @theme_fg_color;
@@ -45,7 +45,7 @@ entry {
     min-height: 34px;
     padding: 6px 10px;
     border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 9px;
+    border-radius: 0;
     background-image: none;
     background-color: @card_bg_color;
     color: @theme_fg_color;
@@ -62,7 +62,7 @@ menu,
 popover,
 .menu {
     border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 10px;
+    border-radius: 0;
     background-color: @card_bg_color;
     color: @theme_fg_color;
 }

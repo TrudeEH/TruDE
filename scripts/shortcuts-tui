@@ -26,7 +26,7 @@ printf '%s\n' "$shortcuts" | fzf \
     --with-nth=1,2 \
     --prompt='󰌌  Search shortcuts  ' \
     --pointer=' ' \
-    --border=rounded \
+    --border=sharp \
     --border-label=' Hyprland Shortcuts ' \
     --info=inline-right \
     --layout=reverse \

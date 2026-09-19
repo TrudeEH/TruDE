@@ -1,0 +1,76 @@
+#!/bin/sh
+set -u
+
+runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+cache_file=$runtime_dir/dotfiles-waybar-workspaces.tsv
+lock_dir=$runtime_dir/dotfiles-waybar-workspaces.lock
+
+valid_workspace() {
+    case $1 in
+        1|2|3|4|5|6|7|8|9|10) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+cache_is_fresh() {
+    [ -f "$cache_file" ] || return 1
+    now=$(date +%s)
+    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
+    [ $((now - modified)) -lt 1 ]
+}
+
+refresh_cache() {
+    cache_is_fresh && return 0
+
+    if ! mkdir "$lock_dir" 2>/dev/null; then
+        attempts=0
+        while [ -d "$lock_dir" ] && [ "$attempts" -lt 20 ]; do
+            sleep 0.05
+            attempts=$((attempts + 1))
+        done
+        [ -f "$cache_file" ] && return 0
+        mkdir "$lock_dir" 2>/dev/null || return 1
+    fi
+
+    trap 'rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+    temporary=$(mktemp "$runtime_dir/dotfiles-waybar-workspaces.XXXXXX") || return 1
+    active=$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // 0' 2>/dev/null)
+    visible=$(hyprctl monitors -j 2>/dev/null | jq -r '.[].activeWorkspace.id' 2>/dev/null)
+    occupied=$(hyprctl clients -j 2>/dev/null | jq -r '.[].workspace.id' 2>/dev/null | sort -nu)
+
+    number=1
+    while [ "$number" -le 10 ]; do
+        state=empty
+        printf '%s\n' "$occupied" | grep -Fqx "$number" && state=occupied
+        printf '%s\n' "$visible" | grep -Fqx "$number" && state=visible
+        [ "$active" = "$number" ] && state=active
+        printf '%s\t%s\n' "$number" "$state" >> "$temporary"
+        number=$((number + 1))
+    done
+
+    mv "$temporary" "$cache_file"
+    rmdir "$lock_dir" 2>/dev/null || :
+    trap - EXIT HUP INT TERM
+}
+
+action=${1:-status}
+requested_workspace=${2:-}
+valid_workspace "$requested_workspace" || exit 1
+
+case $action in
+    focus)
+        hyprctl dispatch "hl.dsp.focus({ workspace = $requested_workspace })" >/dev/null 2>&1 || exit 1
+        rm -f "$cache_file"
+        pkill -RTMIN+7 waybar 2>/dev/null || :
+        ;;
+    status)
+        refresh_cache || exit 1
+        state=$(awk -F '\t' -v workspace="$requested_workspace" '$1 == workspace { print $2; exit }' "$cache_file")
+        [ -n "$state" ] || state=empty
+        printf '{"text":"%s","class":"%s","tooltip":"Workspace %s"}\n' \
+            "$requested_workspace" "$state" "$requested_workspace"
+        ;;
+    *)
+        exit 1
+        ;;
+esac

@@ -146,7 +146,7 @@ Item {
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.topMargin: 8
-                    radius: 12
+                    radius: 0
                     color: Theme.surface
                     border.color: Theme.border
                     border.width: 1
@@ -204,7 +204,7 @@ Item {
                                 required property var modelData
                                 width: ListView.view.width
                                 implicitHeight: notificationContent.implicitHeight + 24
-                                radius: 9
+                                radius: 0
                                 color: Theme.surfaceRaised
                                 border.color: Theme.border
                                 border.width: 1
@@ -297,7 +297,7 @@ Item {
                     anchors.topMargin: 22
                     width: 78
                     height: 26
-                    radius: 6
+                    radius: 0
                     color: clearMouse.containsMouse ? Theme.accentStrong : Theme.accent
                     z: 10
 
@@ -348,7 +348,7 @@ Item {
                     anchors.top: parent.top
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.topMargin: 8
-                    radius: 12
+                    radius: 0
                     color: Theme.surface
                     border.color: Theme.border
                     border.width: 1

@@ -15,7 +15,7 @@ Rectangle {
 
     width: 196
     height: 28
-    radius: 8
+    radius: 0
     color: monitorMouse.containsMouse ? Theme.surfaceHover : Theme.surfaceRaised
     border.color: monitorMouse.containsMouse ? Theme.border : Theme.transparent
     border.width: 1

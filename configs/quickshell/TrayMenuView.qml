@@ -48,7 +48,7 @@ Item {
                 Rectangle {
                     visible: !menuEntry.modelData.isSeparator
                     anchors.fill: parent
-                    radius: 7
+                    radius: 0
                     color: menuEntry.modelData.enabled && entryMouse.containsMouse
                         ? Theme.surfaceHover
                         : Theme.transparent

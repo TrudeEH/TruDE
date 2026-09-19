@@ -12,7 +12,7 @@ Rectangle {
     property bool highlighted: false
 
     implicitHeight: 86
-    radius: 10
+    radius: 0
     color: highlighted ? Theme.surfaceHover : Theme.surfaceRaised
     border.color: highlighted ? Theme.accent : Theme.border
     border.width: 1
@@ -26,7 +26,7 @@ Rectangle {
             Layout.alignment: Qt.AlignTop
             implicitWidth: 30
             implicitHeight: 30
-            radius: 9
+            radius: 0
             color: card.highlighted ? Theme.accent : Theme.surface
 
             AppText {

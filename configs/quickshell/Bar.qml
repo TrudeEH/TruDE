@@ -216,7 +216,7 @@ PanelWindow {
                         Layout.alignment: Qt.AlignVCenter
                         width: 24
                         height: 24
-                        radius: 4
+                        radius: 0
                         color: active ? Theme.accent : (workspaceMouse.containsMouse ? Theme.surfaceHover : Theme.surface)
                         border.color: occupied && !active ? Theme.accent : Theme.transparent
                         border.width: occupied && !active ? 2 : 1
@@ -248,7 +248,7 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             width: clockContent.implicitWidth + 18
             height: 26
-            radius: 8
+            radius: 0
             color: clockMouse.containsMouse ? Theme.surfaceHover : Theme.window
             border.color: Theme.border
             border.width: 1
@@ -384,7 +384,7 @@ PanelWindow {
                         required property var modelData
                         width: 24
                         height: 24
-                        radius: 4
+                        radius: 0
                         color: trayMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
 
                         IconImage {

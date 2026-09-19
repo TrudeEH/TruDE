@@ -91,7 +91,7 @@ Item {
                         anchors.centerIn: parent
                         width: Math.min(parent.width - 80, 820)
                         height: Math.min(parent.height - 80, 720)
-                        radius: 12
+                        radius: 0
                         color: Theme.surface
                         border.color: Theme.border
                         border.width: 1
@@ -131,7 +131,7 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                     implicitWidth: 32
                                     implicitHeight: 32
-                                    radius: 16
+                                    radius: 0
                                     color: closeMouse.containsMouse ? Theme.surfaceHover : Theme.transparent
 
                                     AppText {
@@ -153,7 +153,7 @@ Item {
                             Rectangle {
                                 Layout.fillWidth: true
                                 implicitHeight: 40
-                                radius: 8
+                                radius: 0
                                 color: searchField.activeFocus ? Theme.surfaceHover : Theme.surfaceRaised
                                 border.color: searchField.activeFocus ? Theme.accent : Theme.border
                                 border.width: 1
@@ -196,7 +196,7 @@ Item {
                                     required property int index
                                     width: list.width
                                     height: 36
-                                    radius: 6
+                                    radius: 0
                                     color: index % 2 ? Theme.surfaceRaised : Theme.transparent
 
                                     Rectangle {
@@ -206,7 +206,7 @@ Item {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 210
                                         height: 26
-                                        radius: 6
+                                        radius: 0
                                         color: Theme.surfaceHover
 
                                         AppText {
