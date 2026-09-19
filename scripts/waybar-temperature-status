@@ -1,0 +1,18 @@
+#!/bin/sh
+set -u
+
+maximum=0
+for input in /sys/class/hwmon/hwmon*/temp*_input /sys/class/thermal/thermal_zone*/temp; do
+    [ -r "$input" ] || continue
+    value=$(cat "$input" 2>/dev/null) || continue
+    case $value in *[!0-9]*|'') continue ;; esac
+    [ "$value" -gt "$maximum" ] && maximum=$value
+done
+
+if [ "$maximum" -gt 0 ]; then
+    temperature=$((maximum / 1000))
+    printf '{"text":" %s°C","tooltip":"Maximum temperature: %s°C","percentage":%s}\n' \
+        "$temperature" "$temperature" "$temperature"
+else
+    printf '{"text":" —","tooltip":"No temperature sensor found"}\n'
+fi

@@ -54,7 +54,7 @@ hl.monitor({
 -- Set programs that you use
 local terminal    = "foot"
 local fileManager = "nautilus"
-local menu        = "quickshell ipc call launcher toggle"
+local menu        = "foot --app-id=app-launcher-tui --title='Applications' --override=colors.regular0=222226 --window-size-chars=86x26 dotfiles-app-launcher-tui"
 local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png"
@@ -287,7 +287,7 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal), { description = "Open terminal" })
-hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("quickshell ipc call shortcuts toggle"), {
+hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("foot --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
     description = "Show Hyprland shortcuts",
 })
 local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
@@ -452,6 +452,22 @@ hl.window_rule({
     center = true,
 })
 
+hl.window_rule({
+    name  = "app-launcher-tui",
+    match = { class = "app-launcher-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "shortcuts-tui",
+    match = { class = "shortcuts-tui" },
+
+    float  = true,
+    center = true,
+})
+
 -- Start the bar and authentication agent once per session.
 hl.on("hyprland.start", function ()
     -- Libadwaita follows the desktop color-scheme preference. Set it for
@@ -463,7 +479,6 @@ hl.on("hyprland.start", function ()
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
     hl.exec_cmd("swaybg -i " .. wallpaper .. " -m fill")
-    hl.exec_cmd("env QT_QPA_PLATFORM=wayland QT_STYLE_OVERRIDE=Adwaita-Dark quickshell --no-duplicate")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)

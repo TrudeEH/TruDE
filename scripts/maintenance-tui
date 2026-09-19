@@ -166,6 +166,8 @@ update_system() {
     fi
     printf 'Press Enter to return to maintenance status.'
     IFS= read -r _
+    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar-maintenance.json"
+    pkill -RTMIN+8 waybar 2>/dev/null || :
     collect_status
 }
 

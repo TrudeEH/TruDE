@@ -61,7 +61,7 @@ install_packages() {
     # from backports. libdw1t64 keeps the backported libelf1t64 dependency
     # consistent when stable packages such as bluez are installed afterward.
     sudo apt-get install -y -t "$backports_suite" \
-        hyprland hyprland-guiutils hypridle hyprlock libdw1t64 quickshell uwsm xdg-desktop-portal-hyprland
+        hyprland hyprland-guiutils hypridle hyprlock libdw1t64 uwsm xdg-desktop-portal-hyprland
 
     # The rest of the desktop uses the release's normal package priorities.
     sudo apt-get install -y \
@@ -73,7 +73,8 @@ install_packages() {
         xdg-desktop-portal-gtk brightnessctl brightness-udev playerctl \
         bluez btop pulsemixer whiptail power-profiles-daemon upower \
         cups system-config-printer ipp-usb gvfs udisks2 \
-        qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp wl-clipboard swaybg hyprpolkitagent
+        qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp wl-clipboard swaybg hyprpolkitagent \
+        waybar sway-notification-center fzf dex
 }
 
 install_font() {
@@ -223,21 +224,22 @@ link_configs() {
     link_config "$repo_dir/scripts/power-menu-tui" "$HOME/.local/bin/dotfiles-power-menu-tui"
     link_config "$repo_dir/scripts/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
     link_config "$repo_dir/scripts/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
+    link_config "$repo_dir/scripts/app-launcher-tui" "$HOME/.local/bin/dotfiles-app-launcher-tui"
+    link_config "$repo_dir/scripts/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
+    link_config "$repo_dir/scripts/waybar-temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
+    link_config "$repo_dir/scripts/waybar-notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
+    link_config "$repo_dir/scripts/waybar-power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
+    link_config "$repo_dir/scripts/waybar-maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
+    link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
+    link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
+    link_config "$repo_dir/configs/swaync/config.json" "$config_dir/swaync/config.json"
+    link_config "$repo_dir/configs/swaync/style.css" "$config_dir/swaync/style.css"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
-
-    local quickshell_file
-    for quickshell_file in shell.qml AppText.qml Bar.qml SystemMonitorButton.qml ScreenSharingIndicator.qml TuiLauncherButton.qml InfoCard.qml MetricPill.qml PopupManager.qml LauncherButton.qml Launcher.qml NotificationCenter.qml Shortcuts.qml Theme.qml TrayMenu.qml TrayMenuView.qml qmldir; do
-        link_config "$repo_dir/configs/quickshell/$quickshell_file" "$config_dir/quickshell/$quickshell_file"
-    done
-
-    for quickshell_file in AudioButton.qml AudioPanel.qml BluetoothButton.qml BluetoothPanel.qml ControlPanel.qml NetworkButton.qml NetworkPanel.qml PowerButton.qml PowerMenu.qml PowerProfileButton.qml PowerProfilePanel.qml SystemMonitorPanel.qml MaintenanceButton.qml MaintenancePanel.qml; do
-        remove_obsolete_link "$config_dir/quickshell/$quickshell_file" "$repo_dir/configs/quickshell/$quickshell_file"
-    done
 
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
@@ -261,10 +263,11 @@ main() {
 
     if [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
         systemctl --user daemon-reload || true
+        systemctl --user enable --now waybar.service swaync.service || true
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || true
     fi
 
-    echo "Done. Log out and back in to start Quickshell with Wayland support."
+    echo "Done. Log out and back in to start the Waybar desktop session."
 }
 
 main "$@"

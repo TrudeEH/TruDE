@@ -1,0 +1,5 @@
+#!/bin/sh
+set -u
+
+swaync-client --subscribe-waybar \
+    | sed -u 's/"text": "0"/"text": ""/'

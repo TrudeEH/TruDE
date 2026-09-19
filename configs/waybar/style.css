@@ -1,0 +1,199 @@
+@define-color window #222226;
+@define-color surface #38383c;
+@define-color surface-hover #46464b;
+@define-color text #ffffff;
+@define-color muted #aaaaaa;
+@define-color accent #ffbe6f;
+@define-color accent-strong #ffa348;
+@define-color accent-text #222226;
+@define-color border rgba(255, 255, 255, 0.10);
+@define-color critical #ff7b72;
+
+* {
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 12px;
+    font-weight: 500;
+}
+
+window#waybar {
+    background: @window;
+    color: @text;
+}
+
+tooltip {
+    background: @window;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 10px;
+}
+
+tooltip label {
+    color: @text;
+    padding: 4px;
+}
+
+#custom-launcher,
+#clock,
+#custom-notification,
+#cpu,
+#memory,
+#custom-temperature,
+#pulseaudio,
+#bluetooth,
+#network,
+#custom-power-profile,
+#custom-power-menu,
+#custom-maintenance,
+#tray,
+#privacy {
+    min-height: 26px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    padding: 0 10px;
+    background: @surface;
+    color: @text;
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+#custom-launcher {
+    min-width: 26px;
+    padding: 0;
+    font-size: 15px;
+}
+
+#custom-launcher:hover,
+#cpu:hover,
+#memory:hover,
+#custom-temperature:hover,
+#pulseaudio:hover,
+#bluetooth:hover,
+#network:hover,
+#custom-power-profile:hover,
+#custom-power-menu:hover,
+#custom-maintenance:hover {
+    background: @accent-strong;
+    color: @accent-text;
+    border-color: @accent;
+}
+
+#workspaces {
+    margin: 3px 0;
+    background: transparent;
+}
+
+#workspaces button {
+    min-width: 24px;
+    min-height: 24px;
+    margin-right: 4px;
+    padding: 0;
+    background: @surface;
+    color: @text;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+#workspaces button.empty {
+    background: @window;
+    border-color: transparent;
+}
+
+#workspaces button.active {
+    background: @accent;
+    color: @accent-text;
+    font-weight: 700;
+}
+
+#workspaces button.visible:not(.active) {
+    color: @accent;
+}
+
+#workspaces button.urgent {
+    border-color: @critical;
+}
+
+#workspaces button:hover {
+    background: @surface-hover;
+    color: @text;
+    border-color: @border;
+}
+
+#cpu {
+    border-radius: 8px 0 0 8px;
+    border-right-color: transparent;
+}
+
+#memory {
+    margin-left: -8px;
+    border-radius: 0;
+    border-right-color: transparent;
+    border-left-color: transparent;
+}
+
+#custom-temperature {
+    margin-left: -8px;
+    border-radius: 0 8px 8px 0;
+    border-left-color: transparent;
+}
+
+#clock {
+    margin-right: 0;
+    background: @window;
+    border-color: @border;
+    border-radius: 8px 0 0 8px;
+}
+
+#custom-notification {
+    margin-left: 0;
+    padding-left: 0;
+    background: @window;
+    color: @accent;
+    border-color: @border;
+    border-left-color: transparent;
+    border-radius: 0 8px 8px 0;
+}
+
+#pulseaudio,
+#bluetooth,
+#network,
+#custom-power-profile,
+#custom-power-menu {
+    margin-left: -5px;
+    margin-right: -5px;
+}
+
+#pulseaudio.muted,
+#bluetooth.disabled,
+#bluetooth.off,
+#network.disconnected,
+#network.disabled {
+    color: @muted;
+}
+
+#custom-maintenance.updated {
+    color: @muted;
+}
+
+#custom-maintenance.updates {
+    color: @accent;
+}
+
+#tray {
+    padding: 0 7px;
+}
+
+#privacy {
+    min-width: 26px;
+    padding: 0;
+    color: @critical;
+    border-color: @critical;
+}
+
+#privacy-item.screenshare {
+    color: @critical;
+}

@@ -1,0 +1,36 @@
+#!/bin/sh
+set -u
+
+shortcuts=$(hyprctl binds -j 2>/dev/null | jq -r '
+    def modifier_names:
+        [
+            if (. & 64) != 0 then "Super" else empty end,
+            if (. & 4) != 0 then "Ctrl" else empty end,
+            if (. & 8) != 0 then "Alt" else empty end,
+            if (. & 1) != 0 then "Shift" else empty end
+        ] | join(" + ");
+    .[]
+    | select((.description // "") != "")
+    | ((.modmask // 0) | modifier_names) as $modifiers
+    | [
+        (if $modifiers == "" then (.key // "") else ($modifiers + " + " + (.key // "")) end),
+        .description
+      ]
+    | @tsv
+' | LC_ALL=C sort -f -k1,1)
+
+[ -n "$shortcuts" ] || exit 0
+
+printf '%s\n' "$shortcuts" | fzf \
+    --delimiter='\t' \
+    --with-nth=1,2 \
+    --prompt='󰌌  Search shortcuts  ' \
+    --pointer=' ' \
+    --border=rounded \
+    --border-label=' Hyprland Shortcuts ' \
+    --info=inline-right \
+    --layout=reverse \
+    --no-multi \
+    --no-sort \
+    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa' \
+    >/dev/null

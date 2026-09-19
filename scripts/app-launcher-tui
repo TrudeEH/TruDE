@@ -1,0 +1,93 @@
+#!/bin/sh
+set -u
+
+cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}/dotfiles
+cache_file=$cache_root/applications.tsv
+cache_age=300
+
+mkdir -p "$cache_root"
+
+cache_is_fresh() {
+    [ -f "$cache_file" ] || return 1
+    now=$(date +%s)
+    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
+    [ $((now - modified)) -lt "$cache_age" ]
+}
+
+rebuild_cache() {
+    temporary=$(mktemp "$cache_root/applications.XXXXXX") || exit 1
+    seen=$(mktemp "$cache_root/applications-seen.XXXXXX") || {
+        rm -f "$temporary"
+        exit 1
+    }
+    trap 'rm -f "$temporary" "$seen"' EXIT HUP INT TERM
+
+    data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
+    data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
+    search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
+
+    old_ifs=$IFS
+    IFS=:
+    for data_dir in $search_dirs; do
+        applications_dir=$data_dir/applications
+        [ -d "$applications_dir" ] || continue
+
+        find "$applications_dir" -type f -name '*.desktop' -print 2>/dev/null \
+            | LC_ALL=C sort \
+            | while IFS= read -r desktop_file; do
+                relative=${desktop_file#"$applications_dir"/}
+                desktop_id=$(printf '%s' "$relative" | tr '/' '-')
+                grep -Fqx "$desktop_id" "$seen" 2>/dev/null && continue
+                printf '%s\n' "$desktop_id" >> "$seen"
+
+                entry=$(awk '
+                    BEGIN { section = 0; type = ""; name = ""; comment = ""; hidden = 0 }
+                    /^\[Desktop Entry\]$/ { section = 1; next }
+                    /^\[/ { if (section) exit; next }
+                    !section { next }
+                    /^Type=/ { type = substr($0, 6); next }
+                    /^Name=/ && name == "" { name = substr($0, 6); next }
+                    /^Comment=/ && comment == "" { comment = substr($0, 9); next }
+                    /^(Hidden|NoDisplay)=true$/ { hidden = 1 }
+                    END {
+                        if (type == "Application" && name != "" && !hidden) {
+                            gsub(/\t/, " ", name)
+                            gsub(/\t/, " ", comment)
+                            printf "%s\t%s", name, comment
+                        }
+                    }
+                ' "$desktop_file")
+
+                [ -n "$entry" ] || continue
+                printf '󰀻  %s\t%s\n' "$entry" "$desktop_file" >> "$temporary"
+            done
+    done
+    IFS=$old_ifs
+
+    LC_ALL=C sort -f -k1,1 "$temporary" > "$cache_file"
+    rm -f "$temporary" "$seen"
+    trap - EXIT HUP INT TERM
+}
+
+cache_is_fresh || rebuild_cache
+
+selection=$(fzf \
+    --delimiter='\t' \
+    --with-nth=1,2 \
+    --nth=1,2 \
+    --prompt='󰀻  Search apps  ' \
+    --pointer='󰜴' \
+    --marker='󰄬' \
+    --border=rounded \
+    --border-label=' Applications ' \
+    --info=inline-right \
+    --layout=reverse \
+    --no-multi \
+    --cycle \
+    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
+    < "$cache_file") || exit 0
+
+desktop_file=$(printf '%s\n' "$selection" | awk -F '\t' '{ print $NF }')
+[ -f "$desktop_file" ] || exit 1
+
+exec dex "$desktop_file"

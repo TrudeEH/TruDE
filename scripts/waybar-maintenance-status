@@ -1,0 +1,56 @@
+#!/bin/sh
+set -u
+
+runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+cache_file=$runtime_dir/dotfiles-waybar-maintenance.json
+lock_dir=$runtime_dir/dotfiles-waybar-maintenance.lock
+cache_lifetime=240
+
+cache_is_fresh() {
+    [ -f "$cache_file" ] || return 1
+    now=$(date +%s)
+    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
+    [ $((now - modified)) -lt "$cache_lifetime" ]
+}
+
+if cache_is_fresh; then
+    cat "$cache_file"
+    exit 0
+fi
+
+if ! mkdir "$lock_dir" 2>/dev/null; then
+    attempts=0
+    while [ -d "$lock_dir" ] && [ "$attempts" -lt 60 ]; do
+        sleep 0.5
+        attempts=$((attempts + 1))
+    done
+    if [ -f "$cache_file" ]; then
+        cat "$cache_file"
+        exit 0
+    fi
+    mkdir "$lock_dir" 2>/dev/null || exit 1
+fi
+
+trap 'rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+
+apt_updates=$(apt list --upgradable 2>/dev/null | sed '1{/^Listing/d;}; /^$/d' | wc -l)
+if command -v flatpak >/dev/null 2>&1; then
+    flatpak_updates=$(flatpak remote-ls --updates --app 2>/dev/null | sed '/^$/d' | wc -l)
+else
+    flatpak_updates=0
+fi
+
+total=$((apt_updates + flatpak_updates))
+if [ "$total" -gt 0 ]; then
+    text="󰏗  $total"
+    class=updates
+else
+    text='󰏗'
+    class=updated
+fi
+
+temporary=$(mktemp "$runtime_dir/dotfiles-waybar-maintenance.XXXXXX") || exit 1
+printf '{"text":"%s","tooltip":"APT updates: %s\\nFlatpak updates: %s","class":"%s"}\n' \
+    "$text" "$apt_updates" "$flatpak_updates" "$class" > "$temporary"
+mv "$temporary" "$cache_file"
+cat "$cache_file"
