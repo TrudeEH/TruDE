@@ -74,7 +74,7 @@ install_packages() {
         bluez btop pulsemixer whiptail power-profiles-daemon upower \
         cups system-config-printer ipp-usb gvfs udisks2 \
         qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp wl-clipboard swaybg hyprpolkitagent \
-        waybar sway-notification-center fzf dex
+        waybar mako-notifier fzf dex jq
 }
 
 install_font() {
@@ -225,6 +225,8 @@ link_configs() {
     link_config "$repo_dir/scripts/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
     link_config "$repo_dir/scripts/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
     link_config "$repo_dir/scripts/app-launcher-tui" "$HOME/.local/bin/dotfiles-app-launcher-tui"
+    link_config "$repo_dir/scripts/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
+    link_config "$repo_dir/scripts/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
     link_config "$repo_dir/scripts/waybar-temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar-notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
@@ -232,14 +234,16 @@ link_configs() {
     link_config "$repo_dir/scripts/waybar-maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
     link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
     link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
-    link_config "$repo_dir/configs/swaync/config.json" "$config_dir/swaync/config.json"
-    link_config "$repo_dir/configs/swaync/style.css" "$config_dir/swaync/style.css"
+    link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-launcher" "$repo_dir/scripts/launcher"
     remove_obsolete_link "$HOME/.local/bin/dotfiles-quickshell" "$repo_dir/scripts/quickshell"
+    remove_obsolete_link "$config_dir/swaync/config.json" "$repo_dir/configs/swaync/config.json"
+    remove_obsolete_link "$config_dir/swaync/style.css" "$repo_dir/configs/swaync/style.css"
+    remove_obsolete_link "$config_dir/systemd/user/dotfiles-mako.service" "$repo_dir/configs/systemd/user/dotfiles-mako.service"
 
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
@@ -263,7 +267,8 @@ main() {
 
     if [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
         systemctl --user daemon-reload || true
-        systemctl --user enable --now waybar.service swaync.service || true
+        systemctl --user disable --now swaync.service || true
+        systemctl --user enable --now waybar.service mako.service || true
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || true
     fi
 

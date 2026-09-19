@@ -28,7 +28,7 @@
     "custom/launcher": {
         "format": "󰀻",
         "tooltip": false,
-        "on-click": "foot --app-id=app-launcher-tui --title='Applications' --override=colors.regular0=222226 --window-size-chars=86x26 dotfiles-app-launcher-tui"
+        "on-click": "dotfiles-app-launcher-toggle"
     },
     "hyprland/workspaces": {
         "format": "{id}",
@@ -40,7 +40,7 @@
     "clock": {
         "format": "{:%a %d %b  %I:%M %p}",
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
-        "on-click": "swaync-client --toggle-panel"
+        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "custom/notification": {
         "tooltip": false,
@@ -59,8 +59,8 @@
         "exec": "dotfiles-waybar-notification-status",
         "interval": 5,
         "hide-empty-text": true,
-        "on-click": "swaync-client --toggle-panel",
-        "on-click-right": "swaync-client --toggle-dnd"
+        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
+        "on-click-right": "makoctl mode -t do-not-disturb"
     },
     "group/system-status": {
         "orientation": "horizontal",

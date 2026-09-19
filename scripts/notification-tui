@@ -1,0 +1,121 @@
+#!/bin/sh
+set -u
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-notifications.XXXXXX") || exit 1
+trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
+
+parse_notifications() {
+    kind=$1
+    icon=$2
+    awk -v kind="$kind" -v icon="$icon" '
+        function emit() {
+            if (!have) return
+            gsub(/\t/, " ", summary)
+            gsub(/\t/, " ", app)
+            printf "%s\t%s\t%s  %s — %s  [%s]\n", kind, id, icon, app, summary, urgency
+        }
+        /^Notification [0-9]+:/ {
+            emit()
+            id = $2
+            sub(/:$/, "", id)
+            summary = $0
+            sub(/^Notification [0-9]+:[[:space:]]*/, "", summary)
+            app = "Unknown application"
+            urgency = "normal"
+            have = 1
+            next
+        }
+        /^[[:space:]]+App name:/ {
+            app = $0
+            sub(/^[[:space:]]+App name:[[:space:]]*/, "", app)
+            next
+        }
+        /^[[:space:]]+Urgency:/ {
+            urgency = $0
+            sub(/^[[:space:]]+Urgency:[[:space:]]*/, "", urgency)
+        }
+        END { emit() }
+    '
+}
+
+is_dnd() {
+    makoctl mode 2>/dev/null | grep -Fqx 'do-not-disturb'
+}
+
+clear_history() {
+    while :; do
+        id=$(makoctl history 2>/dev/null \
+            | sed -n 's/^Notification \([0-9][0-9]*\):.*/\1/p' \
+            | head -n 1)
+        [ -n "$id" ] || return 0
+        makoctl restore >/dev/null 2>&1 || return 0
+        makoctl dismiss -h -n "$id" >/dev/null 2>&1 || return 0
+    done
+}
+
+while :; do
+    active_file=$temporary_dir/active
+    history_file=$temporary_dir/history
+    menu_file=$temporary_dir/menu
+
+    makoctl list 2>/dev/null | parse_notifications active '󰂚' > "$active_file"
+    makoctl history 2>/dev/null | parse_notifications history '󰋚' > "$history_file"
+
+    active_count=$(wc -l < "$active_file")
+    history_count=$(wc -l < "$history_file")
+    if is_dnd; then
+        dnd_label='󰂛  Disable Do Not Disturb'
+    else
+        dnd_label='󰂚  Enable Do Not Disturb'
+    fi
+
+    {
+        printf 'toggle-dnd\t0\t%s\n' "$dnd_label"
+        printf 'restore\t0\t󰑐  Restore latest notification\n'
+        printf 'dismiss-all\t0\t󰅖  Dismiss all active notifications\n'
+        printf 'clear-history\t0\t󰎟  Clear notification history\n'
+        cat "$active_file" "$history_file"
+    } > "$menu_file"
+
+    selection=$(fzf \
+        --delimiter='\t' \
+        --with-nth=3 \
+        --nth=3 \
+        --prompt='󰂚  Notifications  ' \
+        --pointer='󰜴' \
+        --marker='󰄬' \
+        --border=rounded \
+        --border-label=" $active_count active · $history_count recent " \
+        --info=inline-right \
+        --layout=reverse \
+        --no-multi \
+        --cycle \
+        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
+        < "$menu_file") || exit 0
+
+    kind=$(printf '%s\n' "$selection" | cut -f1)
+    id=$(printf '%s\n' "$selection" | cut -f2)
+
+    case $kind in
+        toggle-dnd)
+            makoctl mode -t do-not-disturb >/dev/null 2>&1 || :
+            ;;
+        restore)
+            makoctl restore >/dev/null 2>&1 || :
+            ;;
+        dismiss-all)
+            makoctl dismiss -a >/dev/null 2>&1 || :
+            ;;
+        clear-history)
+            clear_history
+            ;;
+        active)
+            makoctl invoke -n "$id" >/dev/null 2>&1 \
+                || makoctl dismiss -n "$id" >/dev/null 2>&1 \
+                || :
+            ;;
+        history)
+            :
+            ;;
+    esac
+done

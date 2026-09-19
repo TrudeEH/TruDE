@@ -1,8 +1,15 @@
 #!/bin/sh
 set -u
 
-count=$(swaync-client --count 2>/dev/null || printf '0')
-dnd=$(swaync-client --get-dnd 2>/dev/null || printf 'false')
+active=$(makoctl list 2>/dev/null | grep -c '^Notification ' || :)
+history=$(makoctl history 2>/dev/null | grep -c '^Notification ' || :)
+count=$((active + history))
+
+if makoctl mode 2>/dev/null | grep -Fqx 'do-not-disturb'; then
+    dnd=true
+else
+    dnd=false
+fi
 
 case $count in *[!0-9]*|'') count=0 ;; esac
 

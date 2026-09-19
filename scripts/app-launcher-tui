@@ -2,7 +2,7 @@
 set -u
 
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}/dotfiles
-cache_file=$cache_root/applications-v2.tsv
+cache_file=$cache_root/applications-v3.tsv
 cache_age=300
 
 mkdir -p "$cache_root"
@@ -32,7 +32,7 @@ rebuild_cache() {
         applications_dir=$data_dir/applications
         [ -d "$applications_dir" ] || continue
 
-        find "$applications_dir" -type f -name '*.desktop' -print 2>/dev/null \
+        find -L "$applications_dir" -type f -name '*.desktop' -print 2>/dev/null \
             | LC_ALL=C sort \
             | while IFS= read -r desktop_file; do
                 relative=${desktop_file#"$applications_dir"/}
@@ -41,16 +41,18 @@ rebuild_cache() {
                 printf '%s\n' "$desktop_id" >> "$seen"
 
                 entry=$(awk '
-                    BEGIN { section = 0; type = ""; name = ""; comment = ""; hidden = 0 }
+                    BEGIN { section = 0; type = ""; name = ""; comment = ""; exec = ""; terminal = 0; hidden = 0 }
                     /^\[Desktop Entry\]$/ { section = 1; next }
                     /^\[/ { if (section) exit; next }
                     !section { next }
                     /^Type=/ { type = substr($0, 6); next }
                     /^Name=/ && name == "" { name = substr($0, 6); next }
                     /^Comment=/ && comment == "" { comment = substr($0, 9); next }
-                    /^(Hidden|NoDisplay)=true$/ { hidden = 1 }
+                    /^Exec=/ && exec == "" { exec = substr($0, 6); next }
+                    tolower($0) == "terminal=true" { terminal = 1; next }
+                    tolower($0) ~ /^(hidden|nodisplay)=true$/ { hidden = 1 }
                     END {
-                        if (type == "Application" && name != "" && !hidden) {
+                        if (type == "Application" && name != "" && exec != "" && !terminal && !hidden) {
                             gsub(/\t/, " ", name)
                             gsub(/\t/, " ", comment)
                             printf "%s\t%s", name, comment
@@ -91,4 +93,4 @@ selection=$(fzf \
 desktop_file=$(printf '%s\n' "$selection" | awk -F '\t' '{ print $NF }')
 [ -f "$desktop_file" ] || exit 1
 
-exec dex "$desktop_file"
+setsid -f dex "$desktop_file" >/dev/null 2>&1

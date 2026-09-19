@@ -54,7 +54,7 @@ hl.monitor({
 -- Set programs that you use
 local terminal    = "foot"
 local fileManager = "nautilus"
-local menu        = "foot --app-id=app-launcher-tui --title='Applications' --override=colors.regular0=222226 --window-size-chars=86x26 dotfiles-app-launcher-tui"
+local menu        = "dotfiles-app-launcher-toggle"
 local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png"
@@ -463,6 +463,14 @@ hl.window_rule({
 hl.window_rule({
     name  = "shortcuts-tui",
     match = { class = "shortcuts-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "notification-tui",
+    match = { class = "notification-tui" },
 
     float  = true,
     center = true,
