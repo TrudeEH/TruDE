@@ -3,28 +3,38 @@ set -u
 
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}/dotfiles
 cache_file=$cache_root/applications-v3.tsv
-cache_age=300
+data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
+data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
+search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
 
 mkdir -p "$cache_root"
 
-cache_is_fresh() {
+cache_is_current() {
     [ -f "$cache_file" ] || return 1
-    now=$(date +%s)
-    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
-    [ $((now - modified)) -lt "$cache_age" ]
+
+    old_ifs=$IFS
+    IFS=:
+    for data_dir in $search_dirs; do
+        applications_dir=$data_dir/applications
+        [ -d "$applications_dir" ] || continue
+
+        if [ "$applications_dir" -nt "$cache_file" ] \
+            || find -L "$applications_dir" -type f -name '*.desktop' -newer "$cache_file" -print -quit 2>/dev/null \
+                | grep -q .; then
+            IFS=$old_ifs
+            return 1
+        fi
+    done
+    IFS=$old_ifs
 }
 
 rebuild_cache() {
     temporary=$(mktemp "$cache_root/applications.XXXXXX") || exit 1
-    seen=$(mktemp "$cache_root/applications-seen.XXXXXX") || {
+    candidates=$(mktemp "$cache_root/applications-candidates.XXXXXX") || {
         rm -f "$temporary"
         exit 1
     }
-    trap 'rm -f "$temporary" "$seen"' EXIT HUP INT TERM
-
-    data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
-    data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
-    search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
+    trap 'rm -f "$temporary" "$candidates"' EXIT HUP INT TERM
 
     old_ifs=$IFS
     IFS=:
@@ -36,42 +46,65 @@ rebuild_cache() {
             | LC_ALL=C sort \
             | while IFS= read -r desktop_file; do
                 relative=${desktop_file#"$applications_dir"/}
-                desktop_id=$(printf '%s' "$relative" | tr '/' '-')
-                grep -Fqx "$desktop_id" "$seen" 2>/dev/null && continue
-                printf '%s\n' "$desktop_id" >> "$seen"
-
-                entry=$(awk '
-                    BEGIN { section = 0; type = ""; name = ""; comment = ""; exec = ""; terminal = 0; hidden = 0 }
-                    /^\[Desktop Entry\]$/ { section = 1; next }
-                    /^\[/ { if (section) exit; next }
-                    !section { next }
-                    /^Type=/ { type = substr($0, 6); next }
-                    /^Name=/ && name == "" { name = substr($0, 6); next }
-                    /^Comment=/ && comment == "" { comment = substr($0, 9); next }
-                    /^Exec=/ && exec == "" { exec = substr($0, 6); next }
-                    tolower($0) == "terminal=true" { terminal = 1; next }
-                    tolower($0) ~ /^(hidden|nodisplay)=true$/ { hidden = 1 }
-                    END {
-                        if (type == "Application" && name != "" && exec != "" && !terminal && !hidden) {
-                            gsub(/\t/, " ", name)
-                            gsub(/\t/, " ", comment)
-                            printf "%s\t%s", name, comment
-                        }
-                    }
-                ' "$desktop_file")
-
-                [ -n "$entry" ] || continue
-                printf '%s\t%s\n' "$entry" "$desktop_file" >> "$temporary"
-            done
+                printf '%s\t%s\n' "$relative" "$desktop_file"
+            done >> "$candidates"
     done
     IFS=$old_ifs
 
-    LC_ALL=C sort -f -k1,1 "$temporary" > "$cache_file"
-    rm -f "$temporary" "$seen"
+    awk -F '\t' '
+        function parse_desktop_file(path, line, section, type, name, comment, command, terminal, hidden) {
+            while ((getline line < path) > 0) {
+                if (line == "[Desktop Entry]") {
+                    section = 1
+                    continue
+                }
+                if (line ~ /^\[/) {
+                    if (section) {
+                        break
+                    }
+                    continue
+                }
+                if (!section) {
+                    continue
+                }
+                if (line ~ /^Type=/) {
+                    type = substr(line, 6)
+                } else if (line ~ /^Name=/ && name == "") {
+                    name = substr(line, 6)
+                } else if (line ~ /^Comment=/ && comment == "") {
+                    comment = substr(line, 9)
+                } else if (line ~ /^Exec=/ && command == "") {
+                    command = substr(line, 6)
+                } else if (tolower(line) == "terminal=true") {
+                    terminal = 1
+                } else if (tolower(line) ~ /^(hidden|nodisplay)=true$/) {
+                    hidden = 1
+                }
+            }
+            close(path)
+
+            if (type == "Application" && name != "" && command != "" && !terminal && !hidden) {
+                gsub(/\t/, " ", name)
+                gsub(/\t/, " ", comment)
+                printf "%s\t%s\t%s\n", name, comment, path
+            }
+        }
+        {
+            desktop_id = $1
+            gsub(/\//, "-", desktop_id)
+            if (!seen[desktop_id]++) {
+                parse_desktop_file($2)
+            }
+        }
+    ' "$candidates" > "$temporary"
+
+    LC_ALL=C sort -f -k1,1 "$temporary" -o "$temporary"
+    mv "$temporary" "$cache_file"
+    rm -f "$candidates"
     trap - EXIT HUP INT TERM
 }
 
-cache_is_fresh || rebuild_cache
+cache_is_current || rebuild_cache
 
 selection=$(awk -F '\t' '
     BEGIN {
