@@ -16,6 +16,26 @@ local adwaita = {
     border        = "ffffff1a",
 }
 
+dotfilesSettings = {
+    terminal           = "foot",
+    fileManager        = "foot --app-id=nnn --title=Files dotfiles-file-manager-tui",
+    browser            = "xdg-open https://start.duckduckgo.com",
+    launcher           = "dotfiles-app-launcher-toggle",
+    wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png",
+    animationsEnabled  = true,
+    blurEnabled        = true,
+    gapsIn             = 5,
+    gapsOut            = 10,
+    borderSize         = 2,
+    keyboardLayout     = "us",
+    naturalScroll      = false,
+    tapToClick         = true,
+    sensitivity        = 0,
+    accelProfile       = "adaptive",
+    workspaceCount     = 5,
+    workspaceSwitching = "existing",
+}
+
 
 ------------------
 ---- MONITORS ----
@@ -43,12 +63,13 @@ end
 ---------------------
 
 -- Set programs that you use
-local terminal    = "foot"
-local fileManager = "foot --app-id=nnn --title=Files dotfiles-file-manager-tui"
-local menu        = "dotfiles-app-launcher-toggle"
+local terminal    = dotfilesSettings.terminal
+local fileManager = dotfilesSettings.fileManager
+local browser     = dotfilesSettings.browser
+local menu        = dotfilesSettings.launcher
 local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
-local wallpaper   = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png"
+local wallpaper   = dotfilesSettings.wallpaper
 
 
 -------------------
@@ -107,10 +128,10 @@ hl.env("XDG_DATA_DIRS", os.getenv("HOME") .. "/.local/share/flatpak/exports/shar
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
     general = {
-        gaps_in  = 5,
-        gaps_out = 10,
+        gaps_in  = dotfilesSettings.gapsIn,
+        gaps_out = dotfilesSettings.gapsOut,
 
-        border_size = 2,
+        border_size = dotfilesSettings.borderSize,
 
         col = {
             -- Adwaita dark palette with the light-orange orange_1 accent.
@@ -143,7 +164,7 @@ hl.config({
         },
 
         blur = {
-            enabled   = true,
+            enabled   = dotfilesSettings.blurEnabled,
             size      = 3,
             passes    = 1,
             vibrancy  = 0.1696,
@@ -151,7 +172,7 @@ hl.config({
     },
 
     animations = {
-        enabled = true,
+        enabled = dotfilesSettings.animationsEnabled,
     },
 })
 
@@ -240,7 +261,7 @@ hl.config({
 
 hl.config({
     input = {
-        kb_layout  = "us",
+        kb_layout  = dotfilesSettings.keyboardLayout,
         kb_variant = "",
         kb_model   = "",
         kb_options = "",
@@ -248,19 +269,23 @@ hl.config({
 
         follow_mouse = 1,
 
-        sensitivity = 0, -- -1.0 - 1.0, 0 means no modification.
+        sensitivity   = dotfilesSettings.sensitivity,
+        accel_profile = dotfilesSettings.accelProfile,
 
         touchpad = {
-            natural_scroll = false,
+            natural_scroll = dotfilesSettings.naturalScroll,
+            tap_to_click    = dotfilesSettings.tapToClick,
         },
     },
 })
 
-hl.gesture({
-    fingers = 3,
-    direction = "horizontal",
-    action = "workspace"
-})
+if dotfilesSettings.workspaceSwitching ~= "disabled" then
+    hl.gesture({
+        fingers = 3,
+        direction = "horizontal",
+        action = "workspace"
+    })
+end
 
 ---------------------
 ---- KEYBINDINGS ----
@@ -280,6 +305,7 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { desc
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"), { description = "Exit Hyprland" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
+hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser), { description = "Open browser" })
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle floating" })
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu), { description = "Open application launcher" })
@@ -299,7 +325,7 @@ hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }), { descripti
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
-for i = 1, 10 do
+for i = 1, dotfilesSettings.workspaceCount do
     local key = i % 10 -- 10 maps to key 0
     hl.bind(mainMod .. " + " .. key,             hl.dsp.focus({ workspace = i}), { description = "Switch to workspace " .. i })
     hl.bind(mainMod .. " + SHIFT + " .. key,     hl.dsp.window.move({ workspace = i }), { description = "Move window to workspace " .. i })
@@ -309,9 +335,16 @@ end
 hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"), { description = "Toggle scratchpad" })
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }), { description = "Move window to scratchpad" })
 
--- Scroll through existing workspaces with mainMod + scroll
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), { description = "Next workspace" })
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }), { description = "Previous workspace" })
+if dotfilesSettings.workspaceSwitching ~= "disabled" then
+    local nextWorkspace = "+1"
+    local previousWorkspace = "-1"
+    if dotfilesSettings.workspaceSwitching == "existing" then
+        nextWorkspace = "e+1"
+        previousWorkspace = "e-1"
+    end
+    hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = nextWorkspace }), { description = "Next workspace" })
+    hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = previousWorkspace }), { description = "Previous workspace" })
+end
 
 -- Move/resize windows with mainMod + LMB/RMB and dragging
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true, description = "Move window" })
@@ -488,7 +521,7 @@ hl.on("hyprland.start", function ()
         .. "gsettings reset org.gnome.desktop.interface accent-color >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
-    hl.exec_cmd("swaybg -i " .. wallpaper .. " -m fill")
-    hl.exec_cmd("hypridle")
+    hl.exec_cmd("swaybg -i " .. string.format("%q", wallpaper) .. " -m fill")
+    hl.exec_cmd("dotfiles-hypridle")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)

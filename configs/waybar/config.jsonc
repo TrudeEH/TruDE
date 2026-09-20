@@ -6,6 +6,11 @@
     "height": 0,
     "margin": 0,
     "spacing": 0,
+    "modules-layout": [
+        "modules-left",
+        "modules-center",
+        "modules-right"
+    ],
     "reload_style_on_change": true,
 
     "modules-left": [

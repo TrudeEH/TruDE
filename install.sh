@@ -202,6 +202,7 @@ link_configs() {
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
     link_config "$repo_dir/assets/wallpapers/wallpaper.png" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png"
     link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
+    link_config "$repo_dir/scripts/hypr/start-idle" "$HOME/.local/bin/dotfiles-hypridle"
     link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
     link_config "$repo_dir/scripts/tui/bluetooth-tui" "$HOME/.local/bin/dotfiles-bluetooth-tui"
     link_config "$repo_dir/scripts/tui/power-profiles-tui" "$HOME/.local/bin/dotfiles-power-profiles-tui"

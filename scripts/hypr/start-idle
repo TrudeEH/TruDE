@@ -1,0 +1,73 @@
+#!/bin/sh
+set -eu
+
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+preferences_file=$config_home/dotfiles/settings.json
+runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-hypridle
+runtime_config=$runtime_dir/hypridle.conf
+
+read_timeout() {
+    preference=$1
+    fallback=$2
+    value=$fallback
+    if [ -f "$preferences_file" ]; then
+        value=$(jq -r "$preference // $fallback" "$preferences_file" 2>/dev/null || printf '%s' "$fallback")
+    fi
+    case $value in
+        ''|*[!0-9]*) value=$fallback ;;
+    esac
+    printf '%s\n' "$value"
+}
+
+lock_timeout=$(read_timeout '.laptop.idle_timeout' 300)
+screen_timeout=$(read_timeout '.laptop.screen_off_timeout' 600)
+suspend_timeout=$(read_timeout '.laptop.suspend_timeout' 900)
+
+umask 077
+mkdir -p "$runtime_dir"
+temporary_config=$(mktemp "$runtime_dir/hypridle.XXXXXX")
+trap 'rm -f "$temporary_config"' EXIT HUP INT TERM
+
+cat > "$temporary_config" <<EOF
+general {
+    lock_cmd = pidof hyprlock >/dev/null || hyprlock --config $HOME/.config/hypr/hyprlock.conf
+    before_sleep_cmd = loginctl lock-session
+    after_sleep_cmd = hyprctl dispatch dpms on
+}
+EOF
+
+if [ "$lock_timeout" -gt 0 ]; then
+    cat >> "$temporary_config" <<EOF
+
+listener {
+    timeout = $lock_timeout
+    on-timeout = pidof hyprlock >/dev/null || hyprlock --config $HOME/.config/hypr/hyprlock.conf
+}
+EOF
+fi
+
+if [ "$screen_timeout" -gt 0 ]; then
+    cat >> "$temporary_config" <<EOF
+
+listener {
+    timeout = $screen_timeout
+    on-timeout = hyprctl dispatch dpms off
+    on-resume = hyprctl dispatch dpms on
+}
+EOF
+fi
+
+if [ "$suspend_timeout" -gt 0 ]; then
+    cat >> "$temporary_config" <<EOF
+
+listener {
+    timeout = $suspend_timeout
+    on-timeout = systemctl suspend
+}
+EOF
+fi
+
+mv "$temporary_config" "$runtime_config"
+trap - EXIT HUP INT TERM
+
+exec hypridle --config "$runtime_config"

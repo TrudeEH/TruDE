@@ -27,12 +27,17 @@ roottext=white,black'
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 settings_dir=$config_home/hypr
 settings_file=$settings_dir/settings.local.lua
-begin_marker='-- dotfiles-monitor-settings:begin'
-end_marker='-- dotfiles-monitor-settings:end'
+preferences_dir=$config_home/dotfiles
+preferences_file=$preferences_dir/settings.json
+monitor_begin_marker='-- dotfiles-monitor-settings:begin'
+monitor_end_marker='-- dotfiles-monitor-settings:end'
+preferences_begin_marker='-- dotfiles-preferences:begin'
+preferences_end_marker='-- dotfiles-preferences:end'
 temp_dir=$(mktemp -d)
-state_file=$temp_dir/monitors.json
+monitor_state=$temp_dir/monitors.json
+preferences_state=$temp_dir/preferences.json
 monitor_block=$temp_dir/monitor-settings.lua
-new_settings=$temp_dir/settings.local.lua
+preferences_block=$temp_dir/preferences.lua
 trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
 
 dialog() {
@@ -40,7 +45,33 @@ dialog() {
 }
 
 message() {
-    dialog --msgbox "$1" 10 68
+    dialog --msgbox "$1" 11 72
+}
+
+confirm() {
+    dialog --yesno "$1" 10 72
+}
+
+is_integer() {
+    integer=$1
+    case $integer in
+        -*) integer=${integer#-} ;;
+    esac
+    case $integer in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+is_unsigned_integer() {
+    case $1 in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+boolean_label() {
+    if [ "$1" = true ]; then printf Enabled; else printf Disabled; fi
 }
 
 load_monitors() {
@@ -66,37 +97,208 @@ load_monitors() {
             transform: (.transform // 0),
             availableModes: ([.availableModes[]? | sub("Hz$"; "")] | unique)
         })
-    ' > "$state_file"; then
+    ' > "$monitor_state"; then
         message "Unable to read monitors from Hyprland."
         exit 1
     fi
-
-    if [ "$(jq 'length' "$state_file")" -eq 0 ]; then
+    if [ "$(jq 'length' "$monitor_state")" -eq 0 ]; then
         message "Hyprland did not report any monitors."
         exit 1
     fi
 }
 
-is_integer() {
-    integer=$1
-    case $integer in
-        -*) integer=${integer#-} ;;
-    esac
-    case $integer in
-        ''|*[!0-9]*) return 1 ;;
-        *) return 0 ;;
-    esac
+load_preferences() {
+    defaults=$temp_dir/default-preferences.json
+    jq -n --arg wallpaper "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png" '
+        {
+            input: {
+                keyboard_layout: "us",
+                natural_scroll: false,
+                tap_to_click: true,
+                sensitivity: 0,
+                accel_profile: "adaptive"
+            },
+            appearance: {
+                wallpaper: $wallpaper,
+                animations: true,
+                blur: true,
+                gaps_in: 5,
+                gaps_out: 10,
+                border_size: 2
+            },
+            waybar: {
+                enabled: true,
+                position: "top",
+                primary_only: true,
+                auto_hide: false
+            },
+            defaults: {
+                terminal: "foot",
+                file_manager: "foot --app-id=nnn --title=Files dotfiles-file-manager-tui",
+                browser: "xdg-open https://start.duckduckgo.com",
+                launcher: "dotfiles-app-launcher-toggle"
+            },
+            laptop: {
+                idle_timeout: 300,
+                screen_off_timeout: 600,
+                suspend_timeout: 900,
+                lid_behavior: "default"
+            },
+            workspaces: {
+                count: 5,
+                switching: "existing"
+            }
+        }
+    ' > "$defaults"
+
+    if [ -f "$preferences_file" ] && jq -e 'type == "object"' "$preferences_file" >/dev/null 2>&1; then
+        jq -s '.[0] * .[1]' "$defaults" "$preferences_file" > "$preferences_state"
+    else
+        cp "$defaults" "$preferences_state"
+    fi
+}
+
+preference() {
+    jq -r "$1" "$preferences_state"
+}
+
+replace_preferences() {
+    jq "$@" "$preferences_state" > "$preferences_state.new" && \
+        mv "$preferences_state.new" "$preferences_state"
+}
+
+toggle_preference() {
+    preference_path=$1
+    replace_preferences "$preference_path = ($preference_path | not)"
+    save_preferences
+}
+
+replace_local_section() {
+    begin_marker=$1
+    end_marker=$2
+    block_file=$3
+    mkdir -p "$settings_dir"
+    new_settings=$(mktemp "$settings_dir/settings.local.lua.XXXXXX")
+
+    has_begin=false
+    has_end=false
+    if [ -f "$settings_file" ]; then
+        grep -Fqx -e "$begin_marker" "$settings_file" && has_begin=true
+        grep -Fqx -e "$end_marker" "$settings_file" && has_end=true
+    fi
+    if [ "$has_begin" != "$has_end" ]; then
+        rm -f "$new_settings"
+        message "A managed section in settings.local.lua is incomplete. No changes were saved."
+        return 1
+    fi
+
+    if [ "$has_begin" = true ]; then
+        awk -v marker="$begin_marker" '$0 == marker { exit } { print }' \
+            "$settings_file" > "$new_settings"
+        cat "$block_file" >> "$new_settings"
+        awk -v marker="$end_marker" 'found { print } $0 == marker { found=1 }' \
+            "$settings_file" >> "$new_settings"
+    else
+        if [ -f "$settings_file" ]; then
+            cat "$settings_file" > "$new_settings"
+            printf '\n' >> "$new_settings"
+        fi
+        cat "$block_file" >> "$new_settings"
+    fi
+
+    if command -v luac >/dev/null 2>&1 && ! luac -p "$new_settings"; then
+        rm -f "$new_settings"
+        message "The generated settings file is not valid Lua. No changes were saved."
+        return 1
+    fi
+
+    if [ -f "$settings_file" ]; then
+        cp "$settings_file" "$settings_file.backup"
+    fi
+    chmod 600 "$new_settings"
+    mv "$new_settings" "$settings_file"
+}
+
+write_preferences_block() {
+    {
+        printf '%s\n' "$preferences_begin_marker"
+        jq -r '
+            "dotfilesSettings.terminal = " + (.defaults.terminal | @json) + "\n" +
+            "dotfilesSettings.fileManager = " + (.defaults.file_manager | @json) + "\n" +
+            "dotfilesSettings.browser = " + (.defaults.browser | @json) + "\n" +
+            "dotfilesSettings.launcher = " + (.defaults.launcher | @json) + "\n" +
+            "dotfilesSettings.wallpaper = " + (.appearance.wallpaper | @json) + "\n" +
+            "dotfilesSettings.animationsEnabled = " + (.appearance.animations | tostring) + "\n" +
+            "dotfilesSettings.blurEnabled = " + (.appearance.blur | tostring) + "\n" +
+            "dotfilesSettings.gapsIn = " + (.appearance.gaps_in | tostring) + "\n" +
+            "dotfilesSettings.gapsOut = " + (.appearance.gaps_out | tostring) + "\n" +
+            "dotfilesSettings.borderSize = " + (.appearance.border_size | tostring) + "\n" +
+            "dotfilesSettings.keyboardLayout = " + (.input.keyboard_layout | @json) + "\n" +
+            "dotfilesSettings.naturalScroll = " + (.input.natural_scroll | tostring) + "\n" +
+            "dotfilesSettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
+            "dotfilesSettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
+            "dotfilesSettings.accelProfile = " + (.input.accel_profile | @json) + "\n" +
+            "dotfilesSettings.workspaceCount = " + (.workspaces.count | tostring) + "\n" +
+            "dotfilesSettings.workspaceSwitching = " + (.workspaces.switching | @json)
+        ' "$preferences_state"
+        printf '%s\n' "$preferences_end_marker"
+    } > "$preferences_block"
+}
+
+save_preferences_json() {
+    mkdir -p "$preferences_dir"
+    new_preferences=$(mktemp "$preferences_dir/settings.json.XXXXXX")
+    cp "$preferences_state" "$new_preferences"
+    chmod 600 "$new_preferences"
+    mv "$new_preferences" "$preferences_file"
+}
+
+apply_wallpaper() {
+    wallpaper=$(preference '.appearance.wallpaper')
+    [ -f "$wallpaper" ] || return
+    pkill -x swaybg 2>/dev/null || :
+    swaybg -i "$wallpaper" -m fill >/dev/null 2>&1 &
+}
+
+apply_idle() {
+    command -v dotfiles-hypridle >/dev/null 2>&1 || return
+    pkill -x hypridle 2>/dev/null || :
+    dotfiles-hypridle >/dev/null 2>&1 &
+}
+
+apply_waybar() {
+    if [ "$(preference '.waybar.enabled')" = true ]; then
+        systemctl --user enable --now waybar.service >/dev/null 2>&1 || :
+        systemctl --user try-restart waybar.service >/dev/null 2>&1 || :
+    else
+        systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
+    fi
+}
+
+save_preferences() {
+    write_preferences_block
+    replace_local_section "$preferences_begin_marker" "$preferences_end_marker" \
+        "$preferences_block" || return 1
+    save_preferences_json
+    if ! output=$(hyprctl reload 2>&1); then
+        message "Settings were saved, but Hyprland could not reload them:\n\n$output"
+        return 1
+    fi
+    apply_wallpaper
+    apply_idle
+    apply_waybar
 }
 
 monitor_value() {
     monitor_name=$1
     monitor_field=$2
     jq -r --arg name "$monitor_name" --arg field "$monitor_field" \
-        '.[] | select(.name == $name) | .[$field]' "$state_file"
+        '.[] | select(.name == $name) | .[$field]' "$monitor_state"
 }
 
-replace_state() {
-    jq "$@" "$state_file" > "$state_file.new" && mv "$state_file.new" "$state_file"
+replace_monitor_state() {
+    jq "$@" "$monitor_state" > "$monitor_state.new" && \
+        mv "$monitor_state.new" "$monitor_state"
 }
 
 choose_mode() {
@@ -105,23 +307,19 @@ choose_mode() {
     modes=$(jq -r --arg name "$monitor_name" --arg current "$current_mode" '
         .[] | select(.name == $name) |
         ([$current, "preferred", "highrr", "highres"] + .availableModes) | unique[]
-    ' "$state_file")
+    ' "$monitor_state")
 
     set --
     while IFS= read -r mode; do
-        if [ "$mode" = "$current_mode" ]; then
-            selected=ON
-        else
-            selected=OFF
-        fi
-        set -- "$@" "$mode" "" "$selected"
+        if [ "$mode" = "$current_mode" ]; then selected=ON; else selected=OFF; fi
+        set -- "$@" "󰍹 $mode" "" "$selected"
     done <<EOF
 $modes
 EOF
-
-    mode=$(dialog --radiolist "Choose the display mode" 22 72 14 "$@" \
+    choice=$(dialog --radiolist "Choose the display mode" 22 72 14 "$@" \
         3>&1 1>&2 2>&3) || return
-    replace_state --arg name "$monitor_name" --arg mode "$mode" \
+    mode=${choice#* }
+    replace_monitor_state --arg name "$monitor_name" --arg mode "$mode" \
         'map(if .name == $name then .mode = $mode else . end)'
 }
 
@@ -130,18 +328,16 @@ choose_position() {
     current_x=$(monitor_value "$monitor_name" x)
     current_y=$(monitor_value "$monitor_name" y)
     position=$(dialog --form "Set the display position in logical pixels" 13 64 4 \
-        "X" 1 1 "$current_x" 1 14 14 0 \
-        "Y" 2 1 "$current_y" 2 14 14 0 \
+        "󰇀 X" 1 1 "$current_x" 1 16 14 0 \
+        "󰇀 Y" 2 1 "$current_y" 2 16 14 0 \
         3>&1 1>&2 2>&3) || return
     position_x=$(printf '%s\n' "$position" | sed -n '1p')
     position_y=$(printf '%s\n' "$position" | sed -n '2p')
-
     if ! is_integer "$position_x" || ! is_integer "$position_y"; then
         message "Positions must be whole numbers."
         return
     fi
-
-    replace_state --arg name "$monitor_name" \
+    replace_monitor_state --arg name "$monitor_name" \
         --argjson x "$position_x" --argjson y "$position_y" \
         'map(if .name == $name then .x = $x | .y = $y else . end)'
 }
@@ -149,9 +345,8 @@ choose_position() {
 choose_scale() {
     monitor_name=$1
     current_scale=$(monitor_value "$monitor_name" scale)
-    scale=$(dialog --inputbox "Set scale (for example: 1, 1.25, 1.5, 2, or auto)" \
+    scale=$(dialog --inputbox "󰩨 Set scale (for example: 1, 1.25, 1.5, 2, or auto)" \
         10 68 "$current_scale" 3>&1 1>&2 2>&3) || return
-
     if [ "$scale" != auto ] && ! printf '%s\n' "$scale" | awk '
         /^[0-9]+([.][0-9]+)?$/ && $1 > 0 { valid=1 }
         END { exit !valid }
@@ -159,37 +354,36 @@ choose_scale() {
         message "Scale must be a positive number or auto."
         return
     fi
-
-    replace_state --arg name "$monitor_name" --arg scale "$scale" \
+    replace_monitor_state --arg name "$monitor_name" --arg scale "$scale" \
         'map(if .name == $name then .scale = $scale else . end)'
 }
 
 choose_rotation() {
     monitor_name=$1
-    current_transform=$(monitor_value "$monitor_name" transform)
-    set -- \
-        0 "Normal" \
-        1 "90° clockwise" \
-        2 "180°" \
-        3 "270° clockwise" \
-        4 "Flipped" \
-        5 "Flipped 90° clockwise" \
-        6 "Flipped 180°" \
-        7 "Flipped 270° clockwise"
-    transform=$(dialog --menu "Choose the display rotation" 20 72 10 "$@" \
+    choice=$(dialog --menu "Choose the display rotation" 20 72 10 \
+        "󰑓 0" "Normal" \
+        "󰑎 1" "90° clockwise" \
+        "󰑏 2" "180°" \
+        "󰑐 3" "270° clockwise" \
+        "󰹳 4" "Flipped" \
+        "󰹴 5" "Flipped 90° clockwise" \
+        "󰹵 6" "Flipped 180°" \
+        "󰹶 7" "Flipped 270° clockwise" \
         3>&1 1>&2 2>&3) || return
-    replace_state --arg name "$monitor_name" --argjson transform "$transform" \
+    transform=${choice##* }
+    replace_monitor_state --arg name "$monitor_name" --argjson transform "$transform" \
         'map(if .name == $name then .transform = $transform else . end)'
 }
 
 toggle_monitor() {
     monitor_name=$1
     enabled=$(monitor_value "$monitor_name" enabled)
-    if [ "$enabled" = true ] && [ "$(jq '[.[] | select(.enabled)] | length' "$state_file")" -le 1 ]; then
+    if [ "$enabled" = true ] && \
+        [ "$(jq '[.[] | select(.enabled)] | length' "$monitor_state")" -le 1 ]; then
         message "At least one monitor must remain enabled."
         return
     fi
-    replace_state --arg name "$monitor_name" \
+    replace_monitor_state --arg name "$monitor_name" \
         'map(if .name == $name then .enabled = (.enabled | not) else . end)'
 }
 
@@ -197,15 +391,14 @@ make_primary() {
     monitor_name=$1
     old_x=$(monitor_value "$monitor_name" x)
     old_y=$(monitor_value "$monitor_name" y)
-    replace_state --arg name "$monitor_name" --argjson old_x "$old_x" --argjson old_y "$old_y" '
+    replace_monitor_state --arg name "$monitor_name" \
+        --argjson old_x "$old_x" --argjson old_y "$old_y" '
         map(
             if .name == $name then
                 .x = 0 | .y = 0 | .enabled = true
             elif .enabled and .x == 0 and .y == 0 then
                 .x = $old_x | .y = $old_y
-            else
-                .
-            end
+            else . end
         )
     '
 }
@@ -219,33 +412,31 @@ edit_monitor() {
         position_y=$(monitor_value "$monitor_name" y)
         scale=$(monitor_value "$monitor_name" scale)
         transform=$(monitor_value "$monitor_name" transform)
-        if [ "$enabled" = true ]; then status=Enabled; else status=Disabled; fi
-
-        action=$(dialog --menu "$monitor_name — $status" 20 76 9 \
-            status "Enable or disable this display" \
-            mode "Mode: $mode" \
-            position "Position: ${position_x}x${position_y}" \
-            scale "Scale: $scale" \
-            rotation "Transform: $transform" \
-            primary "Make primary (position 0x0)" \
-            back "Back to displays" \
+        status=$(boolean_label "$enabled")
+        action=$(dialog --menu "$monitor_name — $status" 21 78 10 \
+            "󰐥 status" "Enable or disable this display" \
+            "󰍹 mode" "Mode: $mode" \
+            "󰇀 position" "Position: ${position_x}x${position_y}" \
+            "󰩨 scale" "Scale: $scale" \
+            "󰑓 rotation" "Transform: $transform" \
+            "󰹑 primary" "Make primary (position 0x0)" \
+            "󰅖 back" "Back to displays" \
             3>&1 1>&2 2>&3) || return
-
         case $action in
-            status) toggle_monitor "$monitor_name" ;;
-            mode) choose_mode "$monitor_name" ;;
-            position) choose_position "$monitor_name" ;;
-            scale) choose_scale "$monitor_name" ;;
-            rotation) choose_rotation "$monitor_name" ;;
-            primary) make_primary "$monitor_name" ;;
-            back) return ;;
+            *" status") toggle_monitor "$monitor_name" ;;
+            *" mode") choose_mode "$monitor_name" ;;
+            *" position") choose_position "$monitor_name" ;;
+            *" scale") choose_scale "$monitor_name" ;;
+            *" rotation") choose_rotation "$monitor_name" ;;
+            *" primary") make_primary "$monitor_name" ;;
+            *" back") return ;;
         esac
     done
 }
 
 write_monitor_block() {
     {
-        printf '%s\n' "$begin_marker"
+        printf '%s\n' "$monitor_begin_marker"
         jq -r '.[] |
             if .enabled then
                 "hl.monitor({\n" +
@@ -261,51 +452,15 @@ write_monitor_block() {
                 "    disabled = true,\n" +
                 "})\n"
             end
-        ' "$state_file"
-        printf '%s\n' "$end_marker"
+        ' "$monitor_state"
+        printf '%s\n' "$monitor_end_marker"
     } > "$monitor_block"
 }
 
-save_settings() {
-    mkdir -p "$settings_dir"
+save_monitor_settings() {
     write_monitor_block
-
-    has_begin=false
-    has_end=false
-    if [ -f "$settings_file" ]; then
-        grep -Fqx -e "$begin_marker" "$settings_file" && has_begin=true
-        grep -Fqx -e "$end_marker" "$settings_file" && has_end=true
-    fi
-    if [ "$has_begin" != "$has_end" ]; then
-        message "The monitor section in settings.local.lua is incomplete. No changes were saved."
-        return 1
-    fi
-
-    if [ "$has_begin" = true ]; then
-        awk -v marker="$begin_marker" '$0 == marker { exit } { print }' \
-            "$settings_file" > "$new_settings"
-        cat "$monitor_block" >> "$new_settings"
-        awk -v marker="$end_marker" 'found { print } $0 == marker { found=1 }' \
-            "$settings_file" >> "$new_settings"
-    else
-        if [ -f "$settings_file" ]; then
-            cat "$settings_file" > "$new_settings"
-            printf '\n' >> "$new_settings"
-        fi
-        cat "$monitor_block" >> "$new_settings"
-    fi
-
-    if command -v luac >/dev/null 2>&1 && ! luac -p "$new_settings"; then
-        message "The generated settings file is not valid Lua. No changes were saved."
-        return 1
-    fi
-
-    if [ -f "$settings_file" ]; then
-        cp "$settings_file" "$settings_file.backup"
-    fi
-    chmod 600 "$new_settings"
-    mv "$new_settings" "$settings_file"
-
+    replace_local_section "$monitor_begin_marker" "$monitor_end_marker" \
+        "$monitor_block" || return 1
     if output=$(hyprctl reload 2>&1); then
         systemctl --user try-restart waybar.service >/dev/null 2>&1 || :
         message "Display settings saved and applied."
@@ -327,35 +482,337 @@ display_settings() {
                     " — scale " + .scale
                 else "" end))
             ] | @tsv
-        ' "$state_file")
-
+        ' "$monitor_state")
         set --
         while IFS="$(printf '\t')" read -r monitor_name summary; do
             [ -n "$monitor_name" ] || continue
-            set -- "$@" "$monitor_name" "$summary"
+            set -- "$@" "󰍹 $monitor_name" "$summary"
         done <<EOF
 $monitor_list
 EOF
-        set -- "$@" save "Save and apply" discard "Discard changes"
-
+        set -- "$@" \
+            "󰆓 save" "Save and apply" \
+            "󰅖 discard" "Discard changes"
         choice=$(dialog --menu "Configure displays" 23 108 14 "$@" \
             3>&1 1>&2 2>&3) || return
         case $choice in
-            save) save_settings && return ;;
-            discard) return ;;
-            *) edit_monitor "$choice" ;;
+            *" save") save_monitor_settings && return ;;
+            *" discard") return ;;
+            *) edit_monitor "${choice#* }" ;;
+        esac
+    done
+}
+
+input_settings() {
+    while :; do
+        layout=$(preference '.input.keyboard_layout')
+        natural=$(boolean_label "$(preference '.input.natural_scroll')")
+        tap=$(boolean_label "$(preference '.input.tap_to_click')")
+        sensitivity=$(preference '.input.sensitivity')
+        accel=$(preference '.input.accel_profile')
+        action=$(dialog --menu "Input settings" 20 82 10 \
+            "󰌌 layout" "Keyboard layout: $layout" \
+            "󰍽 natural-scroll" "Touchpad natural scrolling: $natural" \
+            "󰹑 tap-to-click" "Touchpad tap-to-click: $tap" \
+            "󰇀 sensitivity" "Pointer sensitivity: $sensitivity" \
+            "󰍾 acceleration" "Pointer acceleration: $accel" \
+            "󰅖 back" "Back to settings" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" layout")
+                value=$(dialog --inputbox "󰌌 Keyboard layout (for example: us, gb, de)" \
+                    10 70 "$layout" 3>&1 1>&2 2>&3) || continue
+                case $value in ''|*[[:space:]]*) message "Enter a non-empty layout without spaces."; continue ;; esac
+                replace_preferences --arg value "$value" '.input.keyboard_layout = $value'
+                save_preferences
+                ;;
+            *" natural-scroll") toggle_preference '.input.natural_scroll' ;;
+            *" tap-to-click") toggle_preference '.input.tap_to_click' ;;
+            *" sensitivity")
+                value=$(dialog --inputbox "󰇀 Pointer sensitivity from -1.0 to 1.0" \
+                    10 68 "$sensitivity" 3>&1 1>&2 2>&3) || continue
+                if ! printf '%s\n' "$value" | awk '
+                    /^-?[0-9]+([.][0-9]+)?$/ && $1 >= -1 && $1 <= 1 { valid=1 }
+                    END { exit !valid }
+                '; then
+                    message "Sensitivity must be between -1.0 and 1.0."
+                    continue
+                fi
+                replace_preferences --argjson value "$value" '.input.sensitivity = $value'
+                save_preferences
+                ;;
+            *" acceleration")
+                choice=$(dialog --menu "󰍾 Pointer acceleration profile" 14 68 5 \
+                    "󰘧 adaptive" "Adaptive acceleration" \
+                    "󰓅 flat" "No acceleration" \
+                    3>&1 1>&2 2>&3) || continue
+                replace_preferences --arg value "${choice#* }" '.input.accel_profile = $value'
+                save_preferences
+                ;;
+            *" back") return ;;
+        esac
+    done
+}
+
+set_bounded_integer() {
+    preference_path=$1
+    title=$2
+    minimum=$3
+    maximum=$4
+    current=$(preference "$preference_path")
+    value=$(dialog --inputbox "$title" 10 70 "$current" 3>&1 1>&2 2>&3) || return 1
+    if ! is_unsigned_integer "$value" || [ "$value" -lt "$minimum" ] || [ "$value" -gt "$maximum" ]; then
+        message "Enter a whole number from $minimum to $maximum."
+        return 1
+    fi
+    replace_preferences --argjson value "$value" "$preference_path = \$value"
+    save_preferences
+}
+
+appearance_settings() {
+    while :; do
+        wallpaper=$(preference '.appearance.wallpaper')
+        animations=$(boolean_label "$(preference '.appearance.animations')")
+        blur=$(boolean_label "$(preference '.appearance.blur')")
+        gaps_in=$(preference '.appearance.gaps_in')
+        gaps_out=$(preference '.appearance.gaps_out')
+        border=$(preference '.appearance.border_size')
+        action=$(dialog --menu "Appearance settings" 22 92 12 \
+            "󰸉 wallpaper" "Wallpaper: $wallpaper" \
+            "󰔎 animations" "Animations: $animations" \
+            "󰕢 blur" "Window blur: $blur" \
+            "󰝥 inner-gaps" "Inner gaps: $gaps_in" \
+            "󰝤 outer-gaps" "Outer gaps: $gaps_out" \
+            "󰨤 border" "Border size: $border" \
+            "󰅖 back" "Back to settings" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" wallpaper")
+                value=$(dialog --inputbox "󰸉 Absolute path to the wallpaper" \
+                    10 86 "$wallpaper" 3>&1 1>&2 2>&3) || continue
+                case $value in '~/'*) value=$HOME/${value#\~/} ;; esac
+                if [ ! -f "$value" ]; then message "That wallpaper file does not exist."; continue; fi
+                replace_preferences --arg value "$value" '.appearance.wallpaper = $value'
+                save_preferences
+                ;;
+            *" animations") toggle_preference '.appearance.animations' ;;
+            *" blur") toggle_preference '.appearance.blur' ;;
+            *" inner-gaps") set_bounded_integer '.appearance.gaps_in' "󰝥 Inner gap size" 0 100 || : ;;
+            *" outer-gaps") set_bounded_integer '.appearance.gaps_out' "󰝤 Outer gap size" 0 100 || : ;;
+            *" border") set_bounded_integer '.appearance.border_size' "󰨤 Window border size" 0 20 || : ;;
+            *" back") return ;;
+        esac
+    done
+}
+
+waybar_settings() {
+    while :; do
+        enabled=$(boolean_label "$(preference '.waybar.enabled')")
+        position=$(preference '.waybar.position')
+        primary=$(boolean_label "$(preference '.waybar.primary_only')")
+        auto_hide=$(boolean_label "$(preference '.waybar.auto_hide')")
+        action=$(dialog --menu "Waybar settings" 18 84 8 \
+            "󰐥 enabled" "Waybar: $enabled" \
+            "󰘸 position" "Position: $position" \
+            "󰹑 primary-only" "Primary display only: $primary" \
+            "󰖲 auto-hide" "Automatic hiding: $auto_hide" \
+            "󰅖 back" "Back to settings" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" enabled") toggle_preference '.waybar.enabled' ;;
+            *" position")
+                choice=$(dialog --menu "󰘸 Waybar position" 13 64 4 \
+                    "󰘸 top" "Top edge" \
+                    "󰘷 bottom" "Bottom edge" \
+                    3>&1 1>&2 2>&3) || continue
+                replace_preferences --arg value "${choice#* }" '.waybar.position = $value'
+                save_preferences
+                ;;
+            *" primary-only") toggle_preference '.waybar.primary_only' ;;
+            *" auto-hide") toggle_preference '.waybar.auto_hide' ;;
+            *" back") return ;;
+        esac
+    done
+}
+
+edit_command() {
+    preference_path=$1
+    title=$2
+    current=$(preference "$preference_path")
+    value=$(dialog --inputbox "$title" 10 92 "$current" 3>&1 1>&2 2>&3) || return
+    [ -n "$value" ] || { message "The command cannot be empty."; return; }
+    replace_preferences --arg value "$value" "$preference_path = \$value"
+    save_preferences
+}
+
+default_apps_settings() {
+    while :; do
+        terminal=$(preference '.defaults.terminal')
+        file_manager=$(preference '.defaults.file_manager')
+        browser=$(preference '.defaults.browser')
+        launcher=$(preference '.defaults.launcher')
+        action=$(dialog --menu "Default application commands" 19 100 9 \
+            "󰆍 terminal" "Terminal: $terminal" \
+            "󰉋 file-manager" "File manager: $file_manager" \
+            "󰈹 browser" "Browser: $browser" \
+            "󰍉 launcher" "Application launcher: $launcher" \
+            "󰅖 back" "Back to settings" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" terminal") edit_command '.defaults.terminal' "󰆍 Terminal command" ;;
+            *" file-manager") edit_command '.defaults.file_manager' "󰉋 File manager command" ;;
+            *" browser") edit_command '.defaults.browser' "󰈹 Browser command" ;;
+            *" launcher") edit_command '.defaults.launcher' "󰍉 Application launcher command" ;;
+            *" back") return ;;
+        esac
+    done
+}
+
+set_brightness() {
+    current=$(brightnessctl -m 2>/dev/null | sed -n '1{s/.*,//; s/%//; p;}')
+    [ -n "$current" ] || { message "No brightness device was found."; return; }
+    value=$(dialog --inputbox "󰃠 Display brightness percentage" \
+        10 68 "$current" 3>&1 1>&2 2>&3) || return
+    if ! is_unsigned_integer "$value" || [ "$value" -lt 1 ] || [ "$value" -gt 100 ]; then
+        message "Brightness must be from 1 to 100 percent."
+        return
+    fi
+    if ! output=$(brightnessctl set "$value%" 2>&1); then
+        message "Unable to change brightness:\n\n$output"
+    fi
+}
+
+set_timeout() {
+    preference_path=$1
+    title=$2
+    current=$(preference "$preference_path")
+    value=$(dialog --inputbox "$title\n\nUse 0 to disable." \
+        12 72 "$current" 3>&1 1>&2 2>&3) || return
+    if ! is_unsigned_integer "$value" || [ "$value" -gt 86400 ]; then
+        message "Enter a number of seconds from 0 to 86400."
+        return
+    fi
+    replace_preferences --argjson value "$value" "$preference_path = \$value"
+    save_preferences
+}
+
+apply_lid_behavior() {
+    behavior=$1
+    if ! command -v pkexec >/dev/null 2>&1; then
+        message "pkexec is required to change the system lid-close behavior."
+        return 1
+    fi
+    logind_file=/etc/systemd/logind.conf.d/90-dotfiles-lid.conf
+    if [ "$behavior" = default ]; then
+        pkexec /usr/bin/rm -f "$logind_file" || return 1
+    else
+        temporary=$temp_dir/90-dotfiles-lid.conf
+        {
+            printf '%s\n' '[Login]'
+            printf 'HandleLidSwitch=%s\n' "$behavior"
+            printf 'HandleLidSwitchExternalPower=%s\n' "$behavior"
+            printf '%s\n' 'HandleLidSwitchDocked=ignore'
+        } > "$temporary"
+        pkexec /usr/bin/install -D -m 0644 "$temporary" "$logind_file" || return 1
+    fi
+    pkexec /usr/bin/systemctl kill --kill-whom=main --signal=HUP systemd-logind.service \
+        >/dev/null 2>&1 || :
+}
+
+choose_lid_behavior() {
+    choice=$(dialog --menu "󰌢 Lid-close behavior" 16 72 7 \
+        "󰘚 default" "Use the Debian system default" \
+        "󰒲 suspend" "Suspend the computer" \
+        "󰌾 lock" "Lock the session" \
+        "󰅖 ignore" "Do nothing" \
+        3>&1 1>&2 2>&3) || return
+    behavior=${choice#* }
+    if apply_lid_behavior "$behavior"; then
+        replace_preferences --arg value "$behavior" '.laptop.lid_behavior = $value'
+        save_preferences
+    else
+        message "The lid-close behavior was not changed."
+    fi
+}
+
+laptop_settings() {
+    while :; do
+        idle=$(preference '.laptop.idle_timeout')
+        screen=$(preference '.laptop.screen_off_timeout')
+        suspend=$(preference '.laptop.suspend_timeout')
+        lid=$(preference '.laptop.lid_behavior')
+        set --
+        if brightnessctl -m >/dev/null 2>&1; then
+            set -- "$@" "󰃠 brightness" "Adjust display brightness"
+        fi
+        set -- "$@" \
+            "󰌾 idle" "Lock after: ${idle}s (0 disables)" \
+            "󰍹 screen-off" "Turn screen off after: ${screen}s (0 disables)" \
+            "󰒲 suspend" "Suspend after: ${suspend}s (0 disables)"
+        if find /proc/acpi/button/lid -mindepth 1 -maxdepth 1 -type d \
+            -print -quit 2>/dev/null | grep -q .; then
+            set -- "$@" "󰌢 lid" "Lid close: $lid"
+        fi
+        set -- "$@" "󰅖 back" "Back to settings"
+        action=$(dialog --menu "Laptop and idle settings" 20 86 10 "$@" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" brightness") set_brightness ;;
+            *" idle") set_timeout '.laptop.idle_timeout' "󰌾 Lock timeout in seconds" ;;
+            *" screen-off") set_timeout '.laptop.screen_off_timeout' "󰍹 Screen-off timeout in seconds" ;;
+            *" suspend") set_timeout '.laptop.suspend_timeout' "󰒲 Suspend timeout in seconds" ;;
+            *" lid") choose_lid_behavior ;;
+            *" back") return ;;
+        esac
+    done
+}
+
+workspace_settings() {
+    while :; do
+        count=$(preference '.workspaces.count')
+        switching=$(preference '.workspaces.switching')
+        action=$(dialog --menu "Workspace settings" 16 80 6 \
+            "󰖯 count" "Numbered workspaces: $count" \
+            "󰑐 switching" "Wheel and swipe behavior: $switching" \
+            "󰅖 back" "Back to settings" \
+            3>&1 1>&2 2>&3) || return
+        case $action in
+            *" count") set_bounded_integer '.workspaces.count' "󰖯 Workspace count" 1 10 || : ;;
+            *" switching")
+                choice=$(dialog --menu "󰑐 Workspace switching behavior" 16 78 6 \
+                    "󰆏 existing" "Cycle through workspaces that contain windows" \
+                    "󰑓 sequential" "Cycle through numbered workspaces in sequence" \
+                    "󰅖 disabled" "Disable wheel and three-finger switching" \
+                    3>&1 1>&2 2>&3) || continue
+                replace_preferences --arg value "${choice#* }" '.workspaces.switching = $value'
+                save_preferences
+                ;;
+            *" back") return ;;
         esac
     done
 }
 
 load_monitors
+load_preferences
 while :; do
-    section=$(dialog --menu "Choose a settings section" 15 68 6 \
-        displays "Monitor layout, modes, scale, and rotation" \
-        close "Close settings" \
+    section=$(dialog --menu "Choose a settings section" 23 82 12 \
+        "󰍹 displays" "Monitor layout, modes, scale, and rotation" \
+        "󰌌 input" "Keyboard, pointer, and touchpad" \
+        "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
+        "󰍜 waybar" "Visibility, position, displays, and automatic hiding" \
+        "󰀻 defaults" "Terminal, file manager, browser, and launcher" \
+        "󰌢 laptop" "Brightness, idle timeouts, suspend, and lid behavior" \
+        "󰖲 workspaces" "Workspace count and switching behavior" \
+        "󰅖 close" "Close settings" \
         3>&1 1>&2 2>&3) || exit 0
     case $section in
-        displays) display_settings ;;
-        close) exit 0 ;;
+        *" displays") display_settings ;;
+        *" input") input_settings ;;
+        *" appearance") appearance_settings ;;
+        *" waybar") waybar_settings ;;
+        *" defaults") default_apps_settings ;;
+        *" laptop") laptop_settings ;;
+        *" workspaces") workspace_settings ;;
+        *" close") exit 0 ;;
     esac
 done

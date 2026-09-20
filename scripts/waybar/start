@@ -4,37 +4,72 @@ set -eu
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 config_file=$config_home/waybar/config.jsonc
 style_file=$config_home/waybar/style.css
+preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar
 runtime_config=$runtime_dir/config.json
 
-attempt=0
-primary_output=
-while [ "$attempt" -lt 25 ]; do
-    monitors=$(hyprctl monitors -j 2>/dev/null || :)
-    primary_output=$(printf '%s\n' "$monitors" | jq -r '
-        if type != "array" or length == 0 then
-            empty
-        else
-            (
-                [.[] | select(.x == 0 and .y == 0)][0]
-                // [.[] | select(.activeWorkspace.id == 1)][0]
-                // [.[] | select(.focused == true)][0]
-                // .[0]
-            ).name // empty
-        end
-    ' 2>/dev/null || :)
-    [ -z "$primary_output" ] || break
-    attempt=$((attempt + 1))
-    sleep 0.2
-done
+waybar_enabled=true
+position=top
+primary_only=true
+auto_hide=false
+workspace_count=5
+if [ -f "$preferences_file" ]; then
+    waybar_enabled=$(jq -r 'if .waybar.enabled == null then true else .waybar.enabled end' "$preferences_file" 2>/dev/null || printf true)
+    position=$(jq -r '.waybar.position // "top"' "$preferences_file" 2>/dev/null || printf top)
+    primary_only=$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$preferences_file" 2>/dev/null || printf true)
+    auto_hide=$(jq -r 'if .waybar.auto_hide == null then false else .waybar.auto_hide end' "$preferences_file" 2>/dev/null || printf false)
+    workspace_count=$(jq -r '.workspaces.count // 5' "$preferences_file" 2>/dev/null || printf 5)
+fi
 
-[ -n "$primary_output" ] || exit 1
+[ "$waybar_enabled" = true ] || exit 0
+case $position in top|bottom) ;; *) position=top ;; esac
+case $workspace_count in
+    ''|*[!0-9]*) workspace_count=5 ;;
+esac
+if [ "$workspace_count" -lt 1 ] || [ "$workspace_count" -gt 10 ]; then
+    workspace_count=5
+fi
+if [ "$auto_hide" = true ]; then mode=hide; else mode=dock; fi
+
+primary_output=
+if [ "$primary_only" = true ]; then
+    attempt=0
+    while [ "$attempt" -lt 25 ]; do
+        monitors=$(hyprctl monitors -j 2>/dev/null || :)
+        primary_output=$(printf '%s\n' "$monitors" | jq -r '
+            if type != "array" or length == 0 then
+                empty
+            else
+                (
+                    [.[] | select(.x == 0 and .y == 0)][0]
+                    // [.[] | select(.activeWorkspace.id == 1)][0]
+                    // [.[] | select(.focused == true)][0]
+                    // .[0]
+                ).name // empty
+            end
+        ' 2>/dev/null || :)
+        [ -z "$primary_output" ] || break
+        attempt=$((attempt + 1))
+        sleep 0.2
+    done
+    [ -n "$primary_output" ] || exit 1
+fi
 
 umask 077
 mkdir -p "$runtime_dir"
 temporary_config=$(mktemp "$runtime_dir/config.XXXXXX") || exit 1
 trap 'rm -f "$temporary_config"' 0 HUP INT TERM
-jq --arg output "$primary_output" '.output = $output' "$config_file" > "$temporary_config"
+jq \
+    --arg output "$primary_output" \
+    --arg position "$position" \
+    --arg mode "$mode" \
+    --argjson primary_only "$primary_only" \
+    --argjson workspace_count "$workspace_count" '
+        .position = $position |
+        .mode = $mode |
+        .["hyprland/workspaces"]["persistent-workspaces"]["*"] = [range(1; $workspace_count + 1)] |
+        if $primary_only then .output = $output else del(.output) end
+    ' "$config_file" > "$temporary_config"
 mv "$temporary_config" "$runtime_config"
 trap - 0 HUP INT TERM
 
