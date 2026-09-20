@@ -132,27 +132,18 @@ load_preferences() {
                 primary_only: true,
                 auto_hide: false
             },
-            defaults: {
-                terminal: "foot",
-                file_manager: "foot --app-id=nnn --title=Files dotfiles-file-manager-tui",
-                browser: "xdg-open https://start.duckduckgo.com",
-                launcher: "dotfiles-app-launcher-toggle"
-            },
             laptop: {
                 idle_timeout: 300,
                 screen_off_timeout: 600,
                 suspend_timeout: 900,
                 lid_behavior: "default"
-            },
-            workspaces: {
-                count: 5,
-                switching: "existing"
             }
         }
     ' > "$defaults"
 
     if [ -f "$preferences_file" ] && jq -e 'type == "object"' "$preferences_file" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1]' "$defaults" "$preferences_file" > "$preferences_state"
+        jq -s '.[0] * .[1] | del(.defaults, .workspaces)' \
+            "$defaults" "$preferences_file" > "$preferences_state"
     else
         cp "$defaults" "$preferences_state"
     fi
@@ -223,10 +214,6 @@ write_preferences_block() {
     {
         printf '%s\n' "$preferences_begin_marker"
         jq -r '
-            "dotfilesSettings.terminal = " + (.defaults.terminal | @json) + "\n" +
-            "dotfilesSettings.fileManager = " + (.defaults.file_manager | @json) + "\n" +
-            "dotfilesSettings.browser = " + (.defaults.browser | @json) + "\n" +
-            "dotfilesSettings.launcher = " + (.defaults.launcher | @json) + "\n" +
             "dotfilesSettings.wallpaper = " + (.appearance.wallpaper | @json) + "\n" +
             "dotfilesSettings.animationsEnabled = " + (.appearance.animations | tostring) + "\n" +
             "dotfilesSettings.blurEnabled = " + (.appearance.blur | tostring) + "\n" +
@@ -237,9 +224,7 @@ write_preferences_block() {
             "dotfilesSettings.naturalScroll = " + (.input.natural_scroll | tostring) + "\n" +
             "dotfilesSettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
             "dotfilesSettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
-            "dotfilesSettings.accelProfile = " + (.input.accel_profile | @json) + "\n" +
-            "dotfilesSettings.workspaceCount = " + (.workspaces.count | tostring) + "\n" +
-            "dotfilesSettings.workspaceSwitching = " + (.workspaces.switching | @json)
+            "dotfilesSettings.accelProfile = " + (.input.accel_profile | @json)
         ' "$preferences_state"
         printf '%s\n' "$preferences_end_marker"
     } > "$preferences_block"
@@ -268,8 +253,9 @@ apply_idle() {
 
 apply_waybar() {
     if [ "$(preference '.waybar.enabled')" = true ]; then
-        systemctl --user enable --now waybar.service >/dev/null 2>&1 || :
-        systemctl --user try-restart waybar.service >/dev/null 2>&1 || :
+        systemctl --user reset-failed waybar.service >/dev/null 2>&1 || :
+        systemctl --user enable waybar.service >/dev/null 2>&1 || :
+        systemctl --user restart waybar.service >/dev/null 2>&1 || :
     else
         systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
     fi
@@ -503,6 +489,44 @@ EOF
     done
 }
 
+choose_keyboard_layout() {
+    current_layout=$1
+    rules_file=
+    for candidate in /usr/share/X11/xkb/rules/evdev.lst /usr/share/X11/xkb/rules/base.lst; do
+        if [ -r "$candidate" ]; then
+            rules_file=$candidate
+            break
+        fi
+    done
+    if [ -z "$rules_file" ]; then
+        message "No XKB keyboard layout list was found."
+        return 1
+    fi
+
+    layouts=$(awk '
+        /^! layout/ { in_layouts=1; next }
+        /^!/ { if (in_layouts) exit }
+        in_layouts && NF >= 2 {
+            layout=$1
+            $1=""
+            sub(/^[[:space:]]+/, "")
+            print layout "\t" $0
+        }
+    ' "$rules_file")
+
+    set --
+    while IFS="	" read -r layout description; do
+        [ -n "$layout" ] || continue
+        if [ "$layout" = "$current_layout" ]; then selected=ON; else selected=OFF; fi
+        set -- "$@" "󰌌 $layout" "$description" "$selected"
+    done <<EOF
+$layouts
+EOF
+    choice=$(dialog --radiolist "󰌌 Choose a keyboard layout" 24 86 16 "$@" \
+        3>&1 1>&2 2>&3) || return 1
+    printf '%s\n' "${choice#* }"
+}
+
 input_settings() {
     while :; do
         layout=$(preference '.input.keyboard_layout')
@@ -520,9 +544,7 @@ input_settings() {
             3>&1 1>&2 2>&3) || return
         case $action in
             *" layout")
-                value=$(dialog --inputbox "󰌌 Keyboard layout (for example: us, gb, de)" \
-                    10 70 "$layout" 3>&1 1>&2 2>&3) || continue
-                case $value in ''|*[[:space:]]*) message "Enter a non-empty layout without spaces."; continue ;; esac
+                value=$(choose_keyboard_layout "$layout") || continue
                 replace_preferences --arg value "$value" '.input.keyboard_layout = $value'
                 save_preferences
                 ;;
@@ -635,39 +657,6 @@ waybar_settings() {
     done
 }
 
-edit_command() {
-    preference_path=$1
-    title=$2
-    current=$(preference "$preference_path")
-    value=$(dialog --inputbox "$title" 10 92 "$current" 3>&1 1>&2 2>&3) || return
-    [ -n "$value" ] || { message "The command cannot be empty."; return; }
-    replace_preferences --arg value "$value" "$preference_path = \$value"
-    save_preferences
-}
-
-default_apps_settings() {
-    while :; do
-        terminal=$(preference '.defaults.terminal')
-        file_manager=$(preference '.defaults.file_manager')
-        browser=$(preference '.defaults.browser')
-        launcher=$(preference '.defaults.launcher')
-        action=$(dialog --menu "Default application commands" 19 100 9 \
-            "󰆍 terminal" "Terminal: $terminal" \
-            "󰉋 file-manager" "File manager: $file_manager" \
-            "󰈹 browser" "Browser: $browser" \
-            "󰍉 launcher" "Application launcher: $launcher" \
-            "󰅖 back" "Back to settings" \
-            3>&1 1>&2 2>&3) || return
-        case $action in
-            *" terminal") edit_command '.defaults.terminal' "󰆍 Terminal command" ;;
-            *" file-manager") edit_command '.defaults.file_manager' "󰉋 File manager command" ;;
-            *" browser") edit_command '.defaults.browser' "󰈹 Browser command" ;;
-            *" launcher") edit_command '.defaults.launcher' "󰍉 Application launcher command" ;;
-            *" back") return ;;
-        esac
-    done
-}
-
 set_brightness() {
     current=$(brightnessctl -m 2>/dev/null | sed -n '1{s/.*,//; s/%//; p;}')
     [ -n "$current" ] || { message "No brightness device was found."; return; }
@@ -767,42 +756,15 @@ laptop_settings() {
     done
 }
 
-workspace_settings() {
-    while :; do
-        count=$(preference '.workspaces.count')
-        switching=$(preference '.workspaces.switching')
-        action=$(dialog --menu "Workspace settings" 16 80 6 \
-            "󰖯 count" "Numbered workspaces: $count" \
-            "󰑐 switching" "Wheel and swipe behavior: $switching" \
-            "󰅖 back" "Back to settings" \
-            3>&1 1>&2 2>&3) || return
-        case $action in
-            *" count") set_bounded_integer '.workspaces.count' "󰖯 Workspace count" 1 10 || : ;;
-            *" switching")
-                choice=$(dialog --menu "󰑐 Workspace switching behavior" 16 78 6 \
-                    "󰆏 existing" "Cycle through workspaces that contain windows" \
-                    "󰑓 sequential" "Cycle through numbered workspaces in sequence" \
-                    "󰅖 disabled" "Disable wheel and three-finger switching" \
-                    3>&1 1>&2 2>&3) || continue
-                replace_preferences --arg value "${choice#* }" '.workspaces.switching = $value'
-                save_preferences
-                ;;
-            *" back") return ;;
-        esac
-    done
-}
-
 load_monitors
 load_preferences
 while :; do
-    section=$(dialog --menu "Choose a settings section" 23 82 12 \
+    section=$(dialog --menu "Choose a settings section" 21 82 10 \
         "󰍹 displays" "Monitor layout, modes, scale, and rotation" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
         "󰍜 waybar" "Visibility, position, displays, and automatic hiding" \
-        "󰀻 defaults" "Terminal, file manager, browser, and launcher" \
         "󰌢 laptop" "Brightness, idle timeouts, suspend, and lid behavior" \
-        "󰖲 workspaces" "Workspace count and switching behavior" \
         "󰅖 close" "Close settings" \
         3>&1 1>&2 2>&3) || exit 0
     case $section in
@@ -810,9 +772,7 @@ while :; do
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
         *" waybar") waybar_settings ;;
-        *" defaults") default_apps_settings ;;
         *" laptop") laptop_settings ;;
-        *" workspaces") workspace_settings ;;
         *" close") exit 0 ;;
     esac
 done

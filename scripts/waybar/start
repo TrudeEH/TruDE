@@ -12,23 +12,15 @@ waybar_enabled=true
 position=top
 primary_only=true
 auto_hide=false
-workspace_count=5
 if [ -f "$preferences_file" ]; then
     waybar_enabled=$(jq -r 'if .waybar.enabled == null then true else .waybar.enabled end' "$preferences_file" 2>/dev/null || printf true)
     position=$(jq -r '.waybar.position // "top"' "$preferences_file" 2>/dev/null || printf top)
     primary_only=$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$preferences_file" 2>/dev/null || printf true)
     auto_hide=$(jq -r 'if .waybar.auto_hide == null then false else .waybar.auto_hide end' "$preferences_file" 2>/dev/null || printf false)
-    workspace_count=$(jq -r '.workspaces.count // 5' "$preferences_file" 2>/dev/null || printf 5)
 fi
 
 [ "$waybar_enabled" = true ] || exit 0
 case $position in top|bottom) ;; *) position=top ;; esac
-case $workspace_count in
-    ''|*[!0-9]*) workspace_count=5 ;;
-esac
-if [ "$workspace_count" -lt 1 ] || [ "$workspace_count" -gt 10 ]; then
-    workspace_count=5
-fi
 if [ "$auto_hide" = true ]; then mode=hide; else mode=dock; fi
 
 primary_output=
@@ -63,11 +55,10 @@ jq \
     --arg output "$primary_output" \
     --arg position "$position" \
     --arg mode "$mode" \
-    --argjson primary_only "$primary_only" \
-    --argjson workspace_count "$workspace_count" '
+    --argjson primary_only "$primary_only" '
         .position = $position |
         .mode = $mode |
-        .["hyprland/workspaces"]["persistent-workspaces"]["*"] = [range(1; $workspace_count + 1)] |
+        del(.["hyprland/workspaces"]["persistent-workspaces"]) |
         if $primary_only then .output = $output else del(.output) end
     ' "$config_file" > "$temporary_config"
 mv "$temporary_config" "$runtime_config"

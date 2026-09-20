@@ -32,8 +32,6 @@ dotfilesSettings = {
     tapToClick         = true,
     sensitivity        = 0,
     accelProfile       = "adaptive",
-    workspaceCount     = 5,
-    workspaceSwitching = "existing",
 }
 
 
@@ -279,13 +277,11 @@ hl.config({
     },
 })
 
-if dotfilesSettings.workspaceSwitching ~= "disabled" then
-    hl.gesture({
-        fingers = 3,
-        direction = "horizontal",
-        action = "workspace"
-    })
-end
+hl.gesture({
+    fingers = 3,
+    direction = "horizontal",
+    action = "workspace"
+})
 
 ---------------------
 ---- KEYBINDINGS ----
@@ -325,7 +321,7 @@ hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }), { descripti
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
-for i = 1, dotfilesSettings.workspaceCount do
+for i = 1, 5 do
     local key = i % 10 -- 10 maps to key 0
     hl.bind(mainMod .. " + " .. key,             hl.dsp.focus({ workspace = i}), { description = "Switch to workspace " .. i })
     hl.bind(mainMod .. " + SHIFT + " .. key,     hl.dsp.window.move({ workspace = i }), { description = "Move window to workspace " .. i })
@@ -335,16 +331,8 @@ end
 hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"), { description = "Toggle scratchpad" })
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }), { description = "Move window to scratchpad" })
 
-if dotfilesSettings.workspaceSwitching ~= "disabled" then
-    local nextWorkspace = "+1"
-    local previousWorkspace = "-1"
-    if dotfilesSettings.workspaceSwitching == "existing" then
-        nextWorkspace = "e+1"
-        previousWorkspace = "e-1"
-    end
-    hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = nextWorkspace }), { description = "Next workspace" })
-    hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = previousWorkspace }), { description = "Previous workspace" })
-end
+hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }), { description = "Next workspace" })
+hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }), { description = "Previous workspace" })
 
 -- Move/resize windows with mainMod + LMB/RMB and dragging
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true, description = "Move window" })

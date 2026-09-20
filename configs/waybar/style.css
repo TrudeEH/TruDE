@@ -35,12 +35,6 @@
     background-color: @bg-0;
 }
 
-#waybar > box > box:nth-child(1),
-#waybar > box > box:nth-child(3) {
-    min-width: 50%;
-    max-width: 50%;
-}
-
 .module {
     margin-bottom: -1px;
 }
