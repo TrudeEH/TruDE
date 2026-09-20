@@ -1,21 +1,60 @@
 #!/bin/sh
 set -u
 
-screensharing=false
-if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    if pw-dump 2>/dev/null | jq -e '
-        any(.[];
-            .type == "PipeWire:Interface:Node" and
-            .info.props["media.class"] == "Stream/Input/Video" and
-            .info.state == "running"
-        )
-    ' >/dev/null 2>&1; then
-        screensharing=true
-    fi
-fi
+part=${1:-center}
+runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+cache_file=$runtime_dir/dotfiles-waybar-launcher-status
+lock_dir=$runtime_dir/dotfiles-waybar-launcher-status.lock
 
-if [ "$screensharing" = true ]; then
-    printf '%s\n' '{"text":"<span foreground=\"#f66151\"></span><span background=\"#f66151\" foreground=\"#222226\"> 󰍹 </span><span foreground=\"#f66151\"></span>","class":"screensharing"}'
-else
-    printf '%s\n' '{"text":"<span foreground=\"#ffbe6f\"></span><span background=\"#ffbe6f\" foreground=\"#222226\"> 󰀻 </span><span foreground=\"#ffbe6f\"></span>","class":"launcher"}'
-fi
+cache_is_fresh() {
+    [ -r "$cache_file" ] || return 1
+    now=$(date +%s)
+    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
+    [ $((now - modified)) -le 1 ]
+}
+
+refresh_status() {
+    if ! mkdir "$lock_dir" 2>/dev/null; then
+        attempts=0
+        while [ -d "$lock_dir" ] && [ "$attempts" -lt 25 ]; do
+            sleep 0.02
+            attempts=$((attempts + 1))
+        done
+        [ -r "$cache_file" ] && return
+    fi
+
+    trap 'rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+    status=launcher
+    if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        if pw-dump 2>/dev/null | jq -e '
+            any(.[];
+                .type == "PipeWire:Interface:Node" and
+                .info.props["media.class"] == "Stream/Input/Video" and
+                .info.state == "running"
+            )
+        ' >/dev/null 2>&1; then
+            status=screensharing
+        fi
+    fi
+
+    temporary=$(mktemp "$runtime_dir/dotfiles-waybar-launcher-status.XXXXXX") || exit 1
+    printf '%s\n' "$status" > "$temporary"
+    mv "$temporary" "$cache_file"
+}
+
+cache_is_fresh || refresh_status
+status=$(cat "$cache_file" 2>/dev/null || printf 'launcher')
+
+case $part in
+    left) text='' ;;
+    right) text='' ;;
+    *)
+        if [ "$status" = screensharing ]; then
+            text='󰍹'
+        else
+            text='󰀻'
+        fi
+        ;;
+esac
+
+printf '{"text":"%s","class":"%s"}\n' "$text" "$status"

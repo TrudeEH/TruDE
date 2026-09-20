@@ -25,7 +25,7 @@
         "cpu",
         "custom/left#inverse",
 
-        "custom/launcher",
+        "group/app-launcher",
 
         "custom/right#inverse",
         "clock#time",
@@ -103,13 +103,19 @@
         "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "custom/launcher": {
-        "exec": "dotfiles-waybar-launcher-status",
+        "exec": "dotfiles-waybar-launcher-status center",
         "return-type": "json",
-        "format": "{text}",
-        "escape": false,
         "interval": 1,
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
+    },
+    "group/app-launcher": {
+        "orientation": "horizontal",
+        "modules": [
+            "custom/left#accent",
+            "custom/launcher",
+            "custom/right#accent"
+        ]
     },
     "clock#time": {
         "format": "{:%I:%M %p}",
@@ -198,6 +204,12 @@
         "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
     },
 
+    "custom/left#accent": {
+        "exec": "dotfiles-waybar-launcher-status left",
+        "return-type": "json",
+        "interval": 1,
+        "tooltip": false
+    },
     "custom/left#bg-1": {
         "format": "",
         "tooltip": false
@@ -212,6 +224,12 @@
     },
     "custom/left#inverse": {
         "format": "",
+        "tooltip": false
+    },
+    "custom/right#accent": {
+        "exec": "dotfiles-waybar-launcher-status right",
+        "return-type": "json",
+        "interval": 1,
         "tooltip": false
     },
     "custom/right#bg-1": {
