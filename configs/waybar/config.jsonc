@@ -6,11 +6,7 @@
     "height": 0,
     "margin": 0,
     "spacing": 0,
-    "modules-layout": [
-        "modules-left",
-        "modules-center",
-        "modules-right"
-    ],
+    "fixed-center": true,
     "reload_style_on_change": true,
 
     "modules-left": [
@@ -20,29 +16,9 @@
         "custom/right#bg-1"
     ],
     "modules-center": [
-        "custom/left#bg-1",
-        "custom/temperature",
-
-        "custom/left#bg-2",
-        "memory",
-
-        "custom/left#bg-3",
-        "cpu",
-        "custom/left#inverse",
-
+        "group/center-left",
         "group/app-launcher",
-
-        "custom/right#inverse",
-        "clock#time",
-        "custom/right#bg-3",
-
-        "clock#date",
-        "custom/right#bg-2",
-
-        "network",
-        "bluetooth",
-        "custom/notification",
-        "custom/right#bg-1"
+        "group/center-right"
     ],
     "modules-right": [
         "custom/left#bg-1",
@@ -114,12 +90,38 @@
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
     },
+    "group/center-left": {
+        "orientation": "horizontal",
+        "modules": [
+            "custom/left#bg-1",
+            "custom/temperature",
+            "custom/left#bg-2",
+            "memory",
+            "custom/left#bg-3",
+            "cpu",
+            "custom/left#inverse"
+        ]
+    },
     "group/app-launcher": {
         "orientation": "horizontal",
         "modules": [
             "custom/left#accent",
             "custom/launcher",
             "custom/right#accent"
+        ]
+    },
+    "group/center-right": {
+        "orientation": "horizontal",
+        "modules": [
+            "custom/right#inverse",
+            "clock#time",
+            "custom/right#bg-3",
+            "clock#date",
+            "custom/right#bg-2",
+            "network",
+            "bluetooth",
+            "custom/notification",
+            "custom/right#bg-1"
         ]
     },
     "clock#time": {

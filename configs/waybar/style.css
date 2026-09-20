@@ -101,6 +101,10 @@ tooltip label {
 
 /* Center modules */
 
+#center-left {
+    padding-left: 38px;
+}
+
 #custom-temperature {
     padding: 0 8px;
     background-color: @bg-1;
