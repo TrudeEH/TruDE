@@ -1,173 +1,244 @@
-@define-color window #222226;
-@define-color surface #38383c;
-@define-color surface-hover #46464b;
-@define-color text #ffffff;
+@define-color shadow #1d1d20;
+@define-color bg-0 #222226;
+@define-color bg-1 #2e2e32;
+@define-color bg-2 #38383c;
+@define-color bg-3 #3d3846;
+@define-color fg #ffffff;
 @define-color muted #aaaaaa;
+@define-color border #77767b;
+@define-color hover-bg #5e5c64;
+@define-color hover-fg rgba(255, 255, 255, 0.75);
 @define-color accent #ffbe6f;
 @define-color accent-strong #ffa348;
 @define-color accent-text #222226;
-@define-color border rgba(255, 255, 255, 0.10);
-@define-color critical #ff7b72;
+@define-color warning #f8e45c;
+@define-color critical #f66151;
+@define-color success #57e389;
 
 * {
-    min-height: 0;
-    border: none;
-    border-radius: 0;
-    font-family: "JetBrainsMono Nerd Font";
-    font-size: 12px;
-    font-weight: 500;
-    box-shadow: none;
-    text-shadow: none;
+    all: initial;
 }
 
-window#waybar {
-    background: @window;
-    color: @text;
+* {
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 13px;
+    font-weight: 500;
+    color: @fg;
+}
+
+#waybar {
+    background-color: @shadow;
+}
+
+#waybar > box {
+    margin: 3px;
+    background-color: @bg-0;
+}
+
+.module {
+    margin-bottom: -1px;
+}
+
+button {
+    min-width: 16px;
+    padding: 0 10px;
+    border-radius: 16px;
+}
+
+button:hover {
+    background-color: @hover-bg;
+    color: @hover-fg;
 }
 
 tooltip {
-    background: @window;
-    color: @text;
-    border: 1px solid @border;
-    border-radius: 0;
+    border: 2px solid @border;
+    background-color: @bg-0;
+}
+
+tooltip > box {
+    padding: 0 6px;
 }
 
 tooltip label {
-    color: @text;
-    padding: 4px;
+    font-weight: 400;
 }
 
-#custom-launcher,
-#clock,
-#custom-notification,
-#cpu,
-#memory,
-#custom-temperature,
-#network,
-#bluetooth,
-#custom-power-profile,
-#custom-maintenance,
-#pulseaudio,
-#tray,
-#privacy,
-#custom-power-menu {
-    min-height: 28px;
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    color: @text;
-    border: 0;
-    border-radius: 0;
-}
+/* Left modules */
 
-#custom-launcher {
-    font-size: 15px;
-}
-
-#custom-launcher:hover,
-#clock:hover,
-#custom-notification:hover,
-#cpu:hover,
-#memory:hover,
-#custom-temperature:hover,
-#network:hover,
-#bluetooth:hover,
-#custom-power-profile:hover,
-#custom-maintenance:hover,
-#pulseaudio:hover,
-#custom-power-menu:hover {
-    background: transparent;
-    color: @accent;
-    opacity: 0.82;
+#tray {
+    padding: 0 14px;
 }
 
 #workspaces {
-    margin: 0;
-    padding: 0 5px 0 3px;
-    background: @surface;
+    padding: 0 1px;
+    background-color: @bg-1;
 }
 
-#workspaces button {
-    min-width: 22px;
-    min-height: 22px;
-    margin: 3px 1px;
-    padding: 0;
-    background: transparent;
-    color: @text;
-    border: 0;
-    border-radius: 0;
+#workspaces button.active label,
+#workspaces button.focused label {
+    font-size: 18.75px;
+    color: @accent;
 }
 
-#workspaces button.empty {
-    color: @muted;
+/* Center modules */
+
+#custom-temperature {
+    padding: 0 8px;
+    background-color: @bg-1;
 }
 
-#workspaces button.visible:not(.active) {
-    color: @text;
+#memory {
+    padding: 0 8px;
+    background-color: @bg-2;
 }
 
-#workspaces button.active {
-    background: @accent;
+#cpu {
+    padding: 0 8px;
+    background-color: @bg-3;
+}
+
+#memory.warning,
+#cpu.warning {
+    color: @warning;
+}
+
+#memory.critical,
+#cpu.critical {
+    color: @critical;
+}
+
+#custom-launcher {
+    min-width: 18px;
+    padding: 0 10px 0 8px;
+    background-color: @accent;
     color: @accent-text;
-    font-weight: 700;
+    font-size: 18.75px;
 }
 
-#workspaces button.urgent {
-    background: @critical;
-    color: @window;
-}
-
-#workspaces button:hover {
-    background: @surface-hover;
-    color: @text;
-}
-
-#workspaces button.active:hover {
-    background: @accent-strong;
+#custom-launcher:hover {
+    background-color: @accent-strong;
     color: @accent-text;
 }
 
-#clock.time,
+#clock.time {
+    padding: 0 6px 0 8px;
+    background-color: @bg-3;
+}
+
 #clock.date {
-    font-weight: 700;
+    padding: 0 6px;
+    background-color: @bg-2;
+}
+
+#clock.date:hover {
+    color: @hover-fg;
+}
+
+#network {
+    padding: 0 6px 0 8px;
+    background-color: @bg-1;
+}
+
+#bluetooth {
+    padding: 0 5px;
+    background-color: @bg-1;
 }
 
 #custom-notification {
-    color: @accent;
+    padding: 0 8px 0 4px;
+    background-color: @bg-1;
 }
 
-#cpu,
-#memory,
-#custom-temperature {
-    font-feature-settings: "tnum";
+#network:hover,
+#bluetooth:hover,
+#custom-notification:hover {
+    color: @hover-fg;
 }
 
-#pulseaudio.muted,
-#bluetooth.disabled,
-#bluetooth.off,
 #network.disconnected,
-#network.disabled {
+#network.disabled,
+#bluetooth.disabled,
+#bluetooth.off {
     color: @muted;
 }
 
+/* Right modules */
+
+#pulseaudio {
+    padding: 0 8px;
+    background-color: @bg-1;
+}
+
+#custom-maintenance {
+    padding: 0 8px;
+    background-color: @bg-2;
+}
+
+#custom-power-profile {
+    padding: 0 8px;
+    background-color: @bg-3;
+}
+
+#pulseaudio:hover,
+#pulseaudio.muted,
 #custom-maintenance.updated {
-    color: @muted;
+    color: @hover-fg;
 }
 
 #custom-maintenance.updates {
+    color: @warning;
+}
+
+#custom-power-profile.performance {
     color: @accent;
 }
 
-#tray {
-    min-height: 28px;
-    padding: 0 8px;
-    background: @surface;
+#custom-power-profile.power-saver {
+    color: @success;
 }
 
 #custom-power-menu {
-    color: @accent-text;
+    padding: 0 19px 0 16px;
+    border-radius: 16px;
+    color: @accent;
+    font-size: 16px;
 }
 
 #custom-power-menu:hover {
-    color: @accent-text;
+    background-color: @hover-bg;
+    color: @accent-strong;
+}
+
+/* Powerline dividers */
+
+#custom-left,
+#custom-right {
+    font-size: 19.5px;
+}
+
+#custom-left.accent,
+#custom-right.accent {
+    color: @accent;
+}
+
+#custom-left.bg-1,
+#custom-right.bg-1 {
+    color: @bg-1;
+}
+
+#custom-left.bg-2,
+#custom-right.bg-2 {
+    background-color: @bg-1;
+    color: @bg-2;
+}
+
+#custom-left.bg-3,
+#custom-right.bg-3 {
+    background-color: @bg-2;
+    color: @bg-3;
+}
+
+#custom-left.inverse,
+#custom-right.inverse {
+    color: @bg-3;
 }

@@ -1,59 +1,152 @@
 {
-    "layer": "top",
+    "mode": "dock",
     "position": "top",
-    "height": 28,
+    "layer": "top",
+    "width": 0,
+    "height": 0,
+    "margin": 0,
     "spacing": 0,
-    "margin-top": 0,
-    "margin-right": 0,
-    "margin-bottom": 0,
-    "margin-left": 0,
+    "reload_style_on_change": true,
+
     "modules-left": [
         "tray",
+        "custom/left#bg-1",
         "hyprland/workspaces",
-        "custom/temperature",
-        "memory",
-        "cpu",
-        "custom/launcher"
+        "custom/right#bg-1"
     ],
     "modules-center": [
+        "custom/left#bg-1",
+        "custom/temperature",
+
+        "custom/left#bg-2",
+        "memory",
+
+        "custom/left#bg-3",
+        "cpu",
+        "custom/left#inverse",
+
+        "custom/left#accent",
+        "custom/launcher",
+        "custom/right#accent",
+
+        "custom/right#inverse",
         "clock#time",
-        "clock#date"
-    ],
-    "modules-right": [
+        "custom/right#bg-3",
+
+        "clock#date",
+        "custom/right#bg-2",
+
         "network",
         "bluetooth",
         "custom/notification",
+        "custom/right#bg-1"
+    ],
+    "modules-right": [
+        "custom/left#bg-1",
         "pulseaudio",
+
+        "custom/left#bg-2",
         "custom/maintenance",
+
+        "custom/left#bg-3",
         "custom/power-profile",
+        "custom/left#inverse",
+
         "custom/power-menu"
     ],
 
-    "custom/launcher": {
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰀻 </span>",
-        "tooltip": false,
-        "on-click": "dotfiles-app-launcher-toggle"
+    "tray": {
+        "icon-size": 18,
+        "spacing": 6
     },
     "hyprland/workspaces": {
-        "format": "{id}",
+        "format": "{icon}",
+        "format-icons": {
+            "active": "",
+            "default": ""
+        },
         "persistent-workspaces": {
             "*": [1, 2, 3, 4, 5, 6, 7, 8, 9]
         },
         "sort-by": "number"
     },
+    "custom/temperature": {
+        "exec": "dotfiles-waybar-temperature-status",
+        "return-type": "json",
+        "interval": 5,
+        "min-length": 8,
+        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+    },
+    "memory": {
+        "format": "󰘚 {percentage}%",
+        "format-warning": "󰀧 {percentage}%",
+        "format-critical": "󰀧 {percentage}%",
+        "states": {
+            "warning": 75,
+            "critical": 90
+        },
+        "interval": 2,
+        "min-length": 8,
+        "tooltip-format": "Memory: {percentage}%",
+        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+    },
+    "cpu": {
+        "format": "󰍛 {usage}%",
+        "format-warning": "󰀨 {usage}%",
+        "format-critical": "󰀨 {usage}%",
+        "states": {
+            "warning": 75,
+            "critical": 90
+        },
+        "interval": 2,
+        "min-length": 8,
+        "tooltip-format": "CPU: {usage}%",
+        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+    },
+    "custom/launcher": {
+        "format": "󰀻",
+        "tooltip": false,
+        "on-click": "dotfiles-app-launcher-toggle"
+    },
     "clock#time": {
-        "format": "<span background='#ffbe6f' foreground='#222226'> {:%I:%M %p} </span><span foreground='#ffbe6f'></span>",
+        "format": "{:%I:%M %p}",
+        "min-length": 8,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "clock#date": {
-        "format": "<span background='#38383c'> {:%a %d %b} </span><span foreground='#38383c'></span>",
+        "format": "󰸗 {:%a %d %b}",
+        "min-length": 13,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
+    "network": {
+        "interval": 2,
+        "format-wifi": "{icon}",
+        "format-ethernet": "󰈀",
+        "format-linked": "󰈀",
+        "format-disconnected": "󰤭",
+        "format-disabled": "󰤭",
+        "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
+        "tooltip-format-ethernet": "Ethernet\n{ipaddr}",
+        "tooltip-format-disconnected": "Offline",
+        "on-click": "foot --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
+    },
+    "bluetooth": {
+        "format": "󰂯",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "format-on": "󰂯",
+        "format-connected": "󰂱 {num_connections}",
+        "tooltip-format": "Bluetooth: {status}",
+        "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "foot --app-id=bluetooth-tui --title='Bluetooth' --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui"
+    },
     "custom/notification": {
         "tooltip": false,
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> {icon} {text} </span>",
+        "format": "{icon} {text}",
         "format-icons": {
             "notification": "󰂚",
             "none": "󰂚",
@@ -71,92 +164,75 @@
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"
     },
-    "cpu": {
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰍛 {usage}% </span>",
-        "interval": 2,
-        "tooltip-format": "CPU: {usage}%",
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
-    },
-    "memory": {
-        "format": "<span foreground='#38383c'></span><span background='#38383c'>  {percentage}% </span>",
-        "interval": 2,
-        "tooltip-format": "Memory: {percentage}%",
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
-    },
-    "custom/temperature": {
-        "exec": "dotfiles-waybar-temperature-status",
-        "return-type": "json",
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
-        "interval": 5,
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
-    },
     "pulseaudio": {
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> {icon} {volume}% </span>",
-        "format-muted": "<span foreground='#38383c'></span><span background='#38383c'> 󰖁 {volume}% </span>",
+        "format": "{icon} {volume}%",
+        "format-muted": "󰖁 {volume}%",
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
         },
+        "min-length": 8,
         "scroll-step": 5,
         "on-click": "foot --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
-    },
-    "bluetooth": {
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰂯 </span>",
-        "format-disabled": "<span foreground='#38383c'></span><span background='#38383c'> 󰂲 </span>",
-        "format-off": "<span foreground='#38383c'></span><span background='#38383c'> 󰂲 </span>",
-        "format-on": "<span foreground='#38383c'></span><span background='#38383c'> 󰂯 </span>",
-        "format-connected": "<span foreground='#38383c'></span><span background='#38383c'> 󰂱 {num_connections} </span>",
-        "tooltip-format": "Bluetooth: {status}",
-        "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
-        "tooltip-format-enumerate-connected": "{device_alias}",
-        "on-click": "foot --app-id=bluetooth-tui --title='Bluetooth' --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui"
-    },
-    "network": {
-        "interval": 2,
-        "format-wifi": "<span foreground='#38383c'></span><span background='#38383c'> {icon} </span>",
-        "format-ethernet": "<span foreground='#38383c'></span><span background='#38383c'> 󰈀 </span>",
-        "format-linked": "<span foreground='#38383c'></span><span background='#38383c'> 󰈀 </span>",
-        "format-disconnected": "<span foreground='#38383c'></span><span background='#38383c'> 󰤭 </span>",
-        "format-disabled": "<span foreground='#38383c'></span><span background='#38383c'> 󰤭 </span>",
-        "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
-        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
-        "tooltip-format-ethernet": "Ethernet\n{ipaddr}",
-        "tooltip-format-disconnected": "Offline",
-        "on-click": "foot --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
-    },
-    "custom/power-profile": {
-        "exec": "dotfiles-waybar-power-status",
-        "return-type": "json",
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
-        "interval": 5,
-        "on-click": "foot --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
-    },
-    "custom/power-menu": {
-        "format": "<span foreground='#ffbe6f'></span><span background='#ffbe6f'> 󰐥 </span>",
-        "tooltip": false,
-        "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
     },
     "custom/maintenance": {
         "exec": "dotfiles-waybar-maintenance-status",
         "return-type": "json",
-        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
         "interval": 300,
         "signal": 8,
+        "min-length": 5,
         "on-click": "foot --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui"
     },
-    "tray": {
-        "icon-size": 18,
-        "spacing": 6
+    "custom/power-profile": {
+        "exec": "dotfiles-waybar-power-status",
+        "return-type": "json",
+        "interval": 5,
+        "min-length": 5,
+        "on-click": "foot --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
     },
-    "privacy": {
-        "icon-spacing": 4,
-        "icon-size": 16,
-        "transition-duration": 250,
-        "modules": [
-            {
-                "type": "screenshare",
-                "tooltip": true,
-                "tooltip-icon-size": 24
-            }
-        ]
+    "custom/power-menu": {
+        "format": "󰐥",
+        "tooltip": false,
+        "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
+    },
+
+    "custom/left#accent": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/left#bg-1": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/left#bg-2": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/left#bg-3": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/left#inverse": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/right#accent": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/right#bg-1": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/right#bg-2": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/right#bg-3": {
+        "format": "",
+        "tooltip": false
+    },
+    "custom/right#inverse": {
+        "format": "",
+        "tooltip": false
     }
 }
