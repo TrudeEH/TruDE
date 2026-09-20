@@ -1,12 +1,12 @@
 @define-color shadow #1d1d20;
 @define-color bg-0 #222226;
-@define-color bg-1 #2e2e32;
-@define-color bg-2 #38383c;
-@define-color bg-3 #3d3846;
+@define-color bg-1 #28282c;
+@define-color bg-2 #2e2e32;
+@define-color bg-3 #38383c;
 @define-color fg #ffffff;
 @define-color muted #aaaaaa;
 @define-color border #77767b;
-@define-color hover-bg #5e5c64;
+@define-color hover-bg #46464b;
 @define-color hover-fg rgba(255, 255, 255, 0.75);
 @define-color accent #ffbe6f;
 @define-color accent-strong #ffa348;
@@ -77,6 +77,10 @@ tooltip label {
 #workspaces button.active label,
 #workspaces button.focused label {
     font-size: 18.75px;
+    color: @accent;
+}
+
+#workspaces button.visible:not(.active) label {
     color: @accent;
 }
 
