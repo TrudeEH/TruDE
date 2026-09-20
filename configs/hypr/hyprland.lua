@@ -30,11 +30,11 @@ hl.monitor({
 })
 
 local configHome = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
-local monitorOverrides = configHome .. "/hypr/monitors.local.lua"
-local monitorOverridesFile = io.open(monitorOverrides, "r")
-if monitorOverridesFile then
-    monitorOverridesFile:close()
-    dofile(monitorOverrides)
+local localSettings = configHome .. "/hypr/settings.local.lua"
+local localSettingsFile = io.open(localSettings, "r")
+if localSettingsFile then
+    localSettingsFile:close()
+    dofile(localSettings)
 end
 
 
@@ -273,6 +273,9 @@ hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal), { description = "Open
 hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("foot --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
     description = "Show Hyprland shortcuts",
 })
+hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("foot --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui"), {
+    description = "Open settings",
+})
 local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"), { description = "Exit Hyprland" })
@@ -454,6 +457,14 @@ hl.window_rule({
 hl.window_rule({
     name  = "shortcuts-tui",
     match = { class = "shortcuts-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "settings-tui",
+    match = { class = "settings-tui" },
 
     float  = true,
     center = true,

@@ -213,6 +213,7 @@ link_configs() {
     link_config "$repo_dir/scripts/hypr/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
     link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/tui/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
+    link_config "$repo_dir/scripts/tui/settings-tui" "$HOME/.local/bin/dotfiles-settings-tui"
     link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"

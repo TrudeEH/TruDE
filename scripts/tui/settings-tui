@@ -1,0 +1,361 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+settings_dir=$config_home/hypr
+settings_file=$settings_dir/settings.local.lua
+begin_marker='-- dotfiles-monitor-settings:begin'
+end_marker='-- dotfiles-monitor-settings:end'
+temp_dir=$(mktemp -d)
+state_file=$temp_dir/monitors.json
+monitor_block=$temp_dir/monitor-settings.lua
+new_settings=$temp_dir/settings.local.lua
+trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
+
+dialog() {
+    whiptail --title "Settings" "$@"
+}
+
+message() {
+    dialog --msgbox "$1" 10 68
+}
+
+load_monitors() {
+    if ! monitors=$(hyprctl monitors all -j 2>/dev/null); then
+        message "Unable to read monitors from Hyprland."
+        exit 1
+    fi
+    if ! printf '%s\n' "$monitors" | jq '
+        map({
+            name,
+            description: (.description // .name),
+            enabled: ((.disabled // false) | not),
+            mode: (
+                if (.disabled // false) then
+                    "preferred"
+                else
+                    "\(.width)x\(.height)@\((.refreshRate * 100 | round) / 100)"
+                end
+            ),
+            x: (.x // 0),
+            y: (.y // 0),
+            scale: ((.scale // 1) | tostring),
+            transform: (.transform // 0),
+            availableModes: ([.availableModes[]? | sub("Hz$"; "")] | unique)
+        })
+    ' > "$state_file"; then
+        message "Unable to read monitors from Hyprland."
+        exit 1
+    fi
+
+    if [ "$(jq 'length' "$state_file")" -eq 0 ]; then
+        message "Hyprland did not report any monitors."
+        exit 1
+    fi
+}
+
+is_integer() {
+    integer=$1
+    case $integer in
+        -*) integer=${integer#-} ;;
+    esac
+    case $integer in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+monitor_value() {
+    monitor_name=$1
+    monitor_field=$2
+    jq -r --arg name "$monitor_name" --arg field "$monitor_field" \
+        '.[] | select(.name == $name) | .[$field]' "$state_file"
+}
+
+replace_state() {
+    jq "$@" "$state_file" > "$state_file.new" && mv "$state_file.new" "$state_file"
+}
+
+choose_mode() {
+    monitor_name=$1
+    current_mode=$(monitor_value "$monitor_name" mode)
+    modes=$(jq -r --arg name "$monitor_name" --arg current "$current_mode" '
+        .[] | select(.name == $name) |
+        ([$current, "preferred", "highrr", "highres"] + .availableModes) | unique[]
+    ' "$state_file")
+
+    set --
+    while IFS= read -r mode; do
+        if [ "$mode" = "$current_mode" ]; then
+            selected=ON
+        else
+            selected=OFF
+        fi
+        set -- "$@" "$mode" "" "$selected"
+    done <<EOF
+$modes
+EOF
+
+    mode=$(dialog --radiolist "Choose the display mode" 22 72 14 "$@" \
+        3>&1 1>&2 2>&3) || return
+    replace_state --arg name "$monitor_name" --arg mode "$mode" \
+        'map(if .name == $name then .mode = $mode else . end)'
+}
+
+choose_position() {
+    monitor_name=$1
+    current_x=$(monitor_value "$monitor_name" x)
+    current_y=$(monitor_value "$monitor_name" y)
+    position=$(dialog --form "Set the display position in logical pixels" 13 64 4 \
+        "X" 1 1 "$current_x" 1 14 14 0 \
+        "Y" 2 1 "$current_y" 2 14 14 0 \
+        3>&1 1>&2 2>&3) || return
+    position_x=$(printf '%s\n' "$position" | sed -n '1p')
+    position_y=$(printf '%s\n' "$position" | sed -n '2p')
+
+    if ! is_integer "$position_x" || ! is_integer "$position_y"; then
+        message "Positions must be whole numbers."
+        return
+    fi
+
+    replace_state --arg name "$monitor_name" \
+        --argjson x "$position_x" --argjson y "$position_y" \
+        'map(if .name == $name then .x = $x | .y = $y else . end)'
+}
+
+choose_scale() {
+    monitor_name=$1
+    current_scale=$(monitor_value "$monitor_name" scale)
+    scale=$(dialog --inputbox "Set scale (for example: 1, 1.25, 1.5, 2, or auto)" \
+        10 68 "$current_scale" 3>&1 1>&2 2>&3) || return
+
+    if [ "$scale" != auto ] && ! printf '%s\n' "$scale" | awk '
+        /^[0-9]+([.][0-9]+)?$/ && $1 > 0 { valid=1 }
+        END { exit !valid }
+    '; then
+        message "Scale must be a positive number or auto."
+        return
+    fi
+
+    replace_state --arg name "$monitor_name" --arg scale "$scale" \
+        'map(if .name == $name then .scale = $scale else . end)'
+}
+
+choose_rotation() {
+    monitor_name=$1
+    current_transform=$(monitor_value "$monitor_name" transform)
+    set -- \
+        0 "Normal" \
+        1 "90° clockwise" \
+        2 "180°" \
+        3 "270° clockwise" \
+        4 "Flipped" \
+        5 "Flipped 90° clockwise" \
+        6 "Flipped 180°" \
+        7 "Flipped 270° clockwise"
+    transform=$(dialog --menu "Choose the display rotation" 20 72 10 "$@" \
+        3>&1 1>&2 2>&3) || return
+    replace_state --arg name "$monitor_name" --argjson transform "$transform" \
+        'map(if .name == $name then .transform = $transform else . end)'
+}
+
+toggle_monitor() {
+    monitor_name=$1
+    enabled=$(monitor_value "$monitor_name" enabled)
+    if [ "$enabled" = true ] && [ "$(jq '[.[] | select(.enabled)] | length' "$state_file")" -le 1 ]; then
+        message "At least one monitor must remain enabled."
+        return
+    fi
+    replace_state --arg name "$monitor_name" \
+        'map(if .name == $name then .enabled = (.enabled | not) else . end)'
+}
+
+make_primary() {
+    monitor_name=$1
+    old_x=$(monitor_value "$monitor_name" x)
+    old_y=$(monitor_value "$monitor_name" y)
+    replace_state --arg name "$monitor_name" --argjson old_x "$old_x" --argjson old_y "$old_y" '
+        map(
+            if .name == $name then
+                .x = 0 | .y = 0 | .enabled = true
+            elif .enabled and .x == 0 and .y == 0 then
+                .x = $old_x | .y = $old_y
+            else
+                .
+            end
+        )
+    '
+}
+
+edit_monitor() {
+    monitor_name=$1
+    while :; do
+        enabled=$(monitor_value "$monitor_name" enabled)
+        mode=$(monitor_value "$monitor_name" mode)
+        position_x=$(monitor_value "$monitor_name" x)
+        position_y=$(monitor_value "$monitor_name" y)
+        scale=$(monitor_value "$monitor_name" scale)
+        transform=$(monitor_value "$monitor_name" transform)
+        if [ "$enabled" = true ]; then status=Enabled; else status=Disabled; fi
+
+        action=$(dialog --menu "$monitor_name — $status" 20 76 9 \
+            status "Enable or disable this display" \
+            mode "Mode: $mode" \
+            position "Position: ${position_x}x${position_y}" \
+            scale "Scale: $scale" \
+            rotation "Transform: $transform" \
+            primary "Make primary (position 0x0)" \
+            back "Back to displays" \
+            3>&1 1>&2 2>&3) || return
+
+        case $action in
+            status) toggle_monitor "$monitor_name" ;;
+            mode) choose_mode "$monitor_name" ;;
+            position) choose_position "$monitor_name" ;;
+            scale) choose_scale "$monitor_name" ;;
+            rotation) choose_rotation "$monitor_name" ;;
+            primary) make_primary "$monitor_name" ;;
+            back) return ;;
+        esac
+    done
+}
+
+write_monitor_block() {
+    {
+        printf '%s\n' "$begin_marker"
+        jq -r '.[] |
+            if .enabled then
+                "hl.monitor({\n" +
+                "    output = " + (.name | @json) + ",\n" +
+                "    mode = " + (.mode | @json) + ",\n" +
+                "    position = " + ((.x | tostring) + "x" + (.y | tostring) | @json) + ",\n" +
+                "    scale = " + (if .scale == "auto" then "\"auto\"" else .scale end) + ",\n" +
+                "    transform = " + (.transform | tostring) + ",\n" +
+                "})\n"
+            else
+                "hl.monitor({\n" +
+                "    output = " + (.name | @json) + ",\n" +
+                "    disabled = true,\n" +
+                "})\n"
+            end
+        ' "$state_file"
+        printf '%s\n' "$end_marker"
+    } > "$monitor_block"
+}
+
+save_settings() {
+    mkdir -p "$settings_dir"
+    write_monitor_block
+
+    has_begin=false
+    has_end=false
+    if [ -f "$settings_file" ]; then
+        grep -Fqx -e "$begin_marker" "$settings_file" && has_begin=true
+        grep -Fqx -e "$end_marker" "$settings_file" && has_end=true
+    fi
+    if [ "$has_begin" != "$has_end" ]; then
+        message "The monitor section in settings.local.lua is incomplete. No changes were saved."
+        return 1
+    fi
+
+    if [ "$has_begin" = true ]; then
+        awk -v marker="$begin_marker" '$0 == marker { exit } { print }' \
+            "$settings_file" > "$new_settings"
+        cat "$monitor_block" >> "$new_settings"
+        awk -v marker="$end_marker" 'found { print } $0 == marker { found=1 }' \
+            "$settings_file" >> "$new_settings"
+    else
+        if [ -f "$settings_file" ]; then
+            cat "$settings_file" > "$new_settings"
+            printf '\n' >> "$new_settings"
+        fi
+        cat "$monitor_block" >> "$new_settings"
+    fi
+
+    if command -v luac >/dev/null 2>&1 && ! luac -p "$new_settings"; then
+        message "The generated settings file is not valid Lua. No changes were saved."
+        return 1
+    fi
+
+    if [ -f "$settings_file" ]; then
+        cp "$settings_file" "$settings_file.backup"
+    fi
+    chmod 600 "$new_settings"
+    mv "$new_settings" "$settings_file"
+
+    if output=$(hyprctl reload 2>&1); then
+        systemctl --user try-restart waybar.service >/dev/null 2>&1 || :
+        message "Display settings saved and applied."
+    else
+        message "Settings were saved, but Hyprland could not reload them:\n\n$output"
+        return 1
+    fi
+}
+
+display_settings() {
+    while :; do
+        monitor_list=$(jq -r '.[] |
+            [
+                .name,
+                ((if .enabled then "enabled" else "disabled" end) +
+                " — " + .description +
+                (if .enabled then
+                    " — " + .mode + " at " + (.x | tostring) + "x" + (.y | tostring) +
+                    " — scale " + .scale
+                else "" end))
+            ] | @tsv
+        ' "$state_file")
+
+        set --
+        while IFS="$(printf '\t')" read -r monitor_name summary; do
+            [ -n "$monitor_name" ] || continue
+            set -- "$@" "$monitor_name" "$summary"
+        done <<EOF
+$monitor_list
+EOF
+        set -- "$@" save "Save and apply" discard "Discard changes"
+
+        choice=$(dialog --menu "Configure displays" 23 108 14 "$@" \
+            3>&1 1>&2 2>&3) || return
+        case $choice in
+            save) save_settings && return ;;
+            discard) return ;;
+            *) edit_monitor "$choice" ;;
+        esac
+    done
+}
+
+load_monitors
+while :; do
+    section=$(dialog --menu "Choose a settings section" 15 68 6 \
+        displays "Monitor layout, modes, scale, and rotation" \
+        close "Close settings" \
+        3>&1 1>&2 2>&3) || exit 0
+    case $section in
+        displays) display_settings ;;
+        close) exit 0 ;;
+    esac
+done
