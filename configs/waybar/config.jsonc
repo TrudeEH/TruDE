@@ -8,27 +8,29 @@
     "margin-bottom": 0,
     "margin-left": 0,
     "modules-left": [
-        "custom/launcher",
-        "hyprland/workspaces"
+        "tray",
+        "hyprland/workspaces",
+        "custom/temperature",
+        "memory",
+        "cpu",
+        "custom/launcher"
     ],
     "modules-center": [
-        "clock",
-        "custom/notification"
+        "clock#time",
+        "clock#date"
     ],
     "modules-right": [
-        "group/system-status",
         "network",
         "bluetooth",
-        "custom/power-profile",
-        "custom/maintenance",
+        "custom/notification",
         "pulseaudio",
-        "tray",
-        "privacy",
+        "custom/maintenance",
+        "custom/power-profile",
         "custom/power-menu"
     ],
 
     "custom/launcher": {
-        "format": "󰀻",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰀻 </span>",
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
     },
@@ -39,21 +41,26 @@
         },
         "sort-by": "number"
     },
-    "clock": {
-        "format": "{:%a %d %b  %I:%M %p}",
+    "clock#time": {
+        "format": "<span background='#ffbe6f' foreground='#222226'> {:%I:%M %p} </span><span foreground='#ffbe6f'></span>",
+        "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
+    },
+    "clock#date": {
+        "format": "<span background='#38383c'> {:%a %d %b} </span><span foreground='#38383c'></span>",
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "custom/notification": {
         "tooltip": false,
-        "format": "{icon} {text}",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> {icon} {text} </span>",
         "format-icons": {
             "notification": "󰂚",
-            "none": "",
+            "none": "󰂚",
             "dnd-notification": "󱏨",
             "dnd-none": "󰂛",
             "inhibited-notification": "󰂚",
-            "inhibited-none": "",
+            "inhibited-none": "󰂚",
             "dnd-inhibited-notification": "󱏨",
             "dnd-inhibited-none": "󰂛"
         },
@@ -64,18 +71,14 @@
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"
     },
-    "group/system-status": {
-        "orientation": "horizontal",
-        "modules": ["cpu", "memory", "custom/temperature"]
-    },
     "cpu": {
-        "format": "󰍛 {usage}%",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰍛 {usage}% </span>",
         "interval": 2,
         "tooltip-format": "CPU: {usage}%",
         "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "memory": {
-        "format": " {percentage}%",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'>  {percentage}% </span>",
         "interval": 2,
         "tooltip-format": "Memory: {percentage}%",
         "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
@@ -83,12 +86,13 @@
     "custom/temperature": {
         "exec": "dotfiles-waybar-temperature-status",
         "return-type": "json",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
         "interval": 5,
         "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "pulseaudio": {
-        "format": "{icon}  {volume}%",
-        "format-muted": "󰖁  {volume}%",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> {icon} {volume}% </span>",
+        "format-muted": "<span foreground='#38383c'></span><span background='#38383c'> 󰖁 {volume}% </span>",
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
         },
@@ -96,11 +100,11 @@
         "on-click": "foot --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
     },
     "bluetooth": {
-        "format": "󰂯",
-        "format-disabled": "󰂲",
-        "format-off": "󰂲",
-        "format-on": "󰂯",
-        "format-connected": "󰂱  {num_connections}",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> 󰂯 </span>",
+        "format-disabled": "<span foreground='#38383c'></span><span background='#38383c'> 󰂲 </span>",
+        "format-off": "<span foreground='#38383c'></span><span background='#38383c'> 󰂲 </span>",
+        "format-on": "<span foreground='#38383c'></span><span background='#38383c'> 󰂯 </span>",
+        "format-connected": "<span foreground='#38383c'></span><span background='#38383c'> 󰂱 {num_connections} </span>",
         "tooltip-format": "Bluetooth: {status}",
         "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias}",
@@ -108,11 +112,11 @@
     },
     "network": {
         "interval": 2,
-        "format-wifi": "{icon}",
-        "format-ethernet": "󰈀",
-        "format-linked": "󰈀",
-        "format-disconnected": "󰤭",
-        "format-disabled": "󰤭",
+        "format-wifi": "<span foreground='#38383c'></span><span background='#38383c'> {icon} </span>",
+        "format-ethernet": "<span foreground='#38383c'></span><span background='#38383c'> 󰈀 </span>",
+        "format-linked": "<span foreground='#38383c'></span><span background='#38383c'> 󰈀 </span>",
+        "format-disconnected": "<span foreground='#38383c'></span><span background='#38383c'> 󰤭 </span>",
+        "format-disabled": "<span foreground='#38383c'></span><span background='#38383c'> 󰤭 </span>",
         "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
         "tooltip-format-ethernet": "Ethernet\n{ipaddr}",
@@ -122,17 +126,19 @@
     "custom/power-profile": {
         "exec": "dotfiles-waybar-power-status",
         "return-type": "json",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
         "interval": 5,
         "on-click": "foot --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
     },
     "custom/power-menu": {
-        "format": "󰐥",
+        "format": "<span foreground='#ffbe6f'></span><span background='#ffbe6f'> 󰐥 </span>",
         "tooltip": false,
         "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
     },
     "custom/maintenance": {
         "exec": "dotfiles-waybar-maintenance-status",
         "return-type": "json",
+        "format": "<span foreground='#38383c'></span><span background='#38383c'> {text} </span>",
         "interval": 300,
         "signal": 8,
         "on-click": "foot --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui"

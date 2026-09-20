@@ -51,9 +51,9 @@ tooltip label {
 #tray,
 #privacy,
 #custom-power-menu {
-    min-height: 26px;
-    margin: 0 1px;
-    padding: 0 7px;
+    min-height: 28px;
+    margin: 0;
+    padding: 0;
     background: transparent;
     color: @text;
     border: 0;
@@ -61,9 +61,6 @@ tooltip label {
 }
 
 #custom-launcher {
-    min-width: 28px;
-    margin: 0;
-    padding: 0;
     font-size: 15px;
 }
 
@@ -81,72 +78,68 @@ tooltip label {
 #custom-power-menu:hover {
     background: transparent;
     color: @accent;
+    opacity: 0.82;
 }
 
 #workspaces {
-    margin: 1px 0;
-    background: transparent;
+    margin: 0;
+    padding: 0 5px 0 3px;
+    background: @surface;
 }
 
 #workspaces button {
-    min-width: 24px;
-    min-height: 24px;
-    margin: 0 1px 0 0;
+    min-width: 22px;
+    min-height: 22px;
+    margin: 3px 1px;
     padding: 0;
-    background: @surface;
+    background: transparent;
     color: @text;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: 0;
 }
 
 #workspaces button.empty {
-    background: @window;
+    color: @muted;
 }
 
 #workspaces button.visible:not(.active) {
-    background: @surface;
-    border-color: @accent;
+    color: @text;
 }
 
 #workspaces button.active {
     background: @accent;
     color: @accent-text;
-    border-color: @accent;
     font-weight: 700;
 }
 
 #workspaces button.urgent {
-    border-color: @critical;
+    background: @critical;
+    color: @window;
 }
 
 #workspaces button:hover {
     background: @surface-hover;
     color: @text;
-    border-color: @border;
 }
 
 #workspaces button.active:hover {
     background: @accent-strong;
     color: @accent-text;
-    border-color: @accent-strong;
 }
 
-#clock {
-    padding-right: 4px;
+#clock.time,
+#clock.date {
+    font-weight: 700;
 }
 
 #custom-notification {
-    padding-left: 4px;
     color: @accent;
 }
 
 #cpu,
 #memory,
 #custom-temperature {
-    padding-left: 4px;
-    padding-right: 4px;
-    margin-left: 1px;
-    margin-right: 1px;
+    font-feature-settings: "tnum";
 }
 
 #pulseaudio.muted,
@@ -166,21 +159,15 @@ tooltip label {
 }
 
 #tray {
-    padding-left: 8px;
-    padding-right: 8px;
-}
-
-#privacy {
-    min-width: 18px;
-    padding-left: 4px;
-    padding-right: 4px;
-    color: @critical;
-}
-
-#privacy-item.screenshare {
-    color: @critical;
+    min-height: 28px;
+    padding: 0 8px;
+    background: @surface;
 }
 
 #custom-power-menu {
-    padding-right: 10px;
+    color: @accent-text;
+}
+
+#custom-power-menu:hover {
+    color: @accent-text;
 }
