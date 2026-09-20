@@ -73,7 +73,16 @@ rebuild_cache() {
 
 cache_is_fresh || rebuild_cache
 
-selection=$(fzf \
+selection=$(awk -F '\t' '
+    BEGIN {
+        OFS = "\t"
+        muted = "\033[38;2;170;170;170m"
+        reset = "\033[0m"
+    }
+    $2 != "" { $2 = muted $2 reset }
+    { print }
+' "$cache_file" | fzf \
+    --ansi \
     --delimiter='\t' \
     --with-nth=1,2 \
     --nth=1,2 \
@@ -87,8 +96,7 @@ selection=$(fzf \
     --layout=reverse \
     --no-multi \
     --cycle \
-    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
-    < "$cache_file") || exit 0
+    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa') || exit 0
 
 desktop_file=$(printf '%s\n' "$selection" | awk -F '\t' '{ print $NF }')
 [ -f "$desktop_file" ] || exit 1
