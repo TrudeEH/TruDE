@@ -113,6 +113,7 @@ load_preferences() {
         {
             input: {
                 keyboard_layout: "us",
+                keyboard_variant: "altgr-intl",
                 natural_scroll: false,
                 tap_to_click: true,
                 sensitivity: 0,
@@ -220,6 +221,7 @@ write_preferences_block() {
             "dotfilesSettings.gapsOut = " + (.appearance.gaps_out | tostring) + "\n" +
             "dotfilesSettings.borderSize = " + (.appearance.border_size | tostring) + "\n" +
             "dotfilesSettings.keyboardLayout = " + (.input.keyboard_layout | @json) + "\n" +
+            "dotfilesSettings.keyboardVariant = " + (.input.keyboard_variant | @json) + "\n" +
             "dotfilesSettings.naturalScroll = " + (.input.natural_scroll | tostring) + "\n" +
             "dotfilesSettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
             "dotfilesSettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
@@ -496,6 +498,7 @@ EOF
 
 choose_keyboard_layout() {
     current_layout=$1
+    current_variant=$2
     rules_file=
     for candidate in /usr/share/X11/xkb/rules/evdev.lst /usr/share/X11/xkb/rules/base.lst; do
         if [ -r "$candidate" ]; then
@@ -515,34 +518,57 @@ choose_keyboard_layout() {
             layout=$1
             $1=""
             sub(/^[[:space:]]+/, "")
-            print "󰌌 " layout "\t" $0
+            print "󰌌 " layout "\t" $0 "\t" layout "\t"
         }
     ' "$rules_file")
+    variants=$(awk '
+        /^! variant/ { in_variants=1; next }
+        /^!/ { if (in_variants) exit }
+        in_variants && NF >= 3 {
+            variant=$1
+            layout=$2
+            sub(/:$/, "", layout)
+            $1=""
+            $2=""
+            sub(/^[[:space:]]+/, "")
+            print "󰌌 " layout "+" variant "\t" $0 "\t" layout "\t" variant
+        }
+    ' "$rules_file")
+    choices=$(printf '%s\n%s\n' "$layouts" "$variants")
 
     if ! command -v fzf >/dev/null 2>&1; then
         message "fzf is required to search keyboard layouts."
         return 1
     fi
-    choice=$(printf '%s\n' "$layouts" | fzf \
+    if [ -n "$current_variant" ]; then
+        current_selection=$current_layout+$current_variant
+    else
+        current_selection=$current_layout
+    fi
+    choice=$(printf '%s\n' "$choices" | fzf \
         --no-multi \
         --cycle \
         --layout=reverse \
         --border \
+        --delimiter='\t' \
+        --with-nth=1,2 \
         --prompt='Keyboard layout  ' \
-        --header="Current: $current_layout — type to search, Enter to select" \
+        --header="Current: $current_selection — type to search, Enter to select" \
         --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,info:#aaaaaa,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,spinner:#ffbe6f,header:#aaaaaa,border:#77767b') || return 1
-    printf '%s\n' "$choice" | awk '{ print $2 }'
+    printf '%s\n' "$choice" | awk -F '\t' '{ print $3 "|" $4 }'
 }
 
 input_settings() {
     while :; do
         layout=$(preference '.input.keyboard_layout')
+        variant=$(preference '.input.keyboard_variant')
+        if [ -n "$variant" ]; then layout_label=$layout+$variant; else layout_label=$layout; fi
         natural=$(boolean_label "$(preference '.input.natural_scroll')")
         tap=$(boolean_label "$(preference '.input.tap_to_click')")
         sensitivity=$(preference '.input.sensitivity')
         accel=$(preference '.input.accel_profile')
         action=$(dialog --menu "Input settings" 20 82 10 \
-            "󰌌 layout" "Keyboard layout: $layout" \
+            "󰌌 layout" "Keyboard layout: $layout_label" \
             "󰍽 natural-scroll" "Touchpad natural scrolling: $natural" \
             "󰹑 tap-to-click" "Touchpad tap-to-click: $tap" \
             "󰇀 sensitivity" "Pointer sensitivity: $sensitivity" \
@@ -551,8 +577,13 @@ input_settings() {
             3>&1 1>&2 2>&3) || return
         case $action in
             *" layout")
-                value=$(choose_keyboard_layout "$layout") || continue
-                replace_preferences --arg value "$value" '.input.keyboard_layout = $value'
+                value=$(choose_keyboard_layout "$layout" "$variant") || continue
+                selected_layout=${value%%|*}
+                selected_variant=${value#*|}
+                replace_preferences \
+                    --arg layout "$selected_layout" \
+                    --arg variant "$selected_variant" \
+                    '.input.keyboard_layout = $layout | .input.keyboard_variant = $variant'
                 save_preferences
                 ;;
             *" natural-scroll") toggle_preference '.input.natural_scroll' ;;

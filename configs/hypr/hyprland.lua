@@ -28,6 +28,7 @@ dotfilesSettings = {
     gapsOut            = 10,
     borderSize         = 2,
     keyboardLayout     = "us",
+    keyboardVariant    = "altgr-intl",
     naturalScroll      = false,
     tapToClick         = true,
     sensitivity        = 0,
@@ -260,7 +261,7 @@ hl.config({
 hl.config({
     input = {
         kb_layout  = dotfilesSettings.keyboardLayout,
-        kb_variant = "",
+        kb_variant = dotfilesSettings.keyboardVariant,
         kb_model   = "",
         kb_options = "",
         kb_rules   = "",
