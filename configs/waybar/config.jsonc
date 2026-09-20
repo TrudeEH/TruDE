@@ -41,6 +41,7 @@
     ],
     "modules-right": [
         "custom/left#bg-1",
+        "privacy",
         "pulseaudio",
 
         "custom/left#bg-2",
@@ -177,12 +178,21 @@
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
         },
-        "states": {
-            "overamplified": 101
-        },
         "min-length": 8,
         "scroll-step": 5,
         "on-click": "foot --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
+    },
+    "privacy": {
+        "icon-spacing": 0,
+        "icon-size": 8,
+        "transition-duration": 250,
+        "modules": [
+            {
+                "type": "screenshare",
+                "tooltip": true,
+                "tooltip-icon-size": 24
+            }
+        ]
     },
     "custom/maintenance": {
         "exec": "dotfiles-waybar-maintenance-status",
