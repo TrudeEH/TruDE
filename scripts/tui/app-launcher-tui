@@ -79,8 +79,23 @@ selection=$(awk -F '\t' '
         muted = "\033[38;2;170;170;170m"
         reset = "\033[0m"
     }
-    $2 != "" { $2 = muted $2 reset }
-    { print }
+    {
+        names[NR] = $1
+        descriptions[NR] = $2
+        desktop_files[NR] = $3
+        if (length($1) > name_width) {
+            name_width = length($1)
+        }
+    }
+    END {
+        for (row = 1; row <= NR; row++) {
+            description = descriptions[row]
+            if (description != "") {
+                description = muted description reset
+            }
+            printf "%-*s\t%s\t%s\n", name_width + 2, names[row], description, desktop_files[row]
+        }
+    }
 ' "$cache_file" | fzf \
     --ansi \
     --delimiter='\t' \
