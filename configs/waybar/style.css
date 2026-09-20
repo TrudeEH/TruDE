@@ -141,7 +141,7 @@ tooltip label {
 }
 
 #custom-launcher.screensharing {
-    padding: 0 7px 0 11px;
+    padding: 0 10px 0 5px;
     background-color: @critical;
 }
 
