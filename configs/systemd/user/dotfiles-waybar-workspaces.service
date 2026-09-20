@@ -1,0 +1,12 @@
+[Unit]
+Description=Update Waybar from Hyprland workspace events
+PartOf=graphical-session.target
+After=waybar.service
+
+[Service]
+ExecStart=%h/.local/bin/dotfiles-waybar-workspace-events
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=graphical-session.target

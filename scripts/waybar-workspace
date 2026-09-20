@@ -29,6 +29,7 @@ refresh_cache() {
             attempts=$((attempts + 1))
         done
         [ -f "$cache_file" ] && return 0
+        rmdir "$lock_dir" 2>/dev/null || return 1
         mkdir "$lock_dir" 2>/dev/null || return 1
     fi
 
@@ -60,8 +61,6 @@ valid_workspace "$requested_workspace" || exit 1
 case $action in
     focus)
         hyprctl dispatch "hl.dsp.focus({ workspace = $requested_workspace })" >/dev/null 2>&1 || exit 1
-        rm -f "$cache_file"
-        pkill -RTMIN+7 waybar 2>/dev/null || :
         ;;
     status)
         refresh_cache || exit 1

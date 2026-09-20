@@ -1,7 +1,7 @@
 {
     "layer": "top",
     "position": "top",
-    "height": 34,
+    "height": 28,
     "spacing": 0,
     "margin-top": 0,
     "margin-right": 0,
@@ -44,70 +44,70 @@
     "custom/workspace-1": {
         "exec": "dotfiles-waybar-workspace status 1",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 1"
     },
     "custom/workspace-2": {
         "exec": "dotfiles-waybar-workspace status 2",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 2"
     },
     "custom/workspace-3": {
         "exec": "dotfiles-waybar-workspace status 3",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 3"
     },
     "custom/workspace-4": {
         "exec": "dotfiles-waybar-workspace status 4",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 4"
     },
     "custom/workspace-5": {
         "exec": "dotfiles-waybar-workspace status 5",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 5"
     },
     "custom/workspace-6": {
         "exec": "dotfiles-waybar-workspace status 6",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 6"
     },
     "custom/workspace-7": {
         "exec": "dotfiles-waybar-workspace status 7",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 7"
     },
     "custom/workspace-8": {
         "exec": "dotfiles-waybar-workspace status 8",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 8"
     },
     "custom/workspace-9": {
         "exec": "dotfiles-waybar-workspace status 9",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 9"
     },
     "custom/workspace-10": {
         "exec": "dotfiles-waybar-workspace status 10",
         "return-type": "json",
-        "interval": 1,
+        "interval": "once",
         "signal": 7,
         "on-click": "dotfiles-waybar-workspace focus 10"
     },

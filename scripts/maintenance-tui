@@ -152,7 +152,7 @@ update_system() {
     clear
     printf '󰏗  Updating APT package lists and Debian packages…\n\n'
     update_failed=0
-    sudo apt-get update && sudo apt-get upgrade -y || update_failed=1
+    pkexec apt-get update && pkexec apt-get upgrade -y || update_failed=1
 
     if command -v flatpak >/dev/null 2>&1; then
         printf '\n󰏖  Updating Flatpaks…\n\n'

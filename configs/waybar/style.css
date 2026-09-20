@@ -51,8 +51,8 @@ tooltip label {
 #tray,
 #privacy,
 #custom-power-menu {
-    min-height: 30px;
-    margin: 0;
+    min-height: 26px;
+    margin: 0 1px;
     padding: 0 7px;
     background: transparent;
     color: @text;
@@ -61,7 +61,8 @@ tooltip label {
 }
 
 #custom-launcher {
-    min-width: 34px;
+    min-width: 28px;
+    margin: 0;
     padding: 0;
     font-size: 15px;
 }
@@ -92,8 +93,8 @@ tooltip label {
 #custom-workspace-8,
 #custom-workspace-9,
 #custom-workspace-10 {
-    min-width: 26px;
-    min-height: 30px;
+    min-width: 24px;
+    min-height: 24px;
     margin: 1px 1px 1px 0;
     padding: 0;
     background: @window;
@@ -202,6 +203,8 @@ tooltip label {
 #custom-temperature {
     padding-left: 4px;
     padding-right: 4px;
+    margin-left: 1px;
+    margin-right: 1px;
 }
 
 #pulseaudio.muted,
@@ -221,8 +224,8 @@ tooltip label {
 }
 
 #tray {
-    padding-left: 7px;
-    padding-right: 7px;
+    padding-left: 8px;
+    padding-right: 8px;
 }
 
 #privacy {
