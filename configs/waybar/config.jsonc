@@ -25,9 +25,7 @@
         "cpu",
         "custom/left#inverse",
 
-        "custom/left#accent",
-        "custom/launcher",
-        "custom/right#accent",
+        "group/app-launcher",
 
         "custom/right#inverse",
         "clock#time",
@@ -109,6 +107,14 @@
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
     },
+    "group/app-launcher": {
+        "orientation": "horizontal",
+        "modules": [
+            "custom/left#accent",
+            "custom/launcher",
+            "custom/right#accent"
+        ]
+    },
     "clock#time": {
         "format": "{:%I:%M %p}",
         "min-length": 8,
@@ -170,6 +176,9 @@
         "format-muted": "󰖁 {volume}%",
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
+        },
+        "states": {
+            "normal": 100
         },
         "min-length": 8,
         "scroll-step": 5,

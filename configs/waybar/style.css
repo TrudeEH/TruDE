@@ -84,6 +84,12 @@ tooltip label {
     color: @accent;
 }
 
+#workspaces button,
+#workspaces button:hover {
+    border-radius: 0;
+    background-color: transparent;
+}
+
 /* Center modules */
 
 #custom-temperature {
@@ -122,6 +128,16 @@ tooltip label {
 #custom-launcher:hover {
     background-color: @accent-strong;
     color: @accent-text;
+}
+
+#app-launcher:hover #custom-launcher {
+    background-color: @accent-strong;
+    color: @accent-text;
+}
+
+#app-launcher:hover #custom-left.accent,
+#app-launcher:hover #custom-right.accent {
+    color: @accent-strong;
 }
 
 #clock.time {
@@ -171,6 +187,16 @@ tooltip label {
 #pulseaudio {
     padding: 0 8px;
     background-color: @bg-1;
+    color: @critical;
+}
+
+#pulseaudio.normal {
+    color: @fg;
+}
+
+#pulseaudio.normal:hover,
+#pulseaudio.muted {
+    color: @hover-fg;
 }
 
 #custom-maintenance {
@@ -183,8 +209,6 @@ tooltip label {
     background-color: @bg-3;
 }
 
-#pulseaudio:hover,
-#pulseaudio.muted,
 #custom-maintenance.updated {
     color: @hover-fg;
 }
@@ -203,13 +227,13 @@ tooltip label {
 
 #custom-power-menu {
     padding: 0 19px 0 16px;
-    border-radius: 16px;
+    border-radius: 0;
     color: @accent;
     font-size: 16px;
 }
 
 #custom-power-menu:hover {
-    background-color: @hover-bg;
+    background-color: transparent;
     color: @accent-strong;
 }
 
