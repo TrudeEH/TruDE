@@ -178,7 +178,7 @@
             "default": ["󰕿", "󰖀", "󰕾"]
         },
         "states": {
-            "normal": 100
+            "overamplified": 101
         },
         "min-length": 8,
         "scroll-step": 5,

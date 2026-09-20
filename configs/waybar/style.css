@@ -13,6 +13,7 @@
 @define-color accent-text #222226;
 @define-color warning #f8e45c;
 @define-color critical #f66151;
+@define-color critical-strong #ed333b;
 @define-color success #57e389;
 
 * {
@@ -90,6 +91,15 @@ tooltip label {
     background-color: transparent;
 }
 
+#workspaces button:hover label {
+    color: @hover-fg;
+}
+
+#workspaces button.active:hover label,
+#workspaces button.visible:hover label {
+    color: @accent-strong;
+}
+
 /* Center modules */
 
 #custom-temperature {
@@ -115,6 +125,12 @@ tooltip label {
 #memory.critical,
 #cpu.critical {
     color: @critical;
+}
+
+#custom-temperature:hover,
+#memory:hover,
+#cpu:hover {
+    color: @hover-fg;
 }
 
 #custom-launcher {
@@ -150,6 +166,7 @@ tooltip label {
     background-color: @bg-2;
 }
 
+#clock.time:hover,
 #clock.date:hover {
     color: @hover-fg;
 }
@@ -187,14 +204,12 @@ tooltip label {
 #pulseaudio {
     padding: 0 8px;
     background-color: @bg-1;
+}
+
+#pulseaudio.overamplified {
     color: @critical;
 }
 
-#pulseaudio.normal {
-    color: @fg;
-}
-
-#pulseaudio.normal:hover,
 #pulseaudio.muted {
     color: @hover-fg;
 }
@@ -223,6 +238,16 @@ tooltip label {
 
 #custom-power-profile.power-saver {
     color: @success;
+}
+
+#pulseaudio:hover,
+#custom-maintenance:hover,
+#custom-power-profile:hover {
+    color: @hover-fg;
+}
+
+#pulseaudio.overamplified:hover {
+    color: @critical-strong;
 }
 
 #custom-power-menu {
