@@ -217,6 +217,7 @@ link_configs() {
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
     link_config "$repo_dir/scripts/waybar/power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
     link_config "$repo_dir/scripts/waybar/maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
+    link_config "$repo_dir/scripts/waybar/launcher-status" "$HOME/.local/bin/dotfiles-waybar-launcher-status"
     link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
     link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"

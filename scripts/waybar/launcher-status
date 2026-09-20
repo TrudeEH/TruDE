@@ -1,0 +1,21 @@
+#!/bin/sh
+set -u
+
+screensharing=false
+if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    if pw-dump 2>/dev/null | jq -e '
+        any(.[];
+            .type == "PipeWire:Interface:Node" and
+            .info.props["media.class"] == "Stream/Input/Video" and
+            .info.state == "running"
+        )
+    ' >/dev/null 2>&1; then
+        screensharing=true
+    fi
+fi
+
+if [ "$screensharing" = true ]; then
+    printf '%s\n' '{"text":"<span foreground=\"#f66151\"></span><span background=\"#f66151\" foreground=\"#222226\"> 󰍹 </span><span foreground=\"#f66151\"></span>","class":"screensharing"}'
+else
+    printf '%s\n' '{"text":"<span foreground=\"#ffbe6f\"></span><span background=\"#ffbe6f\" foreground=\"#222226\"> 󰀻 </span><span foreground=\"#ffbe6f\"></span>","class":"launcher"}'
+fi

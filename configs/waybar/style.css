@@ -134,8 +134,8 @@ tooltip label {
 
 #custom-launcher {
     min-width: 18px;
-    padding: 0 10px 0 8px;
-    background-color: @accent;
+    padding: 0;
+    background-color: transparent;
     color: @accent-text;
     font-size: 18.75px;
 }
@@ -184,20 +184,6 @@ tooltip label {
 }
 
 /* Right modules */
-
-#privacy {
-    background-color: @bg-1;
-}
-
-#privacy-item.screenshare {
-    min-width: 8px;
-    min-height: 8px;
-    margin: 0 4px;
-    padding: 0;
-    border-radius: 999px;
-    background-color: @critical;
-    color: transparent;
-}
 
 #pulseaudio {
     padding: 0 8px;
@@ -257,11 +243,6 @@ tooltip label {
 #custom-left,
 #custom-right {
     font-size: 19.5px;
-}
-
-#custom-left.accent,
-#custom-right.accent {
-    color: @accent;
 }
 
 #custom-left.bg-1,

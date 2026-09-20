@@ -25,7 +25,7 @@
         "cpu",
         "custom/left#inverse",
 
-        "group/app-launcher",
+        "custom/launcher",
 
         "custom/right#inverse",
         "clock#time",
@@ -41,7 +41,6 @@
     ],
     "modules-right": [
         "custom/left#bg-1",
-        "privacy",
         "pulseaudio",
 
         "custom/left#bg-2",
@@ -104,17 +103,13 @@
         "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "custom/launcher": {
-        "format": "󰀻",
+        "exec": "dotfiles-waybar-launcher-status",
+        "return-type": "json",
+        "format": "{text}",
+        "escape": false,
+        "interval": 1,
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
-    },
-    "group/app-launcher": {
-        "orientation": "horizontal",
-        "modules": [
-            "custom/left#accent",
-            "custom/launcher",
-            "custom/right#accent"
-        ]
     },
     "clock#time": {
         "format": "{:%I:%M %p}",
@@ -182,18 +177,6 @@
         "scroll-step": 5,
         "on-click": "foot --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
     },
-    "privacy": {
-        "icon-spacing": 0,
-        "icon-size": 8,
-        "transition-duration": 250,
-        "modules": [
-            {
-                "type": "screenshare",
-                "tooltip": true,
-                "tooltip-icon-size": 24
-            }
-        ]
-    },
     "custom/maintenance": {
         "exec": "dotfiles-waybar-maintenance-status",
         "return-type": "json",
@@ -215,10 +198,6 @@
         "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
     },
 
-    "custom/left#accent": {
-        "format": "",
-        "tooltip": false
-    },
     "custom/left#bg-1": {
         "format": "",
         "tooltip": false
@@ -233,10 +212,6 @@
     },
     "custom/left#inverse": {
         "format": "",
-        "tooltip": false
-    },
-    "custom/right#accent": {
-        "format": "",
         "tooltip": false
     },
     "custom/right#bg-1": {
