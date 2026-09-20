@@ -63,6 +63,38 @@ tooltip label {
     font-weight: 400;
 }
 
+menu {
+    padding: 4px;
+    border: 1px solid @border;
+    background-color: @bg-3;
+}
+
+menuitem {
+    min-height: 20px;
+    padding: 4px 8px;
+}
+
+menuitem:hover,
+menuitem:focus {
+    background-color: @accent;
+    color: @accent-text;
+}
+
+menuitem:hover label,
+menuitem:focus label {
+    color: @accent-text;
+}
+
+menuitem:disabled label {
+    color: @muted;
+}
+
+menu separator {
+    min-height: 1px;
+    margin: 4px 0;
+    background-color: @border;
+}
+
 /* Left modules */
 
 #tray {
