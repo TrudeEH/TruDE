@@ -29,22 +29,13 @@ hl.monitor({
     scale    = "auto",
 })
 
--- Main AOC display: its preferred EDID mode is only 60 Hz.
-hl.monitor({
-    output = "DP-1",
-    mode = "1920x1080@300",
-    position = "0x0",
-    scale = 1,
-})
-
--- LG on the left, physically rotated clockwise; align the top edges.
-hl.monitor({
-    output = "HDMI-A-1",
-    mode = "1920x1080@74.97",
-    position = "-1080x0",
-    scale = 1,
-    transform = 1,
-})
+local configHome = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+local monitorOverrides = configHome .. "/hypr/monitors.local.lua"
+local monitorOverridesFile = io.open(monitorOverrides, "r")
+if monitorOverridesFile then
+    monitorOverridesFile:close()
+    dofile(monitorOverrides)
+end
 
 
 ---------------------
@@ -270,14 +261,6 @@ hl.gesture({
     direction = "horizontal",
     action = "workspace"
 })
-
--- Example per-device config
--- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Devices/ for more
-hl.device({
-    name        = "epic-mouse-v1",
-    sensitivity = -0.5,
-})
-
 
 ---------------------
 ---- KEYBINDINGS ----

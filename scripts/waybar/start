@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+config_file=$config_home/waybar/config.jsonc
+style_file=$config_home/waybar/style.css
+runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar
+runtime_config=$runtime_dir/config.json
+
+attempt=0
+primary_output=
+while [ "$attempt" -lt 25 ]; do
+    monitors=$(hyprctl monitors -j 2>/dev/null || :)
+    primary_output=$(printf '%s\n' "$monitors" | jq -r '
+        if type != "array" or length == 0 then
+            empty
+        else
+            (
+                [.[] | select(.x == 0 and .y == 0)][0]
+                // [.[] | select(.activeWorkspace.id == 1)][0]
+                // [.[] | select(.focused == true)][0]
+                // .[0]
+            ).name // empty
+        end
+    ' 2>/dev/null || :)
+    [ -z "$primary_output" ] || break
+    attempt=$((attempt + 1))
+    sleep 0.2
+done
+
+[ -n "$primary_output" ] || exit 1
+
+umask 077
+mkdir -p "$runtime_dir"
+temporary_config=$(mktemp "$runtime_dir/config.XXXXXX") || exit 1
+trap 'rm -f "$temporary_config"' 0 HUP INT TERM
+jq --arg output "$primary_output" '.output = $output' "$config_file" > "$temporary_config"
+mv "$temporary_config" "$runtime_config"
+trap - 0 HUP INT TERM
+
+exec waybar --config "$runtime_config" --style "$style_file"
