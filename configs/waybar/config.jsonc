@@ -155,6 +155,8 @@
         "format-off": "󰂲",
         "format-on": "󰂯",
         "format-connected": "󰂱 {num_connections}",
+        "min-length": 3,
+        "max-length": 3,
         "tooltip-format": "Bluetooth: {status}",
         "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias}",
@@ -176,6 +178,8 @@
         "return-type": "json",
         "exec": "dotfiles-waybar-notification-status",
         "interval": 5,
+        "min-length": 4,
+        "max-length": 4,
         "hide-empty-text": false,
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"

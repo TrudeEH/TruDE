@@ -28,7 +28,11 @@ else
 fi
 
 if [ "$count" -gt 0 ]; then
-    text=$count
+    if [ "$count" -gt 99 ]; then
+        text=99
+    else
+        text=$count
+    fi
 else
     text=
 fi
