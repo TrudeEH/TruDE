@@ -46,6 +46,7 @@ alias free='free -h'
 alias ip='ip -color=auto'
 alias diff='diff --color=auto'
 alias mkdir='mkdir -pv'
+alias fm=nnn
 
 # History
 HISTSIZE=50000
