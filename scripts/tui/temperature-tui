@@ -103,7 +103,7 @@ render() {
     fi
 
     printf '%b%s%b\n' "$orange" "$divider" "$reset"
-    printf '%b  Press Q or Esc to close · Updates every second%b\n' "$muted" "$reset"
+    printf '%b  Press Q or Esc to close%b\n' "$muted" "$reset"
 }
 
 [ -z "$old_stty" ] || stty -echo -icanon min 0 time 0

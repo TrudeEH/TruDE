@@ -70,8 +70,7 @@ install_packages() {
         hyprland hyprland-guiutils hypridle hyprlock libdw1t64 uwsm xdg-desktop-portal-hyprland
     sudo apt-get install -y \
         curl foot nautilus gnome-software gnome-software-plugin-flatpak \
-        flatpak gnome-text-editor gnome-calculator gnome-disk-utility \
-        gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
+        flatpak gnome-disk-utility gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         libnss-mdns lightdm slick-greeter xdg-desktop-portal-gtk brightnessctl \
         brightness-udev playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
