@@ -27,14 +27,10 @@ else
     fi
 fi
 
-if [ "$count" -gt 0 ]; then
-    if [ "$count" -gt 99 ]; then
-        text=99
-    else
-        text=$count
-    fi
+if [ "$count" -gt 99 ]; then
+    text=99
 else
-    text=
+    text=$count
 fi
 
 printf '{"text":"%s","alt":"%s","class":"%s"}\n' "$text" "$state" "$state"
