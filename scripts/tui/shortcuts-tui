@@ -2,12 +2,14 @@
 set -u
 
 shortcuts=$(hyprctl binds -j 2>/dev/null | jq -r '
+    def has_modifier($mask):
+        ((. / $mask | floor) % 2) == 1;
     def modifier_names:
         [
-            if (. & 64) != 0 then "Super" else empty end,
-            if (. & 4) != 0 then "Ctrl" else empty end,
-            if (. & 8) != 0 then "Alt" else empty end,
-            if (. & 1) != 0 then "Shift" else empty end
+            if has_modifier(64) then "Super" else empty end,
+            if has_modifier(4) then "Ctrl" else empty end,
+            if has_modifier(8) then "Alt" else empty end,
+            if has_modifier(1) then "Shift" else empty end
         ] | join(" + ");
     .[]
     | select((.description // "") != "")
