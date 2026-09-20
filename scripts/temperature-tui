@@ -1,0 +1,121 @@
+#!/bin/sh
+set -eu
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-temperature.XXXXXX") || exit 1
+readings_file=$temporary_dir/readings
+old_stty=$(stty -g 2>/dev/null || :)
+escape_key=$(printf '\033')
+
+cleanup() {
+    [ -z "$old_stty" ] || stty "$old_stty" 2>/dev/null || :
+    printf '\033[?25h\033[0m'
+    rm -rf "$temporary_dir"
+}
+
+trap cleanup 0
+trap 'exit 0' HUP INT TERM
+
+if ! command -v sensors >/dev/null 2>&1; then
+    whiptail --title "Temperature Monitor" \
+        --msgbox "Temperature sensors are unavailable. Install the lm-sensors package." 10 64
+    exit 1
+fi
+
+parse_temperatures() {
+    sensors -u 2>/dev/null | awk '
+        function component_name(device) {
+            if (device ~ /^(coretemp|k10temp|zenpower)-/) return "CPU"
+            if (device ~ /^(amdgpu|nouveau)-/) return "GPU"
+            if (device ~ /^nvme-/) return "NVMe"
+            if (device ~ /^(spd[0-9]*|dimm)-/) return "Memory"
+            if (device ~ /^(iwlwifi|mt[0-9]+_phy[0-9]*)-/) return "Wi-Fi"
+            if (device ~ /^(acpitz|pch_|thinkpad)-/) return "System"
+            return "Other"
+        }
+        /^[^[:space:]][^:]*$/ {
+            device = $0
+            next
+        }
+        /^[^[:space:]].*:$/ {
+            sensor = $0
+            sub(/:$/, "", sensor)
+            next
+        }
+        /^[[:space:]]+temp[0-9]+_input:/ {
+            printf "%s\t%s\t%s\t%.3f\n", component_name(device), device, sensor, $2
+        }
+    '
+}
+
+render() {
+    orange='\033[38;2;255;190;111m'
+    strong_orange='\033[38;2;255;163;72m'
+    white='\033[38;2;255;255;255m'
+    muted='\033[38;2;170;170;170m'
+    red='\033[38;2;255;123;99m'
+    reset='\033[0m'
+    divider='────────────────────────────────────────────────────────────────────────────────────────────────────'
+
+    printf '\033[H\033[2J'
+    printf '%b  Temperature Monitor%b\n' "$orange" "$reset"
+    printf '%b  Live hardware sensor readings · %s%b\n' "$muted" "$(date '+%H:%M:%S')" "$reset"
+    printf '%b%s%b\n' "$orange" "$divider" "$reset"
+
+    if [ ! -s "$readings_file" ]; then
+        printf '\n%b  No temperature sensors reported a reading.%b\n' "$white" "$reset"
+        printf '%b  Run sensors-detect if this machine should expose additional sensors.%b\n' "$muted" "$reset"
+    else
+        summary=$(awk -F '\t' '
+            NR == 1 { maximum = $4 }
+            {
+                total += $4
+                count++
+                if ($4 > maximum) maximum = $4
+            }
+            END { printf "%.1f\t%.1f\t%d", total / count, maximum, count }
+        ' "$readings_file")
+        average=$(printf '%s\n' "$summary" | cut -f1)
+        maximum=$(printf '%s\n' "$summary" | cut -f2)
+        sensor_count=$(printf '%s\n' "$summary" | cut -f3)
+
+        printf '%b  Average%b  %5.1f°C    %bMaximum%b  %5.1f°C    %bSensors%b  %s\n' \
+            "$muted" "$white" "$average" \
+            "$muted" "$strong_orange" "$maximum" \
+            "$muted" "$white" "$sensor_count"
+        printf '%b%s%b\n' "$muted" "$divider" "$reset"
+        printf '%b  %-12s  %-62s  %11s%b\n' "$muted" "Component" "Device · sensor" "Temperature" "$reset"
+        printf '%b%s%b\n' "$muted" "$divider" "$reset"
+
+        awk -F '\t' \
+            -v white="$white" \
+            -v orange="$strong_orange" \
+            -v red="$red" \
+            -v reset="$reset" \
+            -v maximum="$maximum" '
+            {
+                color = white
+                if ($4 >= 90) color = red
+                else if (sprintf("%.1f", $4) == sprintf("%.1f", maximum)) color = orange
+                detail = $2 " · " $3
+                printf "  %-12s  %-62.62s  %s%8.1f°C%s\n", $1, detail, color, $4, reset
+            }
+        ' "$readings_file"
+    fi
+
+    printf '%b%s%b\n' "$orange" "$divider" "$reset"
+    printf '%b  Press Q or Esc to close · Updates every second%b\n' "$muted" "$reset"
+}
+
+[ -z "$old_stty" ] || stty -echo -icanon min 0 time 0
+printf '\033[?25l'
+
+while :; do
+    parse_temperatures > "$readings_file"
+    render
+
+    key=$(dd if=/dev/tty bs=1 count=1 2>/dev/null || :)
+    case $key in
+        q|Q|"$escape_key") exit 0 ;;
+    esac
+    sleep 1
+done

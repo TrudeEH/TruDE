@@ -73,7 +73,7 @@ install_packages() {
         flatpak gnome-text-editor gnome-calculator gnome-disk-utility \
         gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         libnss-mdns lightdm slick-greeter xdg-desktop-portal-gtk brightnessctl \
-        brightness-udev playerctl bluez btop s-tui pulsemixer whiptail \
+        brightness-udev playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq
@@ -208,6 +208,7 @@ link_configs() {
     link_config "$repo_dir/scripts/power-profiles-tui" "$HOME/.local/bin/dotfiles-power-profiles-tui"
     link_config "$repo_dir/scripts/power-menu-tui" "$HOME/.local/bin/dotfiles-power-menu-tui"
     link_config "$repo_dir/scripts/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
+    link_config "$repo_dir/scripts/temperature-tui" "$HOME/.local/bin/dotfiles-temperature-tui"
     link_config "$repo_dir/scripts/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
     link_config "$repo_dir/scripts/app-launcher-tui" "$HOME/.local/bin/dotfiles-app-launcher-tui"
     link_config "$repo_dir/scripts/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"

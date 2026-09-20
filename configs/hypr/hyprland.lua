@@ -445,6 +445,14 @@ hl.window_rule({
 })
 
 hl.window_rule({
+    name  = "temperature-tui",
+    match = { class = "temperature-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
     name  = "maintenance-tui",
     match = { class = "maintenance-tui" },
 

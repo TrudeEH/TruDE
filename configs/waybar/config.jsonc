@@ -74,7 +74,7 @@
         "return-type": "json",
         "interval": 5,
         "min-length": 8,
-        "on-click": "foot --app-id=s-tui --title='Temperature Monitor' --window-size-chars=104x32 s-tui"
+        "on-click": "foot --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui"
     },
     "memory": {
         "format": "󰘚 {percentage}%",
