@@ -1,13 +1,14 @@
 #!/bin/sh
 set -u
 
-pids=$(hyprctl clients -j 2>/dev/null \
-    | jq -r '.[] | select(.class == "app-launcher-tui") | .pid' 2>/dev/null)
+addresses=$(hyprctl clients -j 2>/dev/null \
+    | jq -r '.[] | select(.class == "app-launcher-tui") | .address' 2>/dev/null)
 
-if [ -n "$pids" ]; then
-    printf '%s\n' "$pids" | while IFS= read -r pid; do
-        case $pid in *[!0-9]*|'') continue ;; esac
-        kill "$pid" 2>/dev/null || :
+if [ -n "$addresses" ]; then
+    printf '%s\n' "$addresses" | while IFS= read -r address; do
+        hex=${address#0x}
+        case $hex in ''|*[!0-9a-fA-F]*) continue ;; esac
+        hyprctl dispatch closewindow "address:$address" >/dev/null 2>&1 || :
     done
     exit 0
 fi
