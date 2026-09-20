@@ -10,8 +10,8 @@ if command -v batcat >/dev/null 2>&1; then
 elif command -v bat >/dev/null 2>&1; then
     alias cat='bat'
 fi
-if command -v nvim >/dev/null 2>&1; then
-    alias v='nvim'
+if command -v micro >/dev/null 2>&1; then
+    alias e='micro'
 fi
 if command -v lsd >/dev/null 2>&1; then
     alias lt='lsd --tree'
@@ -83,12 +83,8 @@ export LESS='-FRiMX'
 export MANPAGER='less -R'
 export BAT_PAGER='less -FR'
 
-# Prefer Neovim when available.
-if command -v nvim >/dev/null 2>&1; then
-    export EDITOR="${EDITOR:-nvim}"
-else
-    export EDITOR="${EDITOR:-vi}"
-fi
+# Use the approachable terminal editor installed by these dotfiles.
+export EDITOR="${EDITOR:-micro}"
 export VISUAL="${VISUAL:-$EDITOR}"
 
 # Prompt with exit status on failure, current directory, and job count.

@@ -6,4 +6,7 @@ if [ -r "$config_dir/nnn/env" ]; then
     . "$config_dir/nnn/env"
 fi
 
+export EDITOR=${EDITOR:-micro}
+export VISUAL=${VISUAL:-$EDITOR}
+
 exec nnn "$@"

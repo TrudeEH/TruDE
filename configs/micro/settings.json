@@ -1,0 +1,20 @@
+{
+    "autosave": 0,
+    "backup": true,
+    "clipboard": "external",
+    "colorscheme": "dotfiles",
+    "cursorline": true,
+    "diffgutter": true,
+    "hlsearch": true,
+    "keymenu": true,
+    "mkparents": true,
+    "mouse": true,
+    "parsecursor": true,
+    "ruler": true,
+    "savecursor": true,
+    "saveundo": true,
+    "scrollbar": true,
+    "tabsize": 4,
+    "tabstospaces": true,
+    "truecolor": "on"
+}
