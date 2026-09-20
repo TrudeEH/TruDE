@@ -50,7 +50,7 @@ case $part in
     right) text='' ;;
     *)
         if [ "$status" = screensharing ]; then
-            text="<span rise='-1536'>󰍹</span>"
+            text=''
         else
             text='󰀻'
         fi
