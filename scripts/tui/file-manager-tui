@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
+if [ -r "$config_dir/nnn/env" ]; then
+    . "$config_dir/nnn/env"
+fi
+
+exec nnn "$@"

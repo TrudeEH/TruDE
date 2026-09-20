@@ -69,7 +69,7 @@ install_packages() {
     sudo apt-get install -y -t "$backports_suite" \
         hyprland hyprland-guiutils hypridle hyprlock libdw1t64 uwsm xdg-desktop-portal-hyprland
     sudo apt-get install -y \
-        curl foot nautilus gnome-software gnome-software-plugin-flatpak \
+        atool curl foot nnn p7zip-full unzip gnome-software gnome-software-plugin-flatpak \
         flatpak gnome-disk-utility gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         libnss-mdns lightdm slick-greeter xdg-desktop-portal-gtk brightnessctl \
         brightness-udev playerctl bluez btop lm-sensors pulsemixer whiptail \
@@ -213,6 +213,7 @@ link_configs() {
     link_config "$repo_dir/scripts/hypr/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
     link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/tui/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
+    link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
     link_config "$repo_dir/scripts/waybar/power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
@@ -230,6 +231,8 @@ link_configs() {
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
+    link_config "$repo_dir/configs/nnn/env" "$config_dir/nnn/env"
+    link_config "$repo_dir/configs/nnn/plugins" "$config_dir/nnn/plugins"
     link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 
 }

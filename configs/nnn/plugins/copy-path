@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${nnn:-}" ]; then
+    exit 0
+fi
+
+printf '%s' "$nnn" | wl-copy

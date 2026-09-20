@@ -1,0 +1,8 @@
+# Shared nnn defaults for interactive shells and the Hyprland launcher.
+export NNN_OPTS='deEU'
+export NNN_COLORS='3333'
+export NNN_FCOLORS='030303020705060801030501'
+export NNN_ARCHIVE='\.(7z|bz2|gz|rar|tar|tbz2|tgz|txz|xz|zip)$'
+export NNN_TRASH=2
+export NNN_BMS="h:$HOME;d:$HOME/Documents;D:$HOME/Downloads;m:/media;r:/run/media/$USER;t:/tmp"
+export NNN_PLUG='m:mount-usb;u:unmount-usb;y:copy-path;s:-!sync*'

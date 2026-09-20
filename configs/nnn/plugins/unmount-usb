@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+devices=$(lsblk --json --paths --output NAME,TYPE,RM,MOUNTPOINT,LABEL,SIZE |
+    jq -r '.blockdevices[] | recurse(.children[]?) | select(.type == "part" and .rm == true and .mountpoint != null) | [.name, (.label // "unlabelled"), .size, .mountpoint] | @tsv')
+
+if [ -z "$devices" ]; then
+    printf '%s\n' 'No mounted removable partitions found.'
+    printf '%s' 'Press Enter to continue... '
+    read -r _
+    exit 0
+fi
+
+selection=$(printf '%s\n' "$devices" | fzf --delimiter='\t' --with-nth=2,3,4,1 --prompt='Unmount USB > ' || :)
+[ -n "$selection" ] || exit 0
+
+device=${selection%%	*}
+sync
+udisksctl unmount --block-device "$device"
+printf '%s' 'Press Enter to continue... '
+read -r _

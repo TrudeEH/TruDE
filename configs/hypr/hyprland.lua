@@ -44,7 +44,7 @@ end
 
 -- Set programs that you use
 local terminal    = "foot"
-local fileManager = "nautilus"
+local fileManager = "foot --app-id=nnn --title=Files dotfiles-file-manager-tui"
 local menu        = "dotfiles-app-launcher-toggle"
 local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"

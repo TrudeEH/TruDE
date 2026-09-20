@@ -21,6 +21,20 @@ if command -v tmux >/dev/null 2>&1; then
     alias ta='tmux attach'
 fi
 
+if [ -r "$HOME/.config/nnn/env" ]; then
+    . "$HOME/.config/nnn/env"
+
+    n() {
+        local nnn_tmpfile
+        nnn_tmpfile=$(mktemp)
+        NNN_TMPFILE=$nnn_tmpfile command nnn "$@"
+        if [ -s "$nnn_tmpfile" ]; then
+            . "$nnn_tmpfile"
+        fi
+        rm -f "$nnn_tmpfile"
+    }
+fi
+
 alias l='ls -alh'
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
