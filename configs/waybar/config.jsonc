@@ -150,10 +150,10 @@
         "on-click": "foot --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
     },
     "bluetooth": {
-        "format": "󰂯",
+        "format": "󰂯 0",
         "format-disabled": "󰂲",
         "format-off": "󰂲",
-        "format-on": "󰂯",
+        "format-on": "󰂯 0",
         "format-connected": "󰂱 {num_connections}",
         "min-length": 3,
         "max-length": 3,
