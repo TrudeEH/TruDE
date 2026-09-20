@@ -108,6 +108,7 @@ while :; do
             ;;
         clear-history)
             clear_history
+            exit 0
             ;;
         active)
             makoctl invoke -n "$id" >/dev/null 2>&1 \
