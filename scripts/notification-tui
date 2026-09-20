@@ -70,10 +70,10 @@ while :; do
     fi
 
     {
+        printf 'clear-history\t0\t󰎟  Clear notification history\n'
         printf 'toggle-dnd\t0\t%s\n' "$dnd_label"
         printf 'restore\t0\t󰑐  Restore latest notification\n'
         printf 'dismiss-all\t0\t󰅖  Dismiss all active notifications\n'
-        printf 'clear-history\t0\t󰎟  Clear notification history\n'
         cat "$active_file" "$history_file"
     } > "$menu_file"
 

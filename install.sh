@@ -220,6 +220,7 @@ link_configs() {
     link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
     link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
+    link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
