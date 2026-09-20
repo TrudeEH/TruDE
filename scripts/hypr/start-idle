@@ -6,22 +6,20 @@ preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-hypridle
 runtime_config=$runtime_dir/hypridle.conf
 
-read_timeout() {
-    preference=$1
-    fallback=$2
-    value=$fallback
-    if [ -f "$preferences_file" ]; then
-        value=$(jq -r "$preference // $fallback" "$preferences_file" 2>/dev/null || printf '%s' "$fallback")
-    fi
-    case $value in
-        ''|*[!0-9]*) value=$fallback ;;
-    esac
-    printf '%s\n' "$value"
-}
-
-lock_timeout=$(read_timeout '.laptop.idle_timeout' 300)
-screen_timeout=$(read_timeout '.laptop.screen_off_timeout' 600)
-suspend_timeout=$(read_timeout '.laptop.suspend_timeout' 900)
+timeouts='300 600 900'
+if [ -f "$preferences_file" ]; then
+    timeouts=$(jq -r '[
+        (.laptop.idle_timeout // 300),
+        (.laptop.screen_off_timeout // 600),
+        (.laptop.suspend_timeout // 900)
+    ] | @tsv' "$preferences_file" 2>/dev/null || printf '300\t600\t900')
+fi
+IFS="$(printf '\t')" read -r lock_timeout screen_timeout suspend_timeout <<EOF
+$timeouts
+EOF
+case $lock_timeout in ''|*[!0-9]*) lock_timeout=300 ;; esac
+case $screen_timeout in ''|*[!0-9]*) screen_timeout=600 ;; esac
+case $suspend_timeout in ''|*[!0-9]*) suspend_timeout=900 ;; esac
 
 umask 077
 mkdir -p "$runtime_dir"

@@ -32,8 +32,6 @@ confirm() {
     dialog --yesno "$1" 9 58
 }
 
-sleep 0.15
-
 choice=$(dialog --menu "Choose an action" 17 64 8 \
     "󰌾 lock" "Lock the session" \
     "󰒲 suspend" "Suspend the computer" \

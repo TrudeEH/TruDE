@@ -65,11 +65,11 @@ collect_status() {
     progress 5 "Checking APT updates…"
     apt list --upgradable 2>/dev/null \
         | sed '1{/^Listing/d;}; /^$/d' > "$apt_updates_file"
-    apt_updates=$(wc -l < "$apt_updates_file" | tr -d ' ')
+    apt_updates=$(awk 'END { print NR + 0 }' "$apt_updates_file")
 
     progress 20 "Counting installed Debian packages…"
     apt_installed=$(dpkg-query -W -f='${binary:Package}\n' 2>/dev/null \
-        | sed '/^$/d' | wc -l | tr -d ' ')
+        | awk 'NF { count++ } END { print count + 0 }')
     backports_installed=$(dpkg-query -W -f='${binary:Package}\t${Version}\n' 2>/dev/null \
         | awk '$2 ~ /~bpo[0-9]+/ { count++ } END { print count + 0 }')
 
@@ -77,9 +77,9 @@ collect_status() {
     if command -v flatpak >/dev/null 2>&1; then
         flatpak remote-ls --updates --app --columns=name,application,version \
             2>/dev/null > "$flatpak_updates_file"
-        flatpak_updates=$(wc -l < "$flatpak_updates_file" | tr -d ' ')
+        flatpak_updates=$(awk 'END { print NR + 0 }' "$flatpak_updates_file")
         flatpak_installed=$(flatpak list --app --columns=application 2>/dev/null \
-            | sed '/^$/d' | wc -l | tr -d ' ')
+            | awk 'NF { count++ } END { print count + 0 }')
     else
         : > "$flatpak_updates_file"
         flatpak_updates=0
@@ -88,10 +88,10 @@ collect_status() {
 
     progress 65 "Checking held packages and failed units…"
     apt-mark showhold 2>/dev/null | sed '/^$/d' > "$held_file"
-    held=$(wc -l < "$held_file" | tr -d ' ')
+    held=$(awk 'END { print NR + 0 }' "$held_file")
     systemctl --failed --no-legend --plain 2>/dev/null \
         | sed '/^$/d' > "$failed_file"
-    failed=$(wc -l < "$failed_file" | tr -d ' ')
+    failed=$(awk 'END { print NR + 0 }' "$failed_file")
 
     if [ -e /var/run/reboot-required ]; then
         reboot="required"
@@ -170,8 +170,6 @@ update_system() {
     pkill -RTMIN+8 waybar 2>/dev/null || :
     collect_status
 }
-
-sleep 0.15
 
 collect_status
 

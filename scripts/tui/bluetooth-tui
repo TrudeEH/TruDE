@@ -48,9 +48,15 @@ device_status() (
     address=$1
     status=
     info=$(bluetoothctl info "$address" 2>/dev/null || :)
-    printf '%s\n' "$info" | grep -q 'Connected: yes' && status="${status}connected, "
-    printf '%s\n' "$info" | grep -q 'Paired: yes' && status="${status}paired, "
-    printf '%s\n' "$info" | grep -q 'Trusted: yes' && status="${status}trusted, "
+    while IFS= read -r line; do
+        case $line in
+            *'Connected: yes'*) status="${status}connected, " ;;
+            *'Paired: yes'*) status="${status}paired, " ;;
+            *'Trusted: yes'*) status="${status}trusted, " ;;
+        esac
+    done <<EOF
+$info
+EOF
     status=${status%, }
     printf '%s' "${status:-available}"
 )
@@ -116,13 +122,37 @@ EOF
     fi
 
     choice=$(dialog --menu "Select a device" 22 78 14 "$@" 3>&1 1>&2 2>&3) || return
-    name=$(bluetoothctl info "$choice" 2>/dev/null \
-        | sed -n 's/^[[:space:]]*Name: //p' | head -n 1)
+    name=
+    info=$(bluetoothctl info "$choice" 2>/dev/null || :)
+    while IFS= read -r line; do
+        case $line in
+            *'Name: '*)
+                name=${line#*Name: }
+                break
+                ;;
+        esac
+    done <<EOF
+$info
+EOF
     manage_device "$choice" "${name:-$choice}"
 )
 
+adapter_powered() {
+    adapter_info=$(bluetoothctl show 2>/dev/null || :)
+    while IFS= read -r line; do
+        case $line in
+            *'Powered: '*)
+                printf '%s\n' "${line#*Powered: }"
+                return
+                ;;
+        esac
+    done <<EOF
+$adapter_info
+EOF
+}
+
 scan_devices() (
-    powered=$(bluetoothctl show | awk -F': ' '/Powered:/ { print $2; exit }')
+    powered=$(adapter_powered)
     if [ "$powered" != yes ]; then
         message "Bluetooth is disabled. Turn on the adapter before scanning."
         return
@@ -150,7 +180,7 @@ if ! bluetoothctl show >/dev/null 2>&1; then
 fi
 
 while true; do
-    powered=$(bluetoothctl show | awk -F': ' '/Powered:/ { print $2; exit }')
+    powered=$(adapter_powered)
     choice=$(dialog --menu "Adapter power: ${powered:-unknown}" 16 64 6 \
         "󰂯 devices" "Manage known devices" \
         "󰑐 scan" "Scan for devices" \

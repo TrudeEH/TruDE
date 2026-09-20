@@ -33,8 +33,13 @@ Suites: $backports_suite
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 BACKPORTS
-    sudo install -D -m 0644 "$temporary" "$backports"
+    if sudo install -D -m 0644 "$temporary" "$backports"; then
+        install_status=0
+    else
+        install_status=$?
+    fi
     rm -f "$temporary"
+    [ "$install_status" -eq 0 ] || exit "$install_status"
 fi
 
 sudo apt-get update

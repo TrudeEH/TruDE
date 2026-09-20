@@ -55,7 +55,7 @@
         "return-type": "json",
         "interval": 5,
         "min-length": 8,
-        "on-click": "foot --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui"
+        "on-click": "footclient --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui"
     },
     "memory": {
         "format": "󰘚 {percentage}%",
@@ -68,7 +68,7 @@
         "interval": 2,
         "min-length": 8,
         "tooltip-format": "Memory: {percentage}%",
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+        "on-click": "footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "cpu": {
         "format": "󰍛 {usage}%",
@@ -81,7 +81,7 @@
         "interval": 2,
         "min-length": 8,
         "tooltip-format": "CPU: {usage}%",
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+        "on-click": "footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "custom/launcher": {
         "exec": "dotfiles-waybar-launcher-status center",
@@ -128,13 +128,13 @@
         "format": "{:%I:%M %p}",
         "min-length": 8,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
-        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
+        "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "clock#date": {
         "format": "󰸗 {:%a %d %b}",
         "min-length": 13,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
-        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
+        "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "network": {
         "interval": 2,
@@ -147,7 +147,7 @@
         "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
         "tooltip-format-ethernet": "Ethernet\n{ipaddr}",
         "tooltip-format-disconnected": "Offline",
-        "on-click": "foot --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
+        "on-click": "footclient --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
     },
     "bluetooth": {
         "format": "󰂯",
@@ -160,7 +160,7 @@
         "tooltip-format": "Bluetooth: {status}",
         "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
         "tooltip-format-enumerate-connected": "{device_alias}",
-        "on-click": "foot --app-id=bluetooth-tui --title='Bluetooth' --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui"
+        "on-click": "footclient --app-id=bluetooth-tui --title='Bluetooth' --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui"
     },
     "custom/notification": {
         "tooltip": false,
@@ -181,7 +181,7 @@
         "min-length": 4,
         "max-length": 4,
         "hide-empty-text": false,
-        "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
+        "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"
     },
     "pulseaudio": {
@@ -192,7 +192,7 @@
         },
         "min-length": 8,
         "scroll-step": 5,
-        "on-click": "foot --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
+        "on-click": "footclient --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer"
     },
     "custom/maintenance": {
         "exec": "dotfiles-waybar-maintenance-status",
@@ -200,19 +200,19 @@
         "interval": 300,
         "signal": 8,
         "min-length": 5,
-        "on-click": "foot --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui"
+        "on-click": "footclient --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui"
     },
     "custom/power-profile": {
         "exec": "dotfiles-waybar-power-status",
         "return-type": "json",
         "interval": 5,
         "min-length": 5,
-        "on-click": "foot --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
+        "on-click": "footclient --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
     },
     "custom/power-menu": {
         "format": "󰐥",
         "tooltip": false,
-        "on-click": "foot --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
+        "on-click": "footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"
     },
 
     "custom/left#accent": {

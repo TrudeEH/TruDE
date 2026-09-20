@@ -19,23 +19,29 @@ if cache_is_fresh; then
 fi
 
 if ! mkdir "$lock_dir" 2>/dev/null; then
-    attempts=0
-    while [ -d "$lock_dir" ] && [ "$attempts" -lt 60 ]; do
-        sleep 0.5
-        attempts=$((attempts + 1))
-    done
     if [ -f "$cache_file" ]; then
         cat "$cache_file"
         exit 0
     fi
+    lock_pid=
+    IFS= read -r lock_pid < "$lock_dir/pid" 2>/dev/null || :
+    case $lock_pid in
+        ''|*[!0-9]*) ;;
+        *) kill -0 "$lock_pid" 2>/dev/null && exit 1 ;;
+    esac
+    rm -f "$lock_dir/pid"
+    rmdir "$lock_dir" 2>/dev/null || exit 1
     mkdir "$lock_dir" 2>/dev/null || exit 1
 fi
 
-trap 'rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+printf '%s\n' "$$" > "$lock_dir/pid"
+trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
 
-apt_updates=$(apt list --upgradable 2>/dev/null | sed '1{/^Listing/d;}; /^$/d' | wc -l)
+apt_updates=$(apt list --upgradable 2>/dev/null \
+    | awk 'NR == 1 && /^Listing/ { next } NF { count++ } END { print count + 0 }')
 if command -v flatpak >/dev/null 2>&1; then
-    flatpak_updates=$(flatpak remote-ls --updates --app 2>/dev/null | sed '/^$/d' | wc -l)
+    flatpak_updates=$(flatpak remote-ls --updates --app 2>/dev/null \
+        | awk 'NF { count++ } END { print count + 0 }')
 else
     flatpak_updates=0
 fi

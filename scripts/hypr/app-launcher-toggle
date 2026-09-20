@@ -12,7 +12,7 @@ if [ -n "$pids" ]; then
     exit 0
 fi
 
-exec foot \
+exec footclient \
     --app-id=app-launcher-tui \
     --title=Applications \
     --override=colors.regular0=222226 \

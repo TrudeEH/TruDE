@@ -2,15 +2,31 @@
 set -u
 
 cache_root=${XDG_CACHE_HOME:-"$HOME/.cache"}/dotfiles
-cache_file=$cache_root/applications-v3.tsv
+cache_file=$cache_root/applications-v4.tsv
+cache_check=$cache_root/applications-v4.checked
+cache_dirs=$cache_root/applications-v4.dirs
 data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
 data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
-search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
+raw_search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
+search_dirs=
+old_ifs=$IFS
+IFS=:
+for data_dir in $raw_search_dirs; do
+    [ -n "$data_dir" ] || continue
+    case :$search_dirs: in
+        *:"$data_dir":*) ;;
+        *) search_dirs=${search_dirs:+$search_dirs:}$data_dir ;;
+    esac
+done
+IFS=$old_ifs
 
 mkdir -p "$cache_root"
 
 cache_is_current() {
     [ -f "$cache_file" ] || return 1
+    [ -r "$cache_dirs" ] || return 1
+    IFS= read -r cached_search_dirs < "$cache_dirs" || return 1
+    [ "$cached_search_dirs" = "$search_dirs" ] || return 1
 
     old_ifs=$IFS
     IFS=:
@@ -18,23 +34,45 @@ cache_is_current() {
         applications_dir=$data_dir/applications
         [ -d "$applications_dir" ] || continue
 
-        if [ "$applications_dir" -nt "$cache_file" ] \
-            || find -L "$applications_dir" -type f -name '*.desktop' -newer "$cache_file" -print -quit 2>/dev/null \
-                | grep -q .; then
+        # dash supports -nt on the minimal Debian target.
+        # shellcheck disable=SC3013
+        if [ "$applications_dir" -nt "$cache_file" ]; then
             IFS=$old_ifs
             return 1
         fi
     done
     IFS=$old_ifs
+
+    if [ -n "$(find "$cache_check" -mmin -5 -print -quit 2>/dev/null)" ]; then
+        return 0
+    fi
+
+    IFS=:
+    for data_dir in $search_dirs; do
+        applications_dir=$data_dir/applications
+        [ -d "$applications_dir" ] || continue
+        if [ -n "$(find -L "$applications_dir" \
+            \( -type d -o -type f -name '*.desktop' \) \
+            -newer "$cache_file" -print -quit 2>/dev/null)" ]; then
+            IFS=$old_ifs
+            return 1
+        fi
+    done
+    IFS=$old_ifs
+    touch "$cache_check"
 }
 
 rebuild_cache() {
-    temporary=$(mktemp "$cache_root/applications.XXXXXX") || exit 1
-    candidates=$(mktemp "$cache_root/applications-candidates.XXXXXX") || {
-        rm -f "$temporary"
+    parsed=$(mktemp "$cache_root/applications-parsed.XXXXXX") || exit 1
+    temporary=$(mktemp "$cache_root/applications.XXXXXX") || {
+        rm -f "$parsed"
         exit 1
     }
-    trap 'rm -f "$temporary" "$candidates"' EXIT HUP INT TERM
+    candidates=$(mktemp "$cache_root/applications-candidates.XXXXXX") || {
+        rm -f "$parsed" "$temporary"
+        exit 1
+    }
+    trap 'rm -f "$parsed" "$temporary" "$candidates"' EXIT HUP INT TERM
 
     old_ifs=$IFS
     IFS=:
@@ -96,40 +134,43 @@ rebuild_cache() {
                 parse_desktop_file($2)
             }
         }
-    ' "$candidates" > "$temporary"
+    ' "$candidates" > "$parsed"
 
-    LC_ALL=C sort -f -k1,1 "$temporary" -o "$temporary"
+    LC_ALL=C sort -f -k1,1 "$parsed" -o "$parsed"
+    awk -F '\t' '
+        BEGIN {
+            OFS = "\t"
+            muted = "\033[38;2;170;170;170m"
+            reset = "\033[0m"
+        }
+        {
+            names[NR] = $1
+            descriptions[NR] = $2
+            desktop_files[NR] = $3
+            if (length($1) > name_width) {
+                name_width = length($1)
+            }
+        }
+        END {
+            for (row = 1; row <= NR; row++) {
+                description = descriptions[row]
+                if (description != "") {
+                    description = muted description reset
+                }
+                printf "%-*s\t%s\t%s\n", name_width + 2, names[row], description, desktop_files[row]
+            }
+        }
+    ' "$parsed" > "$temporary"
     mv "$temporary" "$cache_file"
-    rm -f "$candidates"
+    printf '%s\n' "$search_dirs" > "$cache_dirs"
+    touch "$cache_check"
+    rm -f "$parsed" "$candidates"
     trap - EXIT HUP INT TERM
 }
 
 cache_is_current || rebuild_cache
 
-selection=$(awk -F '\t' '
-    BEGIN {
-        OFS = "\t"
-        muted = "\033[38;2;170;170;170m"
-        reset = "\033[0m"
-    }
-    {
-        names[NR] = $1
-        descriptions[NR] = $2
-        desktop_files[NR] = $3
-        if (length($1) > name_width) {
-            name_width = length($1)
-        }
-    }
-    END {
-        for (row = 1; row <= NR; row++) {
-            description = descriptions[row]
-            if (description != "") {
-                description = muted description reset
-            }
-            printf "%-*s\t%s\t%s\n", name_width + 2, names[row], description, desktop_files[row]
-        }
-    }
-' "$cache_file" | fzf \
+selection=$(fzf \
     --ansi \
     --delimiter='\t' \
     --with-nth=1,2 \
@@ -144,7 +185,8 @@ selection=$(awk -F '\t' '
     --layout=reverse \
     --no-multi \
     --cycle \
-    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa') || exit 0
+    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
+    < "$cache_file") || exit 0
 
 desktop_file=$(printf '%s\n' "$selection" | awk -F '\t' '{ print $NF }')
 [ -f "$desktop_file" ] || exit 1

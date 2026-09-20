@@ -4,7 +4,7 @@ set -u
 maximum=0
 for input in /sys/class/hwmon/hwmon*/temp*_input /sys/class/thermal/thermal_zone*/temp; do
     [ -r "$input" ] || continue
-    value=$(cat "$input" 2>/dev/null) || continue
+    IFS= read -r value < "$input" 2>/dev/null || continue
     case $value in *[!0-9]*|'') continue ;; esac
     [ "$value" -gt "$maximum" ] && maximum=$value
 done

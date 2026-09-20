@@ -74,9 +74,9 @@ render() {
             }
             END { printf "%.1f\t%.1f\t%d", total / count, maximum, count }
         ' "$readings_file")
-        average=$(printf '%s\n' "$summary" | cut -f1)
-        maximum=$(printf '%s\n' "$summary" | cut -f2)
-        sensor_count=$(printf '%s\n' "$summary" | cut -f3)
+        IFS="$(printf '\t')" read -r average maximum sensor_count <<EOF
+$summary
+EOF
 
         printf '%b  Average%b  %5.1f°C    %bMaximum%b  %5.1f°C    %bSensors%b  %s\n' \
             "$muted" "$white" "$average" \

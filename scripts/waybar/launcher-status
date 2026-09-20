@@ -15,15 +15,19 @@ cache_is_fresh() {
 
 refresh_status() {
     if ! mkdir "$lock_dir" 2>/dev/null; then
-        attempts=0
-        while [ -d "$lock_dir" ] && [ "$attempts" -lt 25 ]; do
-            sleep 0.02
-            attempts=$((attempts + 1))
-        done
-        [ -r "$cache_file" ] && return
+        lock_pid=
+        IFS= read -r lock_pid < "$lock_dir/pid" 2>/dev/null || :
+        case $lock_pid in
+            ''|*[!0-9]*) ;;
+            *) kill -0 "$lock_pid" 2>/dev/null && return ;;
+        esac
+        rm -f "$lock_dir/pid"
+        rmdir "$lock_dir" 2>/dev/null || return
+        mkdir "$lock_dir" 2>/dev/null || return
     fi
 
-    trap 'rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+    printf '%s\n' "$$" > "$lock_dir/pid"
+    trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
     status=launcher
     if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
         if pw-dump 2>/dev/null | jq -e '
@@ -42,8 +46,11 @@ refresh_status() {
     mv "$temporary" "$cache_file"
 }
 
-cache_is_fresh || refresh_status
-status=$(cat "$cache_file" 2>/dev/null || printf 'launcher')
+if [ "$part" = center ]; then
+    cache_is_fresh || refresh_status
+fi
+status=launcher
+IFS= read -r status < "$cache_file" 2>/dev/null || status=launcher
 
 case $part in
     left) text='' ;;

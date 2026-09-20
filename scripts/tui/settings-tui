@@ -160,8 +160,9 @@ replace_preferences() {
 
 toggle_preference() {
     preference_path=$1
+    preference_scope=$2
     replace_preferences "$preference_path = ($preference_path | not)"
-    save_preferences
+    save_preferences "$preference_scope"
 }
 
 replace_local_section() {
@@ -269,17 +270,23 @@ apply_waybar() {
 }
 
 save_preferences() {
+    preference_scope=$1
     write_preferences_block
     replace_local_section "$preferences_begin_marker" "$preferences_end_marker" \
         "$preferences_block" || return 1
     save_preferences_json
-    if ! output=$(hyprctl reload 2>&1); then
-        message "Settings were saved, but Hyprland could not reload them:\n\n$output"
-        return 1
-    fi
-    apply_wallpaper
-    apply_idle
-    apply_waybar
+    case $preference_scope in
+        hypr)
+            if ! output=$(hyprctl reload 2>&1); then
+                message "Settings were saved, but Hyprland could not reload them:\n\n$output"
+                return 1
+            fi
+            ;;
+        wallpaper) apply_wallpaper ;;
+        idle) apply_idle ;;
+        waybar) apply_waybar ;;
+        json) ;;
+    esac
 }
 
 monitor_value() {
@@ -324,8 +331,12 @@ choose_position() {
         "󰇀 X" 1 1 "$current_x" 1 16 14 0 \
         "󰇀 Y" 2 1 "$current_y" 2 16 14 0 \
         3>&1 1>&2 2>&3) || return
-    position_x=$(printf '%s\n' "$position" | sed -n '1p')
-    position_y=$(printf '%s\n' "$position" | sed -n '2p')
+    {
+        IFS= read -r position_x
+        IFS= read -r position_y
+    } <<EOF
+$position
+EOF
     if ! is_integer "$position_x" || ! is_integer "$position_y"; then
         message "Positions must be whole numbers."
         return
@@ -584,10 +595,10 @@ input_settings() {
                     --arg layout "$selected_layout" \
                     --arg variant "$selected_variant" \
                     '.input.keyboard_layout = $layout | .input.keyboard_variant = $variant'
-                save_preferences
+                save_preferences hypr
                 ;;
-            *" natural-scroll") toggle_preference '.input.natural_scroll' ;;
-            *" tap-to-click") toggle_preference '.input.tap_to_click' ;;
+            *" natural-scroll") toggle_preference '.input.natural_scroll' hypr ;;
+            *" tap-to-click") toggle_preference '.input.tap_to_click' hypr ;;
             *" sensitivity")
                 value=$(dialog --inputbox "󰇀 Pointer sensitivity from -1.0 to 1.0" \
                     10 68 "$sensitivity" 3>&1 1>&2 2>&3) || continue
@@ -599,7 +610,7 @@ input_settings() {
                     continue
                 fi
                 replace_preferences --argjson value "$value" '.input.sensitivity = $value'
-                save_preferences
+                save_preferences hypr
                 ;;
             *" acceleration")
                 choice=$(dialog --menu "󰍾 Pointer acceleration profile" 14 68 5 \
@@ -607,7 +618,7 @@ input_settings() {
                     "󰓅 flat" "No acceleration" \
                     3>&1 1>&2 2>&3) || continue
                 replace_preferences --arg value "${choice#* }" '.input.accel_profile = $value'
-                save_preferences
+                save_preferences hypr
                 ;;
             *" back") return ;;
         esac
@@ -626,7 +637,7 @@ set_bounded_integer() {
         return 1
     fi
     replace_preferences --argjson value "$value" "$preference_path = \$value"
-    save_preferences
+    save_preferences hypr
 }
 
 appearance_settings() {
@@ -650,13 +661,13 @@ appearance_settings() {
             *" wallpaper")
                 value=$(dialog --inputbox "󰸉 Absolute path to the wallpaper" \
                     10 86 "$wallpaper" 3>&1 1>&2 2>&3) || continue
-                case $value in '~/'*) value=$HOME/${value#\~/} ;; esac
+                case $value in \~/*) value=$HOME/${value#\~/} ;; esac
                 if [ ! -f "$value" ]; then message "That wallpaper file does not exist."; continue; fi
                 replace_preferences --arg value "$value" '.appearance.wallpaper = $value'
-                save_preferences
+                save_preferences wallpaper
                 ;;
-            *" animations") toggle_preference '.appearance.animations' ;;
-            *" blur") toggle_preference '.appearance.blur' ;;
+            *" animations") toggle_preference '.appearance.animations' hypr ;;
+            *" blur") toggle_preference '.appearance.blur' hypr ;;
             *" inner-gaps") set_bounded_integer '.appearance.gaps_in' "󰝥 Inner gap size" 0 100 || : ;;
             *" outer-gaps") set_bounded_integer '.appearance.gaps_out' "󰝤 Outer gap size" 0 100 || : ;;
             *" border") set_bounded_integer '.appearance.border_size' "󰨤 Window border size" 0 20 || : ;;
@@ -677,16 +688,16 @@ waybar_settings() {
             "󰅖 back" "Back to settings" \
             3>&1 1>&2 2>&3) || return
         case $action in
-            *" enabled") toggle_preference '.waybar.enabled' ;;
+            *" enabled") toggle_preference '.waybar.enabled' waybar ;;
             *" position")
                 choice=$(dialog --menu "󰘸 Waybar position" 13 64 4 \
                     "󰘸 top" "Top edge" \
                     "󰘷 bottom" "Bottom edge" \
                     3>&1 1>&2 2>&3) || continue
                 replace_preferences --arg value "${choice#* }" '.waybar.position = $value'
-                save_preferences
+                save_preferences waybar
                 ;;
-            *" primary-only") toggle_preference '.waybar.primary_only' ;;
+            *" primary-only") toggle_preference '.waybar.primary_only' waybar ;;
             *" back") return ;;
         esac
     done
@@ -703,7 +714,7 @@ set_timeout() {
         return
     fi
     replace_preferences --argjson value "$value" "$preference_path = \$value"
-    save_preferences
+    save_preferences idle
 }
 
 apply_lid_behavior() {
@@ -739,7 +750,7 @@ choose_lid_behavior() {
     behavior=${choice#* }
     if apply_lid_behavior "$behavior"; then
         replace_preferences --arg value "$behavior" '.laptop.lid_behavior = $value'
-        save_preferences
+        save_preferences json
     else
         message "The lid-close behavior was not changed."
     fi

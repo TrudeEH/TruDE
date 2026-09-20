@@ -32,33 +32,44 @@ message() {
     dialog --msgbox "$1" 10 64
 }
 
-battery_value() {
-    field=$1
-    printf '%s\n' "$battery_info" \
-        | sed -n "s/^[[:space:]]*$field:[[:space:]]*//p" \
-        | head -n 1
-}
-
 battery_device=$(upower -e 2>/dev/null | awk '/\/battery_/ { print; exit }')
 if [ -n "$battery_device" ]; then
     battery_info=$(upower -i "$battery_device" 2>/dev/null || :)
-    battery_present=$(battery_value present)
+    battery_model=
+    battery_percentage=
+    battery_state=
+    battery_health=
+    battery_energy=
+    battery_energy_full=
+    battery_rate=
+    battery_time=
+    battery_present=
+    while IFS= read -r line; do
+        field=${line%%:*}
+        field=${field#"${field%%[![:space:]]*}"}
+        field=${field%"${field##*[![:space:]]}"}
+        value=${line#*:}
+        value=${value#"${value%%[![:space:]]*}"}
+        case $field in
+            model) battery_model=$value ;;
+            percentage) battery_percentage=$value ;;
+            state) battery_state=$value ;;
+            capacity) battery_health=$value ;;
+            energy) battery_energy=$value ;;
+            energy-full) battery_energy_full=$value ;;
+            energy-rate) battery_rate=$value ;;
+            'time to empty'|'time to full') [ -n "$battery_time" ] || battery_time=$value ;;
+            present) battery_present=$value ;;
+        esac
+    done <<EOF
+$battery_info
+EOF
 else
     battery_info=
     battery_present=no
 fi
 
 if [ -n "$battery_info" ] && [ "${battery_present:-yes}" = yes ]; then
-    battery_model=$(battery_value model)
-    battery_percentage=$(battery_value percentage)
-    battery_state=$(battery_value state)
-    battery_health=$(battery_value capacity)
-    battery_energy=$(battery_value energy)
-    battery_energy_full=$(battery_value energy-full)
-    battery_rate=$(battery_value energy-rate)
-    battery_time=$(battery_value 'time to empty')
-    [ -n "$battery_time" ] || battery_time=$(battery_value 'time to full')
-
     battery_summary=$(printf 'Battery: %s%s%s\nHealth: %s   Energy: %s / %s\nPower usage: %s   Remaining: %s\n\nSelect a power profile.' \
         "${battery_model:-Battery}" \
         "${battery_percentage:+ — $battery_percentage}" \

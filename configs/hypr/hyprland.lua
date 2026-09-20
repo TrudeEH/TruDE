@@ -17,8 +17,8 @@ local adwaita = {
 }
 
 dotfilesSettings = {
-    terminal           = "foot",
-    fileManager        = "foot --app-id=nnn --title=Files dotfiles-file-manager-tui",
+    terminal           = "footclient",
+    fileManager        = "footclient --app-id=nnn --title=Files dotfiles-file-manager-tui",
     browser            = "xdg-open https://start.duckduckgo.com",
     launcher           = "dotfiles-app-launcher-toggle",
     wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png",
@@ -97,8 +97,18 @@ hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
-local xdgDataDirs = os.getenv("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"
-hl.env("XDG_DATA_DIRS", os.getenv("HOME") .. "/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:" .. xdgDataDirs)
+local xdgDataDirs = {}
+local seenDataDirs = {}
+local dataDirCandidates = os.getenv("HOME") .. "/.local/share/flatpak/exports/share"
+    .. ":/var/lib/flatpak/exports/share:"
+    .. (os.getenv("XDG_DATA_DIRS") or "/usr/local/share:/usr/share")
+for dataDir in string.gmatch(dataDirCandidates, "[^:]+") do
+    if not seenDataDirs[dataDir] then
+        table.insert(xdgDataDirs, dataDir)
+        seenDataDirs[dataDir] = true
+    end
+end
+hl.env("XDG_DATA_DIRS", table.concat(xdgDataDirs, ":"))
 
 
 -----------------------
@@ -248,8 +258,8 @@ hl.config({
 
 hl.config({
     misc = {
-        force_default_wallpaper = -1,    -- Set to 0 or 1 to disable the anime mascot wallpapers
-        disable_hyprland_logo   = false, -- If true disables the random hyprland logo / anime girl background. :(
+        force_default_wallpaper = 0,
+        disable_hyprland_logo   = true,
     },
 })
 
@@ -292,15 +302,15 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal), { description = "Open terminal" })
-hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("foot --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
+hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("footclient --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
     description = "Show Hyprland shortcuts",
 })
-hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("foot --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui"), {
+hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("footclient --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui"), {
     description = "Open settings",
 })
 local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
 -- closeWindowBind:set_enabled(false)
-hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"), { description = "Exit Hyprland" })
+hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch exit"), { description = "Exit Hyprland" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser), { description = "Open browser" })
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })

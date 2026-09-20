@@ -12,13 +12,20 @@ waybar_enabled=true
 position=top
 primary_only=true
 if [ -f "$preferences_file" ]; then
-    waybar_enabled=$(jq -r 'if .waybar.enabled == null then true else .waybar.enabled end' "$preferences_file" 2>/dev/null || printf true)
-    position=$(jq -r '.waybar.position // "top"' "$preferences_file" 2>/dev/null || printf top)
-    primary_only=$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$preferences_file" 2>/dev/null || printf true)
+    preferences=$(jq -r '[
+        (if .waybar.enabled == null then true else .waybar.enabled end),
+        (.waybar.position // "top"),
+        (if .waybar.primary_only == null then true else .waybar.primary_only end)
+    ] | @tsv' "$preferences_file" 2>/dev/null || printf 'true\ttop\ttrue')
+    IFS="$(printf '\t')" read -r waybar_enabled position primary_only <<EOF
+$preferences
+EOF
 fi
 
+[ "$waybar_enabled" = false ] || waybar_enabled=true
 [ "$waybar_enabled" = true ] || exit 0
 case $position in top|bottom) ;; *) position=top ;; esac
+case $primary_only in true|false) ;; *) primary_only=true ;; esac
 primary_output=
 if [ "$primary_only" = true ]; then
     attempt=0

@@ -15,9 +15,9 @@ case $count in *[!0-9]*|'') count=0 ;; esac
 
 if [ "$dnd" = true ]; then
     if [ "$count" -gt 0 ]; then
-        state=dnd-notification
+        state='dnd-notification'
     else
-        state=dnd-none
+        state='dnd-none'
     fi
 else
     if [ "$count" -gt 0 ]; then

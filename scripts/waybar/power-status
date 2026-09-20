@@ -14,9 +14,25 @@ battery=$(upower -e 2>/dev/null | awk '/\/battery_/ { print; exit }')
 
 if [ -n "$battery" ]; then
     info=$(upower -i "$battery" 2>/dev/null || :)
-    present=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*present:[[:space:]]*//p' | head -n 1)
-    percentage=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*percentage:[[:space:]]*\([0-9][0-9]*\)%.*/\1/p' | head -n 1)
-    state=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*state:[[:space:]]*//p' | head -n 1)
+    present=
+    percentage=
+    state=
+    while IFS= read -r line; do
+        value=${line#*:}
+        value=${value#"${value%%[![:space:]]*}"}
+        case $line in
+            *present:*) [ -n "$present" ] || present=$value ;;
+            *percentage:*)
+                if [ -z "$percentage" ]; then
+                    percentage=${value%%%*}
+                    case $percentage in *[!0-9]*|'') percentage= ;; esac
+                fi
+                ;;
+            *state:*) [ -n "$state" ] || state=$value ;;
+        esac
+    done <<EOF
+$info
+EOF
     if [ "${present:-yes}" = yes ] && [ -n "$percentage" ]; then
         label="$icon  $percentage%"
         tooltip="$tooltip\\nBattery: $percentage%${state:+ ($state)}"

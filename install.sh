@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
 backports_suite=stable-backports
@@ -30,8 +30,13 @@ write_root_file() {
     root_mode=$2
     root_temporary=$(mktemp)
     cat > "$root_temporary"
-    sudo install -D -m "$root_mode" "$root_temporary" "$root_destination"
+    if sudo install -D -m "$root_mode" "$root_temporary" "$root_destination"; then
+        root_status=0
+    else
+        root_status=$?
+    fi
     rm -f "$root_temporary"
+    return "$root_status"
 }
 
 configure_debian_sources() {
@@ -75,7 +80,8 @@ install_packages() {
         brightness-udev playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
-        wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq
+        wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
+        file fontconfig procps xdg-user-dirs xdg-utils
 }
 
 install_font() {
@@ -86,9 +92,15 @@ install_font() {
 
     mkdir -p "$font_dir"
     font_archive=$(mktemp)
-    curl --fail --location --output "$font_archive" \
-        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz
-    tar -xJf "$font_archive" -C "$font_dir"
+    if ! curl --fail --location --output "$font_archive" \
+        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz; then
+        rm -f "$font_archive"
+        return 1
+    fi
+    if ! tar -xJf "$font_archive" -C "$font_dir"; then
+        rm -f "$font_archive"
+        return 1
+    fi
     rm -f "$font_archive"
     fc-cache -f "$font_dir"
 }
@@ -116,36 +128,75 @@ configure_networking() {
     sudo systemctl enable --now avahi-daemon.service
     networkmanager_config=/etc/NetworkManager/NetworkManager.conf
     if [ -f "$networkmanager_config" ] && ! awk '
-        /^\[ifupdown\]$/ { in_section=1; next }
-        /^\[/ { in_section=0 }
-        in_section && /^managed=true$/ { found=1 }
+        /^[[:space:]]*\[ifupdown\][[:space:]]*$/ { in_section=1; next }
+        /^[[:space:]]*\[/ { in_section=0 }
+        in_section && /^[[:space:]]*managed[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found=1 }
         END { exit !found }
     ' "$networkmanager_config"; then
-        sudo cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S)"
+        sudo cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S-%N)"
         networkmanager_temporary=$(mktemp)
-        if grep -q '^\[ifupdown\]$' "$networkmanager_config"; then
-            sed '/^\[ifupdown\]$/,/^\[/{s/^managed=.*/managed=true/}' \
-                "$networkmanager_config" > "$networkmanager_temporary"
+        if grep -q '^[[:space:]]*\[ifupdown\][[:space:]]*$' "$networkmanager_config"; then
+            awk '
+                function finish_section() {
+                    if (in_section && !wrote_managed) print "managed=true"
+                }
+                /^[[:space:]]*\[ifupdown\][[:space:]]*$/ {
+                    finish_section()
+                    in_section=1
+                    wrote_managed=0
+                    print
+                    next
+                }
+                /^[[:space:]]*\[/ {
+                    finish_section()
+                    in_section=0
+                }
+                in_section && /^[[:space:]]*managed[[:space:]]*=/ {
+                    if (!wrote_managed) print "managed=true"
+                    wrote_managed=1
+                    next
+                }
+                { print }
+                END { finish_section() }
+            ' "$networkmanager_config" > "$networkmanager_temporary"
         else
             cat "$networkmanager_config" > "$networkmanager_temporary"
             printf '\n[ifupdown]\nmanaged=true\n' >> "$networkmanager_temporary"
         fi
-        sudo install -m 0644 "$networkmanager_temporary" "$networkmanager_config"
+        if sudo install -m 0644 "$networkmanager_temporary" "$networkmanager_config"; then
+            networkmanager_status=0
+        else
+            networkmanager_status=$?
+        fi
         rm -f "$networkmanager_temporary"
+        [ "$networkmanager_status" -eq 0 ] || return "$networkmanager_status"
     fi
 
     interfaces_file=/etc/network/interfaces
     if [ -f "$interfaces_file" ] && awk '$1 == "iface" && $2 != "lo" { found=1 } END { exit !found }' "$interfaces_file"; then
-        sudo cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S)"
+        sudo cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S-%N)"
         interfaces_temporary=$(mktemp)
         awk '
-            $1 == "auto" || $1 == "allow-hotplug" { if ($2 != "lo") next }
+            $1 == "auto" || $1 == "allow-hotplug" {
+                for (field=2; field <= NF; field++) {
+                    if ($field == "lo") {
+                        print $1 " lo"
+                        break
+                    }
+                }
+                next
+            }
             $1 == "iface" { skip = ($2 != "lo") }
             skip { next }
             { print }
         ' "$interfaces_file" > "$interfaces_temporary"
-        sudo install -m 0644 "$interfaces_temporary" "$interfaces_file"
+        if sudo install -m 0644 "$interfaces_temporary" "$interfaces_file"; then
+            interfaces_status=0
+        else
+            interfaces_status=$?
+        fi
         rm -f "$interfaces_temporary"
+        [ "$interfaces_status" -eq 0 ] || return "$interfaces_status"
     fi
 }
 
@@ -191,7 +242,7 @@ link_config() {
         return
     fi
     if [ -e "$link_target" ] || [ -L "$link_target" ]; then
-        mv "$link_target" "$link_target.backup-$(date +%Y%m%d-%H%M%S)"
+        mv "$link_target" "$link_target.backup-$(date +%Y%m%d-%H%M%S-%N)"
     fi
     ln -s "$link_source" "$link_target"
 }
@@ -259,7 +310,7 @@ main() {
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
-        systemctl --user enable --now waybar.service mako.service || :
+        systemctl --user enable --now foot-server.socket waybar.service mako.service || :
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 

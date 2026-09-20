@@ -20,8 +20,16 @@ case "$mode" in
         ;;
 esac
 
-output_dir=${XDG_PICTURES_DIR:-"$HOME/Pictures"}/Screenshots
-output="$output_dir/screenshot-$(date +%Y%m%d-%H%M%S).png"
+if [ -n "${XDG_PICTURES_DIR:-}" ]; then
+    pictures_dir=$XDG_PICTURES_DIR
+elif command -v xdg-user-dir >/dev/null 2>&1; then
+    pictures_dir=$(xdg-user-dir PICTURES)
+    [ -n "$pictures_dir" ] || pictures_dir=$HOME/Pictures
+else
+    pictures_dir=$HOME/Pictures
+fi
+output_dir=$pictures_dir/Screenshots
+output="$output_dir/screenshot-$(date +%Y%m%d-%H%M%S-%N).png"
 mkdir -p "$output_dir"
 
 if [ "$mode" = region ]; then
