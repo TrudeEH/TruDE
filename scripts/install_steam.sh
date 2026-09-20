@@ -21,7 +21,7 @@ if [ "${ID:-}" != debian ] || [ "$debian_major" -lt 13 ] || [ -z "${VERSION_CODE
 fi
 
 if ! dpkg --print-foreign-architectures | grep -qx i386; then
-    pkexec dpkg --add-architecture i386
+    sudo dpkg --add-architecture i386
 fi
 
 if [ ! -f "$backports" ] || ! grep -Fqx "Suites: $backports_suite" "$backports" || ! grep -Fqx "Components: main contrib non-free non-free-firmware" "$backports"; then
@@ -33,11 +33,11 @@ Suites: $backports_suite
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 BACKPORTS
-    pkexec install -D -m 0644 "$temporary" "$backports"
+    sudo install -D -m 0644 "$temporary" "$backports"
     rm -f "$temporary"
 fi
 
-pkexec apt-get update
-pkexec apt-get install -y -t "$backports_suite" steam-installer
+sudo apt-get update
+sudo apt-get install -y -t "$backports_suite" steam-installer
 
 echo "Steam and its 32-bit dependencies are installed."

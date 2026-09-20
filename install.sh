@@ -30,7 +30,7 @@ write_root_file() {
     root_mode=$2
     root_temporary=$(mktemp)
     cat > "$root_temporary"
-    pkexec install -D -m "$root_mode" "$root_temporary" "$root_destination"
+    sudo install -D -m "$root_mode" "$root_temporary" "$root_destination"
     rm -f "$root_temporary"
 }
 
@@ -65,10 +65,10 @@ BACKPORTS
 }
 
 install_packages() {
-    pkexec apt-get update
-    pkexec apt-get install -y -t "$backports_suite" \
+    sudo apt-get update
+    sudo apt-get install -y -t "$backports_suite" \
         hyprland hyprland-guiutils hypridle hyprlock libdw1t64 uwsm xdg-desktop-portal-hyprland
-    pkexec apt-get install -y \
+    sudo apt-get install -y \
         curl foot nautilus gnome-software gnome-software-plugin-flatpak \
         flatpak gnome-text-editor gnome-calculator gnome-disk-utility \
         gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
@@ -76,7 +76,7 @@ install_packages() {
         brightness-udev playerctl bluez btop pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
-        wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq socat
+        wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq
 }
 
 install_font() {
@@ -100,21 +100,21 @@ configure_flatpak() {
 }
 
 configure_lightdm() {
-    pkexec install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
+    sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
         /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
-    pkexec install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
+    sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
         /etc/lightdm/slick-greeter.conf
-    pkexec install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
+    sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
         /var/lib/lightdm/.config/gtk-3.0/gtk.css
-    pkexec systemctl enable lightdm.service
+    sudo systemctl enable lightdm.service
 }
 
 configure_hardware_services() {
-    pkexec systemctl enable --now bluetooth.service cups.service power-profiles-daemon.service
+    sudo systemctl enable --now bluetooth.service cups.service power-profiles-daemon.service
 }
 
 configure_networking() {
-    pkexec systemctl enable --now avahi-daemon.service
+    sudo systemctl enable --now avahi-daemon.service
     networkmanager_config=/etc/NetworkManager/NetworkManager.conf
     if [ -f "$networkmanager_config" ] && ! awk '
         /^\[ifupdown\]$/ { in_section=1; next }
@@ -122,7 +122,7 @@ configure_networking() {
         in_section && /^managed=true$/ { found=1 }
         END { exit !found }
     ' "$networkmanager_config"; then
-        pkexec cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S)"
+        sudo cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S)"
         networkmanager_temporary=$(mktemp)
         if grep -q '^\[ifupdown\]$' "$networkmanager_config"; then
             sed '/^\[ifupdown\]$/,/^\[/{s/^managed=.*/managed=true/}' \
@@ -131,13 +131,13 @@ configure_networking() {
             cat "$networkmanager_config" > "$networkmanager_temporary"
             printf '\n[ifupdown]\nmanaged=true\n' >> "$networkmanager_temporary"
         fi
-        pkexec install -m 0644 "$networkmanager_temporary" "$networkmanager_config"
+        sudo install -m 0644 "$networkmanager_temporary" "$networkmanager_config"
         rm -f "$networkmanager_temporary"
     fi
 
     interfaces_file=/etc/network/interfaces
     if [ -f "$interfaces_file" ] && awk '$1 == "iface" && $2 != "lo" { found=1 } END { exit !found }' "$interfaces_file"; then
-        pkexec cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S)"
+        sudo cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S)"
         interfaces_temporary=$(mktemp)
         awk '
             $1 == "auto" || $1 == "allow-hotplug" { if ($2 != "lo") next }
@@ -145,7 +145,7 @@ configure_networking() {
             skip { next }
             { print }
         ' "$interfaces_file" > "$interfaces_temporary"
-        pkexec install -m 0644 "$interfaces_temporary" "$interfaces_file"
+        sudo install -m 0644 "$interfaces_temporary" "$interfaces_file"
         rm -f "$interfaces_temporary"
     fi
 }
@@ -153,10 +153,10 @@ configure_networking() {
 configure_pam() {
     pam_file=/etc/pam.d/lightdm
     if ! grep -Fqx "auth optional pam_gnome_keyring.so" "$pam_file"; then
-        printf '%s\n' "auth optional pam_gnome_keyring.so" | pkexec tee -a "$pam_file" >/dev/null
+        printf '%s\n' "auth optional pam_gnome_keyring.so" | sudo tee -a "$pam_file" >/dev/null
     fi
     if ! grep -Fqx "session optional pam_gnome_keyring.so auto_start" "$pam_file"; then
-        printf '%s\n' "session optional pam_gnome_keyring.so auto_start" | pkexec tee -a "$pam_file" >/dev/null
+        printf '%s\n' "session optional pam_gnome_keyring.so auto_start" | sudo tee -a "$pam_file" >/dev/null
     fi
 }
 
@@ -213,18 +213,15 @@ link_configs() {
     link_config "$repo_dir/scripts/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
     link_config "$repo_dir/scripts/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
-    link_config "$repo_dir/scripts/waybar-temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
-    link_config "$repo_dir/scripts/waybar-workspace" "$HOME/.local/bin/dotfiles-waybar-workspace"
-    link_config "$repo_dir/scripts/waybar-workspace-events" "$HOME/.local/bin/dotfiles-waybar-workspace-events"
-    link_config "$repo_dir/scripts/waybar-notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
-    link_config "$repo_dir/scripts/waybar-power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
-    link_config "$repo_dir/scripts/waybar-maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
+    link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
+    link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
+    link_config "$repo_dir/scripts/waybar/power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
+    link_config "$repo_dir/scripts/waybar/maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
     link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
     link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-waybar-workspaces.service" "$config_dir/systemd/user/dotfiles-waybar-workspaces.service"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
@@ -250,7 +247,7 @@ main() {
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
-        systemctl --user enable --now waybar.service mako.service dotfiles-waybar-workspaces.service || :
+        systemctl --user enable --now waybar.service mako.service || :
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 
