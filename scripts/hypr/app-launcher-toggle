@@ -5,11 +5,14 @@ addresses=$(hyprctl clients -j 2>/dev/null \
     | jq -r '.[] | select(.class == "app-launcher-tui") | .address' 2>/dev/null)
 
 if [ -n "$addresses" ]; then
-    printf '%s\n' "$addresses" | while IFS= read -r address; do
+    while IFS= read -r address; do
         hex=${address#0x}
         case $hex in ''|*[!0-9a-fA-F]*) continue ;; esac
-        hyprctl dispatch closewindow "address:$address" >/dev/null 2>&1 || :
-    done
+        dispatcher=$(printf 'hl.dsp.window.close({ window = "address:%s" })' "$address")
+        hyprctl dispatch "$dispatcher" >/dev/null
+    done <<EOF
+$addresses
+EOF
     exit 0
 fi
 
