@@ -74,7 +74,7 @@
         "return-type": "json",
         "interval": 5,
         "min-length": 8,
-        "on-click": "foot --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
+        "on-click": "foot --app-id=s-tui --title='Temperature Monitor' --window-size-chars=104x32 s-tui"
     },
     "memory": {
         "format": "󰘚 {percentage}%",

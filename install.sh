@@ -73,7 +73,7 @@ install_packages() {
         flatpak gnome-text-editor gnome-calculator gnome-disk-utility \
         gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         libnss-mdns lightdm slick-greeter xdg-desktop-portal-gtk brightnessctl \
-        brightness-udev playerctl bluez btop pulsemixer whiptail \
+        brightness-udev playerctl bluez btop s-tui pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq
