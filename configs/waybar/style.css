@@ -179,6 +179,20 @@ tooltip label {
     background-color: @bg-1;
 }
 
+#custom-notification.notification,
+#custom-notification.dnd-notification,
+#custom-notification.inhibited-notification,
+#custom-notification.dnd-inhibited-notification {
+    color: @accent;
+}
+
+#custom-notification.none,
+#custom-notification.dnd-none,
+#custom-notification.inhibited-none,
+#custom-notification.dnd-inhibited-none {
+    color: @fg;
+}
+
 #network:hover,
 #bluetooth:hover,
 #custom-notification:hover {

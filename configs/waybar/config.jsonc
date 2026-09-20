@@ -176,7 +176,7 @@
         "return-type": "json",
         "exec": "dotfiles-waybar-notification-status",
         "interval": 5,
-        "hide-empty-text": true,
+        "hide-empty-text": false,
         "on-click": "foot --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"
     },
