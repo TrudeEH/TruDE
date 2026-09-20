@@ -105,6 +105,7 @@
     "custom/launcher": {
         "exec": "dotfiles-waybar-launcher-status center",
         "return-type": "json",
+        "escape": false,
         "interval": 1,
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
