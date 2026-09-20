@@ -129,8 +129,7 @@ load_preferences() {
             waybar: {
                 enabled: true,
                 position: "top",
-                primary_only: true,
-                auto_hide: false
+                primary_only: true
             },
             laptop: {
                 idle_timeout: 300,
@@ -142,7 +141,7 @@ load_preferences() {
     ' > "$defaults"
 
     if [ -f "$preferences_file" ] && jq -e 'type == "object"' "$preferences_file" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1] | del(.defaults, .workspaces)' \
+        jq -s '.[0] * .[1] | del(.defaults, .workspaces, .waybar.auto_hide)' \
             "$defaults" "$preferences_file" > "$preferences_state"
     else
         cp "$defaults" "$preferences_state"
@@ -242,7 +241,13 @@ apply_wallpaper() {
     wallpaper=$(preference '.appearance.wallpaper')
     [ -f "$wallpaper" ] || return
     pkill -x swaybg 2>/dev/null || :
-    swaybg -i "$wallpaper" -m fill >/dev/null 2>&1 &
+    wallpaper_generation=${wallpaper_generation:-0}
+    wallpaper_generation=$((wallpaper_generation + 1))
+    if ! systemd-run --user --quiet --collect \
+        --unit="dotfiles-wallpaper-$$-$wallpaper_generation" \
+        swaybg -i "$wallpaper" -m fill >/dev/null 2>&1; then
+        message "Unable to start the wallpaper service."
+    fi
 }
 
 apply_idle() {
@@ -510,21 +515,23 @@ choose_keyboard_layout() {
             layout=$1
             $1=""
             sub(/^[[:space:]]+/, "")
-            print layout "\t" $0
+            print "󰌌 " layout "\t" $0
         }
     ' "$rules_file")
 
-    set --
-    while IFS="	" read -r layout description; do
-        [ -n "$layout" ] || continue
-        if [ "$layout" = "$current_layout" ]; then selected=ON; else selected=OFF; fi
-        set -- "$@" "󰌌 $layout" "$description" "$selected"
-    done <<EOF
-$layouts
-EOF
-    choice=$(dialog --radiolist "󰌌 Choose a keyboard layout" 24 86 16 "$@" \
-        3>&1 1>&2 2>&3) || return 1
-    printf '%s\n' "${choice#* }"
+    if ! command -v fzf >/dev/null 2>&1; then
+        message "fzf is required to search keyboard layouts."
+        return 1
+    fi
+    choice=$(printf '%s\n' "$layouts" | fzf \
+        --no-multi \
+        --cycle \
+        --layout=reverse \
+        --border \
+        --prompt='Keyboard layout  ' \
+        --header="Current: $current_layout — type to search, Enter to select" \
+        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,info:#aaaaaa,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,spinner:#ffbe6f,header:#aaaaaa,border:#77767b') || return 1
+    printf '%s\n' "$choice" | awk '{ print $2 }'
 }
 
 input_settings() {
@@ -632,12 +639,10 @@ waybar_settings() {
         enabled=$(boolean_label "$(preference '.waybar.enabled')")
         position=$(preference '.waybar.position')
         primary=$(boolean_label "$(preference '.waybar.primary_only')")
-        auto_hide=$(boolean_label "$(preference '.waybar.auto_hide')")
-        action=$(dialog --menu "Waybar settings" 18 84 8 \
+        action=$(dialog --menu "Waybar settings" 17 84 7 \
             "󰐥 enabled" "Waybar: $enabled" \
             "󰘸 position" "Position: $position" \
             "󰹑 primary-only" "Primary display only: $primary" \
-            "󰖲 auto-hide" "Automatic hiding: $auto_hide" \
             "󰅖 back" "Back to settings" \
             3>&1 1>&2 2>&3) || return
         case $action in
@@ -651,24 +656,9 @@ waybar_settings() {
                 save_preferences
                 ;;
             *" primary-only") toggle_preference '.waybar.primary_only' ;;
-            *" auto-hide") toggle_preference '.waybar.auto_hide' ;;
             *" back") return ;;
         esac
     done
-}
-
-set_brightness() {
-    current=$(brightnessctl -m 2>/dev/null | sed -n '1{s/.*,//; s/%//; p;}')
-    [ -n "$current" ] || { message "No brightness device was found."; return; }
-    value=$(dialog --inputbox "󰃠 Display brightness percentage" \
-        10 68 "$current" 3>&1 1>&2 2>&3) || return
-    if ! is_unsigned_integer "$value" || [ "$value" -lt 1 ] || [ "$value" -gt 100 ]; then
-        message "Brightness must be from 1 to 100 percent."
-        return
-    fi
-    if ! output=$(brightnessctl set "$value%" 2>&1); then
-        message "Unable to change brightness:\n\n$output"
-    fi
 }
 
 set_timeout() {
@@ -724,17 +714,13 @@ choose_lid_behavior() {
     fi
 }
 
-laptop_settings() {
+idle_settings() {
     while :; do
         idle=$(preference '.laptop.idle_timeout')
         screen=$(preference '.laptop.screen_off_timeout')
         suspend=$(preference '.laptop.suspend_timeout')
         lid=$(preference '.laptop.lid_behavior')
-        set --
-        if brightnessctl -m >/dev/null 2>&1; then
-            set -- "$@" "󰃠 brightness" "Adjust display brightness"
-        fi
-        set -- "$@" \
+        set -- \
             "󰌾 idle" "Lock after: ${idle}s (0 disables)" \
             "󰍹 screen-off" "Turn screen off after: ${screen}s (0 disables)" \
             "󰒲 suspend" "Suspend after: ${suspend}s (0 disables)"
@@ -743,10 +729,9 @@ laptop_settings() {
             set -- "$@" "󰌢 lid" "Lid close: $lid"
         fi
         set -- "$@" "󰅖 back" "Back to settings"
-        action=$(dialog --menu "Laptop and idle settings" 20 86 10 "$@" \
+        action=$(dialog --menu "Idle settings" 19 86 9 "$@" \
             3>&1 1>&2 2>&3) || return
         case $action in
-            *" brightness") set_brightness ;;
             *" idle") set_timeout '.laptop.idle_timeout' "󰌾 Lock timeout in seconds" ;;
             *" screen-off") set_timeout '.laptop.screen_off_timeout' "󰍹 Screen-off timeout in seconds" ;;
             *" suspend") set_timeout '.laptop.suspend_timeout' "󰒲 Suspend timeout in seconds" ;;
@@ -763,8 +748,8 @@ while :; do
         "󰍹 displays" "Monitor layout, modes, scale, and rotation" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
-        "󰍜 waybar" "Visibility, position, displays, and automatic hiding" \
-        "󰌢 laptop" "Brightness, idle timeouts, suspend, and lid behavior" \
+        "󰍜 waybar" "Visibility, position, and displays" \
+        "󰌾 idle" "Lock, screen-off, suspend, and lid behavior" \
         "󰅖 close" "Close settings" \
         3>&1 1>&2 2>&3) || exit 0
     case $section in
@@ -772,7 +757,7 @@ while :; do
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
         *" waybar") waybar_settings ;;
-        *" laptop") laptop_settings ;;
+        *" idle") idle_settings ;;
         *" close") exit 0 ;;
     esac
 done
