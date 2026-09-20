@@ -4,23 +4,19 @@ set -eu
 [ "$#" -gt 0 ] || exit 0
 
 path=$1
-extension=$(printf '%s\n' "${path##*.}" | tr '[:upper:]' '[:lower:]')
+imv=$(command -v imv || printf "/usr/libexec/imv/imv")
+cmus=$(command -v cmus || printf "/usr/bin/cmus")
+
+extension=$(printf "%s\n" "${path##*.}" | tr "[:upper:]" "[:lower:]")
+
 mime_type=$(file --brief --mime-type -- "$path")
 
 case $extension:$mime_type in
     jpg:*|jpeg:*|png:*|gif:*|webp:*|bmp:*|tif:*|tiff:*|svg:*|heic:*|avif:*|*:image/*)
-        if ! command -v imv >/dev/null 2>&1; then
-            printf 'nnn: imv is required to open images\n' >&2
-            exit 1
-        fi
-        imv "$path" >/dev/null 2>&1 &
+        "$imv" "$path" >/dev/null 2>&1 &
         ;;
     mp3:*|flac:*|ogg:*|oga:*|opus:*|wav:*|m4a:*|aac:*|wma:*|aiff:*|ape:*|*:audio/*)
-        if ! command -v cmus >/dev/null 2>&1; then
-            printf 'nnn: cmus is required to open audio files\n' >&2
-            exit 1
-        fi
-        exec cmus "$path"
+        exec "$cmus" "$path"
         ;;
     *)
         xdg-open "$path" >/dev/null 2>&1 &
