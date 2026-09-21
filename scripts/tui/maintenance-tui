@@ -180,6 +180,7 @@ while true; do
         "$reboot" "$apt_updated")
 
     choice=$(dialog --menu "$prompt" 25 94 10 \
+        "󰏗 packages" "Search, install, or remove packages" \
         "󰋼 summary" "Full summary and update preview" \
         "󰏗 apt" "APT updates ($apt_updates)" \
         "󰏖 flatpak" "Flatpak updates ($flatpak_updates)" \
@@ -191,6 +192,10 @@ while true; do
         "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
 
     case $choice in
+        *" packages")
+            dotfiles-package-manager-tui
+            collect_status
+            ;;
         *" summary") show_file "Maintenance Summary" "$summary_file" ;;
         *" apt") show_file "APT Updates" "$apt_updates_file" ;;
         *" flatpak") show_file "Flatpak Updates" "$flatpak_updates_file" ;;

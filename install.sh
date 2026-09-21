@@ -261,6 +261,7 @@ link_configs() {
     link_config "$repo_dir/scripts/tui/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
     link_config "$repo_dir/scripts/tui/temperature-tui" "$HOME/.local/bin/dotfiles-temperature-tui"
     link_config "$repo_dir/scripts/tui/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
+    link_config "$repo_dir/scripts/tui/package-manager-tui" "$HOME/.local/bin/dotfiles-package-manager-tui"
     link_config "$repo_dir/scripts/tui/app-launcher-tui" "$HOME/.local/bin/dotfiles-app-launcher-tui"
     link_config "$repo_dir/scripts/hypr/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
     link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"

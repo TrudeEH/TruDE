@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Package Manager
+Comment=Search, install, and remove Debian packages and Flatpaks
+Exec=footclient --app-id=package-manager-tui --title="Package Manager" --override=colors.regular0=222226 --window-size-chars=112x34 dotfiles-package-manager-tui
+Terminal=false
+Categories=System;
