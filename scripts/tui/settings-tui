@@ -343,17 +343,15 @@ choose_position_coordinates() {
     monitor_name=$1
     current_x=$(monitor_value "$monitor_name" x)
     current_y=$(monitor_value "$monitor_name" y)
-    position=$(dialog --form "Set the display position in logical pixels" 13 64 4 \
-        "󰇀 X" 1 1 "$current_x" 1 16 14 0 \
-        "󰇀 Y" 2 1 "$current_y" 2 16 14 0 \
-        3>&1 1>&2 2>&3) || return
-    {
-        IFS= read -r position_x
-        IFS= read -r position_y
-    } <<EOF
-$position
-EOF
-    if ! is_integer "$position_x" || ! is_integer "$position_y"; then
+    position_x=$(dialog --inputbox "󰇀 X position in logical pixels" 10 68 \
+        "$current_x" 3>&1 1>&2 2>&3) || return
+    if ! is_integer "$position_x"; then
+        message "Positions must be whole numbers."
+        return
+    fi
+    position_y=$(dialog --inputbox "󰇀 Y position in logical pixels" 10 68 \
+        "$current_y" 3>&1 1>&2 2>&3) || return
+    if ! is_integer "$position_y"; then
         message "Positions must be whole numbers."
         return
     fi
