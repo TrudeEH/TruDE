@@ -284,15 +284,31 @@ install_package() {
 }
 
 create_installed_package_results() {
-    query=$1
     results_file=$temporary_dir/installed-package-results
     : > "$results_file"
+    debian_color=$(printf '\033[38;2;255;190;111m')
+    backports_color=$(printf '\033[38;2;255;163;72m')
+    flatpak_color=$(printf '\033[38;2;255;255;255m')
+    package_color=$(printf '\033[38;2;255;255;255m')
+    muted_color=$(printf '\033[38;2;170;170;170m')
+    reset_color=$(printf '\033[0m')
 
     dpkg-query -W -f='${binary:Package}\t${Version}\t${Essential}\t${Status}\n' 2>/dev/null \
-        | awk -F '\t' -v query="$query" '
-            $4 ~ /installed$/ && index(tolower($1), tolower(query)) {
-                label = "[Debian] " $1 " — " $2
-                if ($3 == "yes") label = label " [essential]"
+        | awk -F '\t' \
+            -v source_color="$debian_color" \
+            -v backports_color="$backports_color" \
+            -v package_color="$package_color" \
+            -v muted_color="$muted_color" \
+            -v reset_color="$reset_color" '
+            $4 ~ /installed$/ {
+                color = source_color
+                source = "[Debian]"
+                if ($2 ~ /~bpo/) {
+                    color = backports_color
+                    source = "[Backports]"
+                }
+                label = color source reset_color " " package_color $1 reset_color " " muted_color "— " $2 reset_color
+                if ($3 == "yes") label = label " " color "[essential]" reset_color
                 print "apt\t" $1 "\t" label
             }
         ' >> "$results_file"
@@ -300,41 +316,61 @@ create_installed_package_results() {
     if command -v flatpak >/dev/null 2>&1; then
         for scope in user system; do
             flatpak list --"$scope" --app --columns=application,name,version 2>/dev/null \
-                | awk -F '\t' -v source="flatpak-"$scope -v query="$query" '
-                    NF >= 1 && $1 != "" && index(tolower($1 " " $2), tolower(query)) {
-                        label = "[Flatpak " substr(source, 9) "] " $2
-                        if ($3 != "") label = label " — " $3
+                | awk -F '\t' \
+                    -v source="flatpak-"$scope \
+                    -v source_color="$flatpak_color" \
+                    -v package_color="$package_color" \
+                    -v muted_color="$muted_color" \
+                    -v reset_color="$reset_color" '
+                    NF >= 1 && $1 != "" {
+                        label = source_color "[Flatpak " substr(source, 9) "]" reset_color " " package_color $2 reset_color
+                        if ($3 != "") label = label " " muted_color "— " $3 reset_color
+                        label = label " " muted_color "(" $1 ")" reset_color
                         print source "\t" $1 "\t" label
                     }
                 ' >> "$results_file"
         done
     fi
 
-    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$results_file" \
-        | sed -n '1,160p' > "$results_file.sorted"
+    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$results_file" > "$results_file.sorted"
     mv "$results_file.sorted" "$results_file"
 }
 
 select_installed_package() {
-    query=$(dialog --inputbox 'Search installed Debian packages and Flatpaks:' 10 78 "" \
-        3>&1 1>&2 2>&3) || return 1
-    [ -n "$query" ] || return 1
-
-    create_installed_package_results "$query"
-    results_file=$temporary_dir/installed-package-results
-    [ -s "$results_file" ] || {
-        message "No installed packages matched that search."
+    command -v fzf >/dev/null 2>&1 || {
+        message "fzf is required to search installed packages."
         return 1
     }
 
-    set --
-    while IFS="$(printf '\t')" read -r source identifier label; do
-        set -- "$@" "$source:$identifier" "$label"
-    done < "$results_file"
+    create_installed_package_results
+    results_file=$temporary_dir/installed-package-results
+    [ -s "$results_file" ] || {
+        message "No installed Debian packages or Flatpaks were found."
+        return 1
+    }
 
-    selected=$(dialog --menu "Installed packages matching: $query" 24 112 16 "$@" \
-        3>&1 1>&2 2>&3) || return 1
-    printf '%s\n' "$selected"
+    selected=$(fzf \
+        --ansi \
+        --delimiter='\t' \
+        --with-nth=3 \
+        --nth=3 \
+        --prompt='󰏖  Remove package  ' \
+        --pointer='󰜴' \
+        --marker='󰄬' \
+        --border=sharp \
+        --border-label=" Installed packages: $(wc -l < "$results_file") " \
+        --header='Type to search all installed Debian packages and Flatpaks' \
+        --info=inline-right \
+        --layout=reverse \
+        --no-multi \
+        --no-hscroll \
+        --cycle \
+        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
+        < "$results_file") || return 1
+
+    source=$(printf '%s\n' "$selected" | cut -f1)
+    identifier=$(printf '%s\n' "$selected" | cut -f2)
+    printf '%s:%s\n' "$source" "$identifier"
 }
 
 remove_debian_package() {
