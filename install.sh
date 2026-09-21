@@ -289,6 +289,7 @@ link_configs() {
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
+    link_config "$repo_dir/configs/mimeapps.list" "$config_dir/mimeapps.list"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
     link_config "$repo_dir/configs/micro/settings.json" "$config_dir/micro/settings.json"
     link_config "$repo_dir/configs/micro/colorschemes/dotfiles.micro" "$config_dir/micro/colorschemes/dotfiles.micro"
