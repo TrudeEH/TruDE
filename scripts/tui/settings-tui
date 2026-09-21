@@ -95,6 +95,9 @@ load_monitors() {
             y: (.y // 0),
             scale: ((.scale // 1) | tostring),
             transform: (.transform // 0),
+            raw_width: (.width // 0),
+            raw_height: (.height // 0),
+            effective_scale: (.scale // 1),
             availableModes: ([.availableModes[]? | sub("Hz$"; "")] | unique)
         })
     ' > "$monitor_state"; then
@@ -321,6 +324,19 @@ EOF
     mode=${choice#* }
     replace_monitor_state --arg name "$monitor_name" --arg mode "$mode" \
         'map(if .name == $name then .mode = $mode else . end)'
+
+    mode_size=${mode%@*}
+    case $mode_size in
+        *x*)
+            mode_width=${mode_size%%x*}
+            mode_height=${mode_size#*x}
+            if is_unsigned_integer "$mode_width" && is_unsigned_integer "$mode_height"; then
+                replace_monitor_state --arg name "$monitor_name" \
+                    --argjson width "$mode_width" --argjson height "$mode_height" \
+                    'map(if .name == $name then .raw_width = $width | .raw_height = $height else . end)'
+            fi
+            ;;
+    esac
 }
 
 choose_position() {
@@ -346,6 +362,74 @@ EOF
         'map(if .name == $name then .x = $x | .y = $y else . end)'
 }
 
+monitor_layout_width() {
+    monitor_name=$1
+    jq -r --arg name "$monitor_name" '
+        .[] | select(.name == $name) |
+        (((if (.transform % 2 == 1) then .raw_height else .raw_width end) /
+            .effective_scale) | round)
+    ' "$monitor_state"
+}
+
+monitor_layout_height() {
+    monitor_name=$1
+    jq -r --arg name "$monitor_name" '
+        .[] | select(.name == $name) |
+        (((if (.transform % 2 == 1) then .raw_width else .raw_height end) /
+            .effective_scale) | round)
+    ' "$monitor_state"
+}
+
+choose_vertical_alignment() {
+    alignment_monitor=$1
+    reference_list=$(jq -r --arg name "$alignment_monitor" \
+        '.[] | select(.enabled and .name != $name) | .name' "$monitor_state")
+    if [ -z "$reference_list" ]; then
+        message "Enable another monitor before choosing vertical alignment."
+        return
+    fi
+
+    reference_count=$(printf '%s\n' "$reference_list" | awk 'NF { count++ } END { print count + 0 }')
+    if [ "$reference_count" -eq 1 ]; then
+        reference_monitor=$reference_list
+    else
+        set --
+        while IFS= read -r candidate; do
+            [ -n "$candidate" ] || continue
+            candidate_x=$(monitor_value "$candidate" x)
+            candidate_y=$(monitor_value "$candidate" y)
+            candidate_width=$(monitor_layout_width "$candidate")
+            candidate_height=$(monitor_layout_height "$candidate")
+            set -- "$@" "󰍹 $candidate" \
+                "Position: ${candidate_x}x${candidate_y} — size ${candidate_width}x${candidate_height}"
+        done <<EOF
+$reference_list
+EOF
+        reference_choice=$(dialog --menu "Align $alignment_monitor relative to" 18 92 8 "$@" \
+            3>&1 1>&2 2>&3) || return
+        reference_monitor=${reference_choice#* }
+    fi
+
+    alignment_choice=$(dialog --menu "Vertical alignment relative to $reference_monitor" 16 86 5 \
+        "󰁅 up" "Align the top edges" \
+        "󰘃 center" "Center the monitor vertically" \
+        "󰁆 down" "Align the bottom edges" \
+        3>&1 1>&2 2>&3) || return
+    alignment=${alignment_choice#* }
+
+    reference_y=$(monitor_value "$reference_monitor" y)
+    reference_height=$(monitor_layout_height "$reference_monitor")
+    alignment_height=$(monitor_layout_height "$alignment_monitor")
+    case $alignment in
+        up) alignment_y=$reference_y ;;
+        center) alignment_y=$((reference_y + (reference_height - alignment_height) / 2)) ;;
+        down) alignment_y=$((reference_y + reference_height - alignment_height)) ;;
+        *) return ;;
+    esac
+    replace_monitor_state --arg name "$alignment_monitor" --argjson y "$alignment_y" \
+        'map(if .name == $name then .y = $y else . end)'
+}
+
 choose_scale() {
     monitor_name=$1
     current_scale=$(monitor_value "$monitor_name" scale)
@@ -359,7 +443,10 @@ choose_scale() {
         return
     fi
     replace_monitor_state --arg name "$monitor_name" --arg scale "$scale" \
-        'map(if .name == $name then .scale = $scale else . end)'
+        'map(if .name == $name then
+            .scale = $scale |
+            if $scale == "auto" then . else .effective_scale = ($scale | tonumber) end
+        else . end)'
 }
 
 choose_rotation() {
@@ -421,6 +508,7 @@ edit_monitor() {
             "󰐥 status" "Enable or disable this display" \
             "󰍹 mode" "Mode: $mode" \
             "󰇀 position" "Position: ${position_x}x${position_y}" \
+            "󰘃 alignment" "Align vertically with another display" \
             "󰩨 scale" "Scale: $scale" \
             "󰑓 rotation" "Transform: $transform" \
             "󰹑 primary" "Make primary (position 0x0)" \
@@ -430,6 +518,7 @@ edit_monitor() {
             *" status") toggle_monitor "$monitor_name" ;;
             *" mode") choose_mode "$monitor_name" ;;
             *" position") choose_position "$monitor_name" ;;
+            *" alignment") choose_vertical_alignment "$monitor_name" ;;
             *" scale") choose_scale "$monitor_name" ;;
             *" rotation") choose_rotation "$monitor_name" ;;
             *" primary") make_primary "$monitor_name" ;;
@@ -787,7 +876,7 @@ load_monitors
 load_preferences
 while :; do
     section=$(dialog --menu "Choose a settings section" 21 82 10 \
-        "󰍹 displays" "Monitor layout, modes, scale, and rotation" \
+        "󰍹 displays" "Monitor layout, modes, scale, rotation, and alignment" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
         "󰍜 waybar" "Visibility, position, and displays" \
