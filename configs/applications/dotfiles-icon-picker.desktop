@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Icon Picker
+Comment=Search Nerd Font icons and copy a selection
+Exec=footclient --app-id=icon-picker-tui --title="Icon Picker" --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-icon-picker-tui
+Terminal=false
+Categories=Utility;

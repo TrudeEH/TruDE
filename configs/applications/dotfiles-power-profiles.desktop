@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Power Profiles
+Comment=Choose the active system power profile
+Exec=footclient --app-id=power-profiles-tui --title="Power Profile" --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui
+Terminal=false
+Categories=Settings;HardwareSettings;

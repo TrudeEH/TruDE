@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Power
+Comment=Lock, suspend, restart, or shut down
+Exec=footclient --app-id=power-menu-tui --title=Power --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui
+Terminal=false
+Categories=System;

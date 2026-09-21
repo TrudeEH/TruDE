@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Application Launcher
+Comment=Search and open installed applications
+Exec=footclient --app-id=app-launcher-tui --title="Application Launcher" --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-app-launcher-tui
+Terminal=false
+Categories=Utility;

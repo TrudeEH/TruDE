@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Notifications
+Comment=Review and manage notification history
+Exec=footclient --app-id=notification-tui --title=Notifications --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Network Settings
+Comment=Configure network connections
+Exec=footclient --app-id=nmtui --title="Network Settings" --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui
+Terminal=false
+Categories=Network;

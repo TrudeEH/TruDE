@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Comment=Configure Hyprland and dotfiles preferences
+Exec=footclient --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui
+Terminal=false
+Categories=Settings;

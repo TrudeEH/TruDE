@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard Shortcuts
+Comment=Browse configured Hyprland keyboard shortcuts
+Exec=footclient --app-id=shortcuts-tui --title="Hyprland Shortcuts" --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui
+Terminal=false
+Categories=Settings;

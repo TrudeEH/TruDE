@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=System Monitor
+Comment=Monitor system resources and processes
+Exec=footclient --app-id=btop --title="System Monitor" --override=colors.regular0=222226 --window-size-chars=120x36 dotfiles-system-monitor-tui
+Terminal=false
+Categories=System;Monitor;

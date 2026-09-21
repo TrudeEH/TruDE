@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Bluetooth
+Comment=Manage Bluetooth devices and connections
+Exec=footclient --app-id=bluetooth-tui --title=Bluetooth --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui
+Terminal=false
+Categories=Settings;HardwareSettings;
