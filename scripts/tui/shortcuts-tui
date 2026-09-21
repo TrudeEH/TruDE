@@ -23,16 +23,62 @@ shortcuts=$(hyprctl binds -j 2>/dev/null | jq -r '
 
 [ -n "$shortcuts" ] || exit 0
 
-printf '%s\n' "$shortcuts" | fzf \
+terminal_columns=$(tput cols 2>/dev/null || printf '80')
+case $terminal_columns in
+    ''|*[!0-9]*) terminal_columns=80 ;;
+esac
+
+printf '%s\n' "$shortcuts" \
+    | awk -F '\t' -v terminal_columns="$terminal_columns" '
+        BEGIN {
+            OFS = "\t"
+            muted = "\033[38;2;170;170;170m"
+            reset = "\033[0m"
+        }
+        function truncate_description(value, limit) {
+            if (value == "" || length(value) <= limit) {
+                return value
+            }
+            if (limit <= 1) {
+                return substr(value, 1, limit)
+            }
+            return substr(value, 1, limit - 1) "…"
+        }
+        {
+            keys[NR] = $1
+            descriptions[NR] = $2
+            if (length($1) > key_width) {
+                key_width = length($1)
+            }
+        }
+        END {
+            description_width = terminal_columns - key_width - 6
+            if (description_width < 12) {
+                description_width = 12
+            }
+            for (row = 1; row <= NR; row++) {
+                description = truncate_description(descriptions[row], description_width)
+                if (description != "") {
+                    description = muted description reset
+                }
+                printf "%-*s\t%s\n", key_width + 2, keys[row], description
+            }
+        }
+    ' \
+    | fzf \
+    --ansi \
     --delimiter='\t' \
     --with-nth=1,2 \
+    --nth=1,2 \
+    --tiebreak=begin,length,index \
     --prompt='󰌌  Search shortcuts  ' \
-    --pointer=' ' \
+    --pointer='󰜴' \
     --border=sharp \
     --border-label=' Hyprland Shortcuts ' \
     --info=inline-right \
     --layout=reverse \
     --no-multi \
+    --no-hscroll \
     --no-sort \
-    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa' \
+    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa' \
     >/dev/null
