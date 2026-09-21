@@ -174,7 +174,7 @@ menu separator {
     background-color: @accent;
     color: @accent-text;
     font-family: "JetBrainsMono Nerd Font Mono";
-    font-size: 18.75px;
+    font-size: 21px;
 }
 
 #custom-launcher.screensharing {
