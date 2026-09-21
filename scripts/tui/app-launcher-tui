@@ -16,6 +16,11 @@ for data_dir in $raw_search_dirs; do
 done
 IFS=$old_ifs
 
+terminal_columns=$(tput cols 2>/dev/null || printf '80')
+case $terminal_columns in
+    ''|*[!0-9]*) terminal_columns=80 ;;
+esac
+
 selection=$(
     {
     old_ifs=$IFS
@@ -79,11 +84,20 @@ selection=$(
         }
     ' \
     | LC_ALL=C sort -f -k1,1 \
-    | awk -F '\t' '
+    | awk -F '\t' -v terminal_columns="$terminal_columns" '
         BEGIN {
             OFS = "\t"
             muted = "\033[38;2;170;170;170m"
             reset = "\033[0m"
+        }
+        function truncate_description(value, limit) {
+            if (value == "" || length(value) <= limit) {
+                return value
+            }
+            if (limit <= 1) {
+                return substr(value, 1, limit)
+            }
+            return substr(value, 1, limit - 1) "…"
         }
         {
             names[NR] = $1
@@ -94,8 +108,12 @@ selection=$(
             }
         }
         END {
+            description_width = terminal_columns - name_width - 6
+            if (description_width < 12) {
+                description_width = 12
+            }
             for (row = 1; row <= NR; row++) {
-                description = descriptions[row]
+                description = truncate_description(descriptions[row], description_width)
                 if (description != "") {
                     description = muted description reset
                 }
