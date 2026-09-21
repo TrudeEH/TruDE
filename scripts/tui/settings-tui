@@ -386,9 +386,10 @@ choose_position() {
         "󰘃 align" "Align vertically with another display" \
         "󰇀 coordinates" "Set exact X/Y coordinates" \
         3>&1 1>&2 2>&3) || return
-    case $choice in
-        *" align") choose_vertical_alignment "$monitor_name" ;;
-        *" coordinates") choose_position_coordinates "$monitor_name" ;;
+    position_action=${choice##* }
+    case $position_action in
+        align) choose_vertical_alignment "$monitor_name" ;;
+        coordinates) choose_position_coordinates "$monitor_name" ;;
     esac
 }
 
