@@ -381,13 +381,13 @@ monitor_layout_height() {
 choose_position() {
     monitor_name=$1
     choice=$(dialog --menu "Position for $monitor_name" 15 82 5 \
-        "󰘃 align" "Align vertically with another display" \
-        "󰇀 coordinates" "Set exact X/Y coordinates" \
+        "align" "󰘃 Align vertically with another display" \
+        "coordinates" "󰇀 Set exact X/Y coordinates" \
         3>&1 1>&2 2>&3) || return
-    position_action=${choice##* }
-    case $position_action in
+    case $choice in
         align) choose_vertical_alignment "$monitor_name" ;;
         coordinates) choose_position_coordinates "$monitor_name" ;;
+        *) message "Unknown position action returned by whiptail: $choice" ;;
     esac
 }
 
