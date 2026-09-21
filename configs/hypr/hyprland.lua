@@ -487,6 +487,14 @@ hl.window_rule({
 })
 
 hl.window_rule({
+    name  = "icon-picker-tui",
+    match = { class = "icon-picker-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
     name  = "shortcuts-tui",
     match = { class = "shortcuts-tui" },
 
