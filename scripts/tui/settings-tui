@@ -339,7 +339,7 @@ EOF
     esac
 }
 
-choose_position() {
+choose_position_coordinates() {
     monitor_name=$1
     current_x=$(monitor_value "$monitor_name" x)
     current_y=$(monitor_value "$monitor_name" y)
@@ -378,6 +378,18 @@ monitor_layout_height() {
         (((if (.transform % 2 == 1) then .raw_width else .raw_height end) /
             .effective_scale) | round)
     ' "$monitor_state"
+}
+
+choose_position() {
+    monitor_name=$1
+    choice=$(dialog --menu "Position for $monitor_name" 15 82 5 \
+        "󰘃 align" "Align vertically with another display" \
+        "󰇀 coordinates" "Set exact X/Y coordinates" \
+        3>&1 1>&2 2>&3) || return
+    case $choice in
+        *" align") choose_vertical_alignment "$monitor_name" ;;
+        *" coordinates") choose_position_coordinates "$monitor_name" ;;
+    esac
 }
 
 choose_vertical_alignment() {
@@ -508,7 +520,6 @@ edit_monitor() {
             "󰐥 status" "Enable or disable this display" \
             "󰍹 mode" "Mode: $mode" \
             "󰇀 position" "Position: ${position_x}x${position_y}" \
-            "󰘃 alignment" "Align vertically with another display" \
             "󰩨 scale" "Scale: $scale" \
             "󰑓 rotation" "Transform: $transform" \
             "󰹑 primary" "Make primary (position 0x0)" \
@@ -518,7 +529,6 @@ edit_monitor() {
             *" status") toggle_monitor "$monitor_name" ;;
             *" mode") choose_mode "$monitor_name" ;;
             *" position") choose_position "$monitor_name" ;;
-            *" alignment") choose_vertical_alignment "$monitor_name" ;;
             *" scale") choose_scale "$monitor_name" ;;
             *" rotation") choose_rotation "$monitor_name" ;;
             *" primary") make_primary "$monitor_name" ;;
@@ -876,7 +886,7 @@ load_monitors
 load_preferences
 while :; do
     section=$(dialog --menu "Choose a settings section" 21 82 10 \
-        "󰍹 displays" "Monitor layout, modes, scale, rotation, and alignment" \
+        "󰍹 displays" "Monitor layout, modes, scale, rotation, and position" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
         "󰍜 waybar" "Visibility, position, and displays" \
