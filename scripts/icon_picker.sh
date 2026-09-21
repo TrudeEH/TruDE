@@ -1,0 +1,226 @@
+#!/bin/sh
+set -u
+
+usage() {
+    printf 'Usage: %s\n\n' "${0##*/}"
+    printf 'Search the installed Nerd Font glyphs and copy a selected icon.\n'
+    printf 'Set DOTFILES_NERDFONT_FAMILY to choose a specific installed font.\n'
+}
+
+if [ "$#" -gt 0 ]; then
+    case $1 in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            usage >&2
+            exit 2
+            ;;
+    esac
+fi
+
+for command in fc-list fc-match fzf python3; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+        printf 'icon_picker.sh: %s is required.\n' "$command" >&2
+        exit 1
+    fi
+done
+
+font_family=${DOTFILES_NERDFONT_FAMILY:-}
+if [ -n "$font_family" ]; then
+    font_file=$(fc-match -f '%{file}' "$font_family" 2>/dev/null || :)
+else
+    font_file=$(fc-list --format='%{family}\t%{file}\n' 2>/dev/null \
+        | awk -F '	' 'tolower($1) ~ /nerd font/ { print $2; exit }')
+fi
+
+if [ -z "$font_file" ] || [ ! -r "$font_file" ]; then
+    printf 'icon_picker.sh: no readable Nerd Font was found.\n' >&2
+    printf 'Set DOTFILES_NERDFONT_FAMILY to an installed Nerd Font family.\n' >&2
+    exit 1
+fi
+
+clipboard=
+for command in wl-copy xclip xsel pbcopy; do
+    if command -v "$command" >/dev/null 2>&1; then
+        clipboard=$command
+        break
+    fi
+done
+
+if [ -z "$clipboard" ]; then
+    printf 'icon_picker.sh: no clipboard command found (tried wl-copy, xclip, xsel, pbcopy).\n' >&2
+    exit 1
+fi
+
+selection=$(
+    python3 - "$font_file" <<'PY' |
+import struct
+import sys
+
+
+def u16(data, offset):
+    return struct.unpack_from(">H", data, offset)[0]
+
+
+def i16(data, offset):
+    return struct.unpack_from(">h", data, offset)[0]
+
+
+def u32(data, offset):
+    return struct.unpack_from(">I", data, offset)[0]
+
+
+def tables(data):
+    count = u16(data, 4)
+    result = {}
+    for index in range(count):
+        offset = 12 + index * 16
+        tag = data[offset:offset + 4]
+        result[tag] = (u32(data, offset + 8), u32(data, offset + 12))
+    return result
+
+
+def private_use(codepoint):
+    return (
+        0xE000 <= codepoint <= 0xF8FF
+        or 0xF0000 <= codepoint <= 0xFFFFD
+        or 0x100000 <= codepoint <= 0x10FFFD
+    )
+
+
+def cmap_entries(data, table_offset):
+    count = u16(data, table_offset + 2)
+    candidates = []
+    for index in range(count):
+        record = table_offset + 4 + index * 8
+        platform = u16(data, record)
+        encoding = u16(data, record + 2)
+        subtable = table_offset + u32(data, record + 4)
+        format_number = u16(data, subtable)
+        priority = 0
+        if format_number in (12, 13):
+            priority = 3 if platform == 3 and encoding == 10 else 2
+        elif format_number == 4:
+            priority = 2 if platform == 3 else 1
+        if priority:
+            candidates.append((priority, format_number, subtable))
+
+    if not candidates:
+        return {}
+
+    _, format_number, subtable = max(candidates)
+    entries = {}
+    ranges = ((0xE000, 0xF8FF), (0xF0000, 0xFFFFD), (0x100000, 0x10FFFD))
+
+    if format_number in (12, 13):
+        groups = u32(data, subtable + 12)
+        for index in range(groups):
+            group = subtable + 16 + index * 12
+            first = u32(data, group)
+            last = u32(data, group + 4)
+            glyph = u32(data, group + 8)
+            for range_start, range_end in ranges:
+                start = max(first, range_start)
+                end = min(last, range_end)
+                for codepoint in range(start, end + 1):
+                    entries[codepoint] = glyph if format_number == 13 else glyph + codepoint - first
+        return entries
+
+    segments = u16(data, subtable + 6) // 2
+    end_codes = subtable + 14
+    start_codes = end_codes + segments * 2 + 2
+    deltas = start_codes + segments * 2
+    range_offsets = deltas + segments * 2
+    for index in range(segments):
+        first = u16(data, start_codes + index * 2)
+        last = u16(data, end_codes + index * 2)
+        delta = i16(data, deltas + index * 2)
+        range_offset = u16(data, range_offsets + index * 2)
+        for range_start, range_end in ranges:
+            start = max(first, range_start)
+            end = min(last, range_end)
+            for codepoint in range(start, end + 1):
+                if range_offset == 0:
+                    glyph = (codepoint + delta) & 0xFFFF
+                else:
+                    address = range_offsets + index * 2 + range_offset + (codepoint - first) * 2
+                    glyph = (u16(data, address) + delta) & 0xFFFF
+                if glyph:
+                    entries[codepoint] = glyph
+    return entries
+
+
+def glyph_names(data, table_offset):
+    version = u32(data, table_offset)
+    if version != 0x00020000:
+        return {}
+
+    count = u16(data, table_offset + 32)
+    indices_offset = table_offset + 34
+    indices = [u16(data, indices_offset + index * 2) for index in range(count)]
+    custom_offset = indices_offset + count * 2
+    custom_count = max(indices, default=257) - 257
+    custom = []
+    cursor = custom_offset
+    for _ in range(max(custom_count, 0)):
+        length = data[cursor]
+        cursor += 1
+        custom.append(data[cursor:cursor + length].decode("ascii", "replace"))
+        cursor += length
+
+    names = {}
+    for glyph, name_index in enumerate(indices):
+        if name_index >= 258 and name_index - 258 < len(custom):
+            name = custom[name_index - 258]
+            if name and name != ".notdef":
+                names[glyph] = name.replace("_", "-")
+    return names
+
+
+font_file = sys.argv[1]
+with open(font_file, "rb") as stream:
+    font_data = stream.read()
+font_tables = tables(font_data)
+
+if b"cmap" not in font_tables or b"post" not in font_tables:
+    raise SystemExit("font has no cmap/post glyph tables")
+
+cmap_offset, _ = font_tables[b"cmap"]
+post_offset, _ = font_tables[b"post"]
+codepoints = cmap_entries(font_data, cmap_offset)
+names = glyph_names(font_data, post_offset)
+
+for codepoint, glyph in sorted(codepoints.items()):
+    name = names.get(glyph)
+    if name:
+        print("{}\t{}\tU+{:04X}".format(chr(codepoint), name, codepoint))
+PY
+    LC_ALL=C sort -t "$(printf '\t')" -k2,2f \
+    | fzf \
+        --delimiter='\t' \
+        --with-nth=1,2,3 \
+        --nth=2,3 \
+        --prompt='󰍉  Search Nerd Font icons  ' \
+        --header='Enter copy · Esc quit' \
+        --pointer='󰜴' \
+        --marker='󰄬' \
+        --border=sharp \
+        --border-label=' Nerd Font Icon Picker ' \
+        --info=inline-right \
+        --layout=reverse \
+        --no-multi \
+        --cycle \
+        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa'
+) || exit 0
+
+icon=$(printf '%s\n' "$selection" | awk -F '	' 'NR == 1 { print $1 }')
+[ -n "$icon" ] || exit 0
+
+case $clipboard in
+    wl-copy) printf '%s' "$icon" | wl-copy ;;
+    xclip) printf '%s' "$icon" | xclip -selection clipboard ;;
+    xsel) printf '%s' "$icon" | xsel --clipboard --input ;;
+    pbcopy) printf '%s' "$icon" | pbcopy ;;
+esac
