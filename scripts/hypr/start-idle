@@ -30,7 +30,7 @@ cat > "$temporary_config" <<EOF
 general {
     lock_cmd = pidof hyprlock >/dev/null || hyprlock --config $HOME/.config/hypr/hyprlock.conf
     before_sleep_cmd = loginctl lock-session
-    after_sleep_cmd = hyprctl dispatch dpms on
+    after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'
 }
 EOF
 
@@ -39,7 +39,7 @@ if [ "$lock_timeout" -gt 0 ]; then
 
 listener {
     timeout = $lock_timeout
-    on-timeout = pidof hyprlock >/dev/null || hyprlock --config $HOME/.config/hypr/hyprlock.conf
+    on-timeout = loginctl lock-session
 }
 EOF
 fi
@@ -49,8 +49,8 @@ if [ "$screen_timeout" -gt 0 ]; then
 
 listener {
     timeout = $screen_timeout
-    on-timeout = hyprctl dispatch dpms off
-    on-resume = hyprctl dispatch dpms on
+    on-timeout = hyprctl dispatch 'hl.dsp.dpms({ action = "off" })'
+    on-resume = hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'
 }
 EOF
 fi
