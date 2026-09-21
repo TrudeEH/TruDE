@@ -48,10 +48,10 @@ fi
 
 total=$((apt_updates + flatpak_updates))
 if [ "$total" -gt 0 ]; then
-    text="󰏗  $total"
+    text="  $total"
     class=updates
 else
-    text='󰏗'
+    text=''
     class=updated
 fi
 
