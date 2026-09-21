@@ -173,6 +173,7 @@ menu separator {
     padding: 0 9px;
     background-color: @accent;
     color: @accent-text;
+    font-family: "JetBrainsMono Nerd Font Mono";
     font-size: 18.75px;
 }
 
