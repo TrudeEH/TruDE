@@ -128,28 +128,6 @@ create_apt_search_results() {
     printf '%s\n' "$results_file"
 }
 
-select_apt_package() {
-    source=$1
-    query_prompt=$2
-    query=$(dialog --inputbox "$query_prompt" 10 78 "" 3>&1 1>&2 2>&3) || return 1
-    [ -n "$query" ] || return 1
-
-    results_file=$(create_apt_search_results "$query" "$source")
-    [ -s "$results_file" ] || {
-        message "No matching packages were found in the selected Debian repository."
-        return 1
-    }
-
-    set --
-    while IFS="$(printf '\t')" read -r package description; do
-        set -- "$@" "$package" "$description"
-    done < "$results_file"
-
-    selected=$(dialog --menu "Search results for: $query" 24 112 16 "$@" \
-        3>&1 1>&2 2>&3) || return 1
-    printf '%s\n' "$selected"
-}
-
 run_apt_install() {
     source=$1
     package=$2
@@ -183,19 +161,6 @@ run_apt_install() {
     pause_after_command
 }
 
-install_apt_package() {
-    source=$1
-    case $source in
-        apt)
-            package=$(select_apt_package apt 'Search Debian packages by name or description:') || return
-            ;;
-        backports)
-            package=$(select_apt_package backports 'Search Debian Backports packages by name or description:') || return
-            ;;
-    esac
-    run_apt_install "$source" "$package"
-}
-
 create_flatpak_search_results() {
     query=$1
     raw_file=$temporary_dir/flatpak-search-raw
@@ -225,37 +190,65 @@ create_flatpak_search_results() {
     printf '%s\n' "$results_file"
 }
 
-install_flatpak() {
-    command -v flatpak >/dev/null 2>&1 || {
-        message "Flatpak is not installed."
-        return
-    }
+create_unified_install_results() {
+    query=$1
+    results_file=$temporary_dir/install-results
+    : > "$results_file"
 
-    query=$(dialog --inputbox 'Search Flathub applications by name or description:' 10 78 "" \
-        3>&1 1>&2 2>&3) || return
-    [ -n "$query" ] || return
+    apt_results=$(create_apt_search_results "$query" apt)
+    while IFS="$(printf '\t')" read -r package description; do
+        [ -n "$package" ] || continue
+        printf 'apt\t%s\t[Debian] %s\t\n' "$package" "$description" >> "$results_file"
+    done < "$apt_results"
 
-    results_file=$(create_flatpak_search_results "$query") || return
+    backports_results=$(create_apt_search_results "$query" backports)
+    while IFS="$(printf '\t')" read -r package description; do
+        [ -n "$package" ] || continue
+        printf 'backports\t%s\t[Backports] %s\t\n' "$package" "$description" >> "$results_file"
+    done < "$backports_results"
+
+    if command -v flatpak >/dev/null 2>&1; then
+        flatpak_results=$(create_flatpak_search_results "$query") || flatpak_results=
+        if [ -n "$flatpak_results" ] && [ -s "$flatpak_results" ]; then
+            while IFS="$(printf '\t')" read -r application name version remote description; do
+                [ -n "$application" ] || continue
+                label="$name"
+                [ -n "$version" ] && label="$label — $version"
+                [ -n "$description" ] && label="$label — $(compact_text "$description")"
+                printf 'flatpak\t%s\t[Flatpak:%s] %s\t%s\n' \
+                    "$application" "$remote" "$label" "$remote" >> "$results_file"
+            done < "$flatpak_results"
+        fi
+    fi
+
+    printf '%s\n' "$results_file"
+}
+
+select_install_package() {
+    query=$(dialog --inputbox 'Search Debian packages, Backports, and Flatpaks:' 10 78 "" \
+        3>&1 1>&2 2>&3) || return 1
+    [ -n "$query" ] || return 1
+
+    results_file=$(create_unified_install_results "$query")
     [ -s "$results_file" ] || {
-        message "No matching Flatpak applications were found."
-        return
+        message "No installable packages matched that search."
+        return 1
     }
 
     set --
-    while IFS="$(printf '\t')" read -r application name version remote description; do
-        [ -n "$application" ] || continue
-        label="$name"
-        [ -n "$version" ] && label="$label — $version"
-        [ -n "$remote" ] && label="$label [$remote]"
-        [ -n "$description" ] && label="$label — $(compact_text "$description")"
-        set -- "$@" "$application" "$label"
+    while IFS="$(printf '\t')" read -r source identifier label remote; do
+        [ -n "$identifier" ] || continue
+        set -- "$@" "$source:$identifier" "$label"
     done < "$results_file"
 
-    application=$(dialog --menu "Flatpak results for: $query" 24 112 16 "$@" \
-        3>&1 1>&2 2>&3) || return
-    remote=$(awk -F '\t' -v application="$application" '$1 == application { print $4; exit }' "$results_file")
-    [ -n "$remote" ] || remote=flathub
+    selected=$(dialog --menu "Install results for: $query" 24 112 16 "$@" \
+        3>&1 1>&2 2>&3) || return 1
+    printf '%s\n' "$selected"
+}
 
+run_flatpak_install() {
+    application=$1
+    remote=$2
     if ! dialog --yesno "Install Flatpak application:\n\n$application\nRemote: $remote" 12 78; then
         return
     fi
@@ -272,38 +265,80 @@ install_flatpak() {
     pause_after_command
 }
 
-select_installed_apt_package() {
-    query=$(dialog --inputbox 'Search installed Debian packages to remove:' 10 78 "" \
-        3>&1 1>&2 2>&3) || return 1
-    [ -n "$query" ] || return 1
+install_package() {
+    selected=$(select_install_package) || return
+    source=${selected%%:*}
+    identifier=${selected#*:}
 
-    results_file=$temporary_dir/installed-apt-results
+    case $source in
+        apt|backports)
+            run_apt_install "$source" "$identifier"
+            ;;
+        flatpak)
+            remote=$(awk -F '\t' -v application="$identifier" \
+                '$1 == "flatpak" && $2 == application { print $4; exit }' "$temporary_dir/install-results")
+            [ -n "$remote" ] || remote=flathub
+            run_flatpak_install "$identifier" "$remote"
+            ;;
+    esac
+}
+
+create_installed_package_results() {
+    query=$1
+    results_file=$temporary_dir/installed-package-results
+    : > "$results_file"
+
     dpkg-query -W -f='${binary:Package}\t${Version}\t${Essential}\t${Status}\n' 2>/dev/null \
         | awk -F '\t' -v query="$query" '
             $4 ~ /installed$/ && index(tolower($1), tolower(query)) {
-                label = $1 " — " $2
+                label = "[Debian] " $1 " — " $2
                 if ($3 == "yes") label = label " [essential]"
-                print $1 "\t" label
+                print "apt\t" $1 "\t" label
             }
-        ' | LC_ALL=C sort -f -k1,1 | sed -n '1,100p' > "$results_file"
+        ' >> "$results_file"
 
+    if command -v flatpak >/dev/null 2>&1; then
+        for scope in user system; do
+            flatpak list --"$scope" --app --columns=application,name,version 2>/dev/null \
+                | awk -F '\t' -v source="flatpak-"$scope -v query="$query" '
+                    NF >= 1 && $1 != "" && index(tolower($1 " " $2), tolower(query)) {
+                        label = "[Flatpak " substr(source, 9) "] " $2
+                        if ($3 != "") label = label " — " $3
+                        print source "\t" $1 "\t" label
+                    }
+                ' >> "$results_file"
+        done
+    fi
+
+    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$results_file" \
+        | sed -n '1,160p' > "$results_file.sorted"
+    mv "$results_file.sorted" "$results_file"
+}
+
+select_installed_package() {
+    query=$(dialog --inputbox 'Search installed Debian packages and Flatpaks:' 10 78 "" \
+        3>&1 1>&2 2>&3) || return 1
+    [ -n "$query" ] || return 1
+
+    create_installed_package_results "$query"
+    results_file=$temporary_dir/installed-package-results
     [ -s "$results_file" ] || {
-        message "No installed Debian packages matched that search."
+        message "No installed packages matched that search."
         return 1
     }
 
     set --
-    while IFS="$(printf '\t')" read -r package description; do
-        set -- "$@" "$package" "$description"
+    while IFS="$(printf '\t')" read -r source identifier label; do
+        set -- "$@" "$source:$identifier" "$label"
     done < "$results_file"
 
-    selected=$(dialog --menu "Installed Debian packages matching: $query" 24 106 16 "$@" \
+    selected=$(dialog --menu "Installed packages matching: $query" 24 112 16 "$@" \
         3>&1 1>&2 2>&3) || return 1
     printf '%s\n' "$selected"
 }
 
-remove_apt_package() {
-    package=$(select_installed_apt_package) || return
+remove_debian_package() {
+    package=$1
     preview_file=$temporary_dir/apt-remove-preview
     apt-get -s remove -- "$package" > "$preview_file" 2>&1
     preview_status=$?
@@ -333,48 +368,9 @@ remove_apt_package() {
     pause_after_command
 }
 
-create_installed_flatpak_results() {
-    query=$1
-    results_file=$temporary_dir/installed-flatpak-results
-    : > "$results_file"
-
-    for scope in user system; do
-        flatpak list --"$scope" --app --columns=application,name,version 2>/dev/null \
-            | awk -F '\t' -v scope="$scope" -v query="$query" '
-                NF >= 1 && $1 != "" && index(tolower($1 " " $2), tolower(query)) {
-                    label = $2
-                    if ($3 != "") label = label " — " $3
-                    print scope "\t" $1 "\t" label
-                }
-            ' >> "$results_file"
-    done
-}
-
-remove_flatpak() {
-    command -v flatpak >/dev/null 2>&1 || {
-        message "Flatpak is not installed."
-        return
-    }
-
-    query=$(dialog --inputbox 'Search installed Flatpaks to remove (name or ID):' 10 78 "" \
-        3>&1 1>&2 2>&3) || return
-    create_installed_flatpak_results "$query"
-    results_file=$temporary_dir/installed-flatpak-results
-    [ -s "$results_file" ] || {
-        message "No installed Flatpaks matched that search."
-        return
-    }
-
-    set --
-    while IFS="$(printf '\t')" read -r scope application label; do
-        set -- "$@" "$scope:$application" "$label [$scope]"
-    done < "$results_file"
-
-    selected=$(dialog --menu 'Installed Flatpaks' 24 106 16 "$@" \
-        3>&1 1>&2 2>&3) || return
-    scope=${selected%%:*}
-    application=${selected#*:}
-
+remove_flatpak_application() {
+    scope=$1
+    application=$2
     if ! dialog --yesno "Uninstall Flatpak application?\n\n$application\nInstallation: $scope\n\nApplication data will be kept." 14 78; then
         return
     fi
@@ -396,16 +392,19 @@ remove_flatpak() {
     pause_after_command
 }
 
-remove_menu() {
-    choice=$(dialog --menu 'Choose what to remove.' 14 78 3 \
-        'debian' 'Installed Debian package' \
-        'flatpak' 'Installed Flatpak application' \
-        'cancel' 'Return to package manager' \
-        3>&1 1>&2 2>&3) || return
+remove_package() {
+    selected=$(select_installed_package) || return
+    source=${selected%%:*}
+    identifier=${selected#*:}
 
-    case $choice in
-        debian) remove_apt_package ;;
-        flatpak) remove_flatpak ;;
+    case $source in
+        apt)
+            remove_debian_package "$identifier"
+            ;;
+        flatpak-user|flatpak-system)
+            scope=${source#flatpak-}
+            remove_flatpak_application "$scope" "$identifier"
+            ;;
     esac
 }
 
@@ -433,20 +432,16 @@ command -v apt-cache >/dev/null 2>&1 || {
 }
 
 while :; do
-    choice=$(dialog --menu 'Search, install, and remove Debian packages and Flatpak applications.' 22 94 8 \
-        'apt' 'Search and install Debian packages' \
-        'backports' 'Search and install Debian Backports packages' \
-        'flatpak' 'Search and install Flatpak applications' \
-        'remove' 'Remove an installed Debian package or Flatpak' \
+    choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 6 \
+        'install' 'Search and install a Debian package, Backport, or Flatpak' \
+        'remove' 'Search and uninstall an installed Debian package or Flatpak' \
         'refresh' 'Refresh Debian package lists' \
         'close' 'Close' \
         3>&1 1>&2 2>&3) || exit 0
 
     case $choice in
-        apt) install_apt_package apt ;;
-        backports) install_apt_package backports ;;
-        flatpak) install_flatpak ;;
-        remove) remove_menu ;;
+        install) install_package ;;
+        remove) remove_package ;;
         refresh) refresh_apt_metadata ;;
         close) exit 0 ;;
     esac
