@@ -344,13 +344,13 @@ choose_position_coordinates() {
     current_x=$(monitor_value "$monitor_name" x)
     current_y=$(monitor_value "$monitor_name" y)
     position_x=$(dialog --inputbox "󰇀 X position in logical pixels" 10 68 \
-        "$current_x" 3>&1 1>&2 2>&3) || return
+        -- "$current_x" 3>&1 1>&2 2>&3) || return
     if ! is_integer "$position_x"; then
         message "Positions must be whole numbers."
         return
     fi
     position_y=$(dialog --inputbox "󰇀 Y position in logical pixels" 10 68 \
-        "$current_y" 3>&1 1>&2 2>&3) || return
+        -- "$current_y" 3>&1 1>&2 2>&3) || return
     if ! is_integer "$position_y"; then
         message "Positions must be whole numbers."
         return
@@ -381,10 +381,11 @@ monitor_layout_height() {
 choose_position() {
     monitor_name=$1
     choice=$(dialog --menu "Position for $monitor_name" 15 82 5 \
-        "align" "󰘃 Align vertically with another display" \
-        "coordinates" "󰇀 Set exact X/Y coordinates" \
+        "󰘃 align" "Align vertically with another display" \
+        "󰇀 coordinates" "Set exact X/Y coordinates" \
         3>&1 1>&2 2>&3) || return
-    case $choice in
+    position_action=${choice##* }
+    case $position_action in
         align) choose_vertical_alignment "$monitor_name" ;;
         coordinates) choose_position_coordinates "$monitor_name" ;;
         *) message "Unknown position action returned by whiptail: $choice" ;;
