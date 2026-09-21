@@ -54,6 +54,11 @@ if [ -z "$clipboard" ]; then
     exit 1
 fi
 
+terminal_columns=$(tput cols 2>/dev/null || printf '80')
+case $terminal_columns in
+    ''|*[!0-9]*) terminal_columns=80 ;;
+esac
+
 selection=$(
     python3 - "$font_file" <<'PY' |
 import struct
@@ -198,7 +203,46 @@ for codepoint, glyph in sorted(codepoints.items()):
         print("{}\t{}\tU+{:04X}".format(chr(codepoint), name, codepoint))
 PY
     LC_ALL=C sort -t "$(printf '\t')" -k2,2f \
+    | awk -F '\t' -v terminal_columns="$terminal_columns" '
+        BEGIN {
+            OFS = "\t"
+            muted = "\033[38;2;170;170;170m"
+            reset = "\033[0m"
+        }
+        function truncate_name(value, limit) {
+            if (value == "" || length(value) <= limit) {
+                return value
+            }
+            if (limit <= 1) {
+                return substr(value, 1, limit)
+            }
+            return substr(value, 1, limit - 1) "…"
+        }
+        {
+            icons[NR] = $1
+            names[NR] = $2
+            codepoints[NR] = $3
+            if (length($2) > name_width) {
+                name_width = length($2)
+            }
+        }
+        END {
+            max_name_width = terminal_columns - 18
+            if (max_name_width < 16) {
+                max_name_width = 16
+            }
+            if (name_width > max_name_width) {
+                name_width = max_name_width
+            }
+            for (row = 1; row <= NR; row++) {
+                name = truncate_name(names[row], name_width)
+                codepoint = muted codepoints[row] reset
+                printf "%s\t%-*s\t%s\n", icons[row], name_width + 2, name, codepoint
+            }
+        }
+    ' \
     | fzf \
+        --ansi \
         --delimiter='\t' \
         --with-nth=1,2,3 \
         --nth=2,3 \
@@ -211,6 +255,7 @@ PY
         --info=inline-right \
         --layout=reverse \
         --no-multi \
+        --no-hscroll \
         --cycle \
         --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa'
 ) || exit 0
