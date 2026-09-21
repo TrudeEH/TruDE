@@ -87,6 +87,8 @@
         "exec": "dotfiles-waybar-launcher-status center",
         "return-type": "json",
         "interval": 1,
+        "align": 0.5,
+        "justify": "center",
         "tooltip": false,
         "on-click": "dotfiles-app-launcher-toggle"
     },

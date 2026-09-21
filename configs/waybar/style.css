@@ -170,14 +170,13 @@ menu separator {
 
 #custom-launcher {
     min-width: 18px;
-    padding: 0 10px 0 8px;
+    padding: 0 9px;
     background-color: @accent;
     color: @accent-text;
     font-size: 18.75px;
 }
 
 #custom-launcher.screensharing {
-    padding: 0 10px 0 5px;
     background-color: @critical;
 }
 
