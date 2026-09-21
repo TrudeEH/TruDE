@@ -133,6 +133,7 @@ load_preferences() {
             waybar: {
                 enabled: true,
                 position: "top",
+                height: 36,
                 primary_only: true,
                 launcher_icon: ""
             },
@@ -730,14 +731,18 @@ set_bounded_integer() {
     title=$2
     minimum=$3
     maximum=$4
+    integer_scope=${5:-hypr}
     current=$(preference "$preference_path")
     value=$(dialog --inputbox "$title" 10 70 "$current" 3>&1 1>&2 2>&3) || return 1
-    if ! is_unsigned_integer "$value" || [ "$value" -lt "$minimum" ] || [ "$value" -gt "$maximum" ]; then
+    if ! printf '%s\n' "$value" | awk -v minimum="$minimum" -v maximum="$maximum" '
+        /^[0-9]+$/ && $0 + 0 >= minimum && $0 + 0 <= maximum { valid=1 }
+        END { exit !valid }
+    '; then
         message "Enter a whole number from $minimum to $maximum."
         return 1
     fi
-    replace_preferences --argjson value "$value" "$preference_path = \$value"
-    save_preferences hypr
+    replace_preferences --arg value "$value" "$preference_path = (\$value | tonumber)"
+    save_preferences "$integer_scope"
 }
 
 appearance_settings() {
@@ -780,6 +785,7 @@ waybar_settings() {
     while :; do
         enabled=$(boolean_label "$(preference '.waybar.enabled')")
         position=$(preference '.waybar.position')
+        height=$(preference '.waybar.height')
         primary=$(boolean_label "$(preference '.waybar.primary_only')")
         launcher_icon=$(preference '.waybar.launcher_icon')
         if [ -n "$launcher_icon" ]; then
@@ -790,6 +796,7 @@ waybar_settings() {
         set -- \
             "󰐥 enabled" "Waybar: $enabled" \
             "󰘸 position" "Position: $position" \
+            "󰡍 height" "Bar height: ${height}px" \
             "󰹑 primary-only" "Primary display only: $primary" \
             "󰀻 launcher-icon" "Launcher icon: $launcher_icon_summary"
         if [ -n "$launcher_icon" ]; then
@@ -800,6 +807,7 @@ waybar_settings() {
             3>&1 1>&2 2>&3) || return
         case $action in
             *" enabled") toggle_preference '.waybar.enabled' waybar ;;
+            *" height") set_bounded_integer '.waybar.height' "󰡍 Bar height in pixels (28–64; default 36)" 28 64 waybar || : ;;
             *" position")
                 choice=$(dialog --menu "󰘸 Waybar position" 13 64 4 \
                     "󰘸 top" "Top edge" \
@@ -916,7 +924,7 @@ while :; do
         "󰍹 displays" "Monitor layout, modes, scale, rotation, and position" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
-        "󰍜 waybar" "Visibility, position, and displays" \
+        "󰍜 waybar" "Visibility, position, height, and displays" \
         "󰌾 idle" "Lock, screen-off, suspend, and lid behavior" \
         "󰅖 close" "Close settings" \
         3>&1 1>&2 2>&3) || exit 0

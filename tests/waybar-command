@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+case ${0##*/} in
+    hyprctl)
+        printf '%s\n' '[{"name":"TEST-1","width":1920,"height":1080,"refreshRate":60,"x":0,"y":0}]'
+        ;;
+    waybar)
+        test "$1" = --config && test -s "$2"
+        test "$3" = --style && test -s "$4"
+        touch "$WAYBAR_TEST_DIR/launched"
+        ;;
+    systemctl)
+        case $* in *'restart waybar.service') touch "$WAYBAR_TEST_DIR/restarted" ;; esac
+        ;;
+    whiptail)
+        case $* in *--msgbox*) exit 0 ;; esac
+        count=0
+        if [ -f "$WAYBAR_TEST_DIR/dialog-count" ]; then
+            read -r count < "$WAYBAR_TEST_DIR/dialog-count"
+        fi
+        count=$((count + 1))
+        printf '%s\n' "$count" > "$WAYBAR_TEST_DIR/dialog-count"
+        case $count in
+            1) printf '%s\n' 'test waybar' >&2 ;;
+            2) printf '%s\n' 'test height' >&2 ;;
+            3)
+                [ "$WAYBAR_TEST_INPUT" != cancel ] || exit 1
+                printf '%s\n' "$WAYBAR_TEST_INPUT" >&2
+                ;;
+            4) printf '%s\n' 'test back' >&2 ;;
+            5) printf '%s\n' 'test close' >&2 ;;
+            *) exit 1 ;;
+        esac
+        ;;
+esac

@@ -7,17 +7,20 @@ style_file=$config_home/waybar/style.css
 preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar
 runtime_config=$runtime_dir/config.json
+runtime_style=$runtime_dir/style.css
 
 waybar_enabled=true
 position=top
 primary_only=true
+height=$(jq -r '.height // 36' "$config_file")
 if [ -f "$preferences_file" ]; then
     preferences=$(jq -r '[
         (if .waybar.enabled == null then true else .waybar.enabled end),
         (.waybar.position // "top"),
-        (if .waybar.primary_only == null then true else .waybar.primary_only end)
-    ] | @tsv' "$preferences_file" 2>/dev/null || printf 'true\ttop\ttrue')
-    IFS="$(printf '\t')" read -r waybar_enabled position primary_only <<EOF
+        (if .waybar.primary_only == null then true else .waybar.primary_only end),
+        (.waybar.height // $height)
+    ] | @tsv' --argjson height "$height" "$preferences_file" 2>/dev/null || printf 'true\ttop\ttrue\t36')
+    IFS="$(printf '\t')" read -r waybar_enabled position primary_only height <<EOF
 $preferences
 EOF
 fi
@@ -26,6 +29,8 @@ fi
 [ "$waybar_enabled" = true ] || exit 0
 case $position in top|bottom) ;; *) position=top ;; esac
 case $primary_only in true|false) ;; *) primary_only=true ;; esac
+# Bound manual preferences too, so GTK never has to enlarge an undersized bar.
+case $height in 2[89]|[345][0-9]|6[0-4]) ;; *) height=36 ;; esac
 primary_output=
 if [ "$primary_only" = true ]; then
     attempt=0
@@ -53,17 +58,34 @@ fi
 umask 077
 mkdir -p "$runtime_dir"
 temporary_config=$(mktemp "$runtime_dir/config.XXXXXX") || exit 1
-trap 'rm -f "$temporary_config"' 0 HUP INT TERM
+temporary_style=
+trap 'rm -f "$temporary_config" "$temporary_style"' 0 HUP INT TERM
+temporary_style=$(mktemp "$runtime_dir/style.XXXXXX") || exit 1
 jq \
     --arg output "$primary_output" \
     --arg position "$position" \
+    --argjson height "$height" \
     --argjson primary_only "$primary_only" '
         .position = $position |
+        .height = $height |
         .mode = "dock" |
         .["hyprland/workspaces"]["persistent-workspaces"]["*"] = [1, 2, 3, 4, 5] |
         if $primary_only then .output = $output else del(.output) end
     ' "$config_file" > "$temporary_config"
+# Keep text, tile widths and divider widths constant. Large icons shrink for
+# compact bars; their reserved cells stay the same width.
+launcher_size=$(((height - 4) * 23 / 32))
+[ "$launcher_size" -le 23 ] || launcher_size=23
+workspace_size=$launcher_size
+[ "$workspace_size" -le 18 ] || workspace_size=18
+jq -nr --arg style "$style_file" --argjson size "$launcher_size" \
+    --argjson workspace_size "$workspace_size" '
+    "@import url(\($style | @json));\n" +
+    "#custom-launcher { font-size: \($size)px; }\n" +
+    "#workspaces button label { font-size: \($workspace_size)px; }"
+' > "$temporary_style"
 mv "$temporary_config" "$runtime_config"
+mv "$temporary_style" "$runtime_style"
 trap - 0 HUP INT TERM
 
-exec waybar --config "$runtime_config" --style "$style_file"
+exec waybar --config "$runtime_config" --style "$runtime_style"

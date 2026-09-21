@@ -6,96 +6,67 @@
 @define-color fg #ffffff;
 @define-color muted #aaaaaa;
 @define-color border #77767b;
-@define-color hover-bg #46464b;
 @define-color hover-fg rgba(255, 255, 255, 0.75);
 @define-color accent #ffbe6f;
 @define-color accent-strong #ffa348;
-@define-color accent-text #222226;
 @define-color warning #f8e45c;
 @define-color critical #f66151;
 @define-color success #57e389;
 
 * {
     all: initial;
-}
-
-* {
-    font-family: "JetBrainsMono Nerd Font";
+    font-family: "JetBrainsMono Nerd Font Mono";
     font-size: 13px;
     font-weight: 500;
     color: @fg;
 }
 
-#waybar {
+/* Height belongs to config.jsonc (overridden by Settings). No vertical
+ * padding, negative margins, or font-sized dividers determine the height. */
+window#waybar {
     background-color: @shadow;
 }
 
-#waybar > box {
-    margin: 3px;
+window#waybar > box {
+    margin: 2px 3px;
     background-color: @bg-0;
 }
 
 .module {
-    margin-bottom: -1px;
-}
-
-button {
-    min-width: 16px;
-    padding: 0 10px;
-    border-radius: 16px;
-}
-
-button:hover {
-    background-color: @hover-bg;
-    color: @hover-fg;
-}
-
-tooltip {
-    border: 2px solid @border;
-    background-color: @bg-0;
-}
-
-tooltip > box {
     padding: 0 6px;
 }
 
-tooltip label {
-    font-weight: 400;
+.module:hover {
+    color: @hover-fg;
 }
 
-menu {
-    padding: 4px;
-    border: 1px solid @border;
+/* Each center wing has three equal tiles and four dividers. Connectivity
+ * shares one tile: 3 + 3 + 4 character cells and 3 x 4px padding.
+ * Character widths and text alignment live in config.jsonc. */
+#custom-temperature,
+#workspaces,
+#connectivity,
+#pulseaudio {
+    background-color: @bg-1;
+}
+
+#memory,
+#clock.date,
+#custom-maintenance {
+    background-color: @bg-2;
+}
+
+#cpu,
+#clock.time,
+#custom-power-profile {
     background-color: @bg-3;
 }
 
-menuitem {
-    min-height: 20px;
-    padding: 4px 8px;
+#network,
+#bluetooth,
+#custom-notification {
+    padding: 0 2px;
 }
-
-menuitem:hover,
-menuitem:focus {
-    background-color: @accent;
-    color: @accent-text;
-}
-
-menuitem:hover label,
-menuitem:focus label {
-    color: @accent-text;
-}
-
-menuitem:disabled label {
-    color: @muted;
-}
-
-menu separator {
-    min-height: 1px;
-    margin: 4px 0;
-    background-color: @border;
-}
-
-/* Left modules */
 
 #tray {
     padding: 0 14px;
@@ -103,23 +74,22 @@ menu separator {
 
 #workspaces {
     padding: 0 1px;
-    background-color: @bg-1;
+}
+
+#workspaces button {
+    min-width: 20px;
+    padding: 0 8px;
+}
+
+/* Reserve the active icon's size in every workspace, including on hover. */
+#workspaces button label {
+    font-size: 18px;
 }
 
 #workspaces button.active label,
-#workspaces button.focused label {
-    font-size: 18.75px;
+#workspaces button.focused label,
+#workspaces button.visible label {
     color: @accent;
-}
-
-#workspaces button.visible:not(.active) label {
-    color: @accent;
-}
-
-#workspaces button,
-#workspaces button:hover {
-    border-radius: 0;
-    background-color: transparent;
 }
 
 #workspaces button:hover label {
@@ -131,29 +101,36 @@ menu separator {
     color: @accent-strong;
 }
 
-/* Center modules */
-
-#center-left {
-    padding-left: 54px;
+#custom-launcher {
+    min-width: 24px;
+    padding: 0 9px;
+    font-size: 23px;
+    background-color: @accent;
+    color: @bg-0;
 }
 
-#custom-temperature {
-    padding: 0 8px;
-    background-color: @bg-1;
+#custom-launcher:hover {
+    background-color: @accent-strong;
 }
 
-#memory {
-    padding: 0 8px;
-    background-color: @bg-2;
+/* Sharing changes color and content, never the launcher's geometry. */
+#custom-launcher.screensharing {
+    background-color: @critical;
 }
 
-#cpu {
-    padding: 0 8px;
-    background-color: @bg-3;
+#custom-power-menu {
+    padding: 0 16px;
+    font-size: 16px;
+    color: @accent;
+}
+
+#custom-power-menu:hover {
+    color: @accent-strong;
 }
 
 #memory.warning,
-#cpu.warning {
+#cpu.warning,
+#custom-maintenance.updates {
     color: @warning;
 }
 
@@ -162,111 +139,20 @@ menu separator {
     color: @critical;
 }
 
-#custom-temperature:hover,
-#memory:hover,
-#cpu:hover {
-    color: @hover-fg;
-}
-
-#custom-launcher {
-    min-width: 18px;
-    padding: 0 9px;
-    background-color: @accent;
-    color: @accent-text;
-    font-family: "JetBrainsMono Nerd Font Mono";
-    font-size: 21px;
-}
-
-#custom-launcher.screensharing {
-    background-color: @critical;
-}
-
-#clock.time {
-    padding: 0 6px 0 8px;
-    background-color: @bg-3;
-}
-
-#clock.date {
-    padding: 0 6px;
-    background-color: @bg-2;
-}
-
-#clock.time:hover,
-#clock.date:hover {
-    color: @hover-fg;
-}
-
-#network {
-    padding: 0 6px 0 8px;
-    background-color: @bg-1;
-}
-
-#bluetooth {
-    padding: 0 5px;
-    background-color: @bg-1;
-}
-
-#custom-notification {
-    padding: 0 8px 0 4px;
-    background-color: @bg-1;
+#network.disconnected,
+#network.disabled,
+#bluetooth.disabled,
+#bluetooth.no-controller,
+#bluetooth.off,
+#pulseaudio.muted,
+#custom-maintenance.updated {
+    color: @muted;
 }
 
 #custom-notification.notification,
 #custom-notification.dnd-notification,
 #custom-notification.inhibited-notification,
-#custom-notification.dnd-inhibited-notification {
-    color: @accent;
-}
-
-#custom-notification.none,
-#custom-notification.dnd-none,
-#custom-notification.inhibited-none,
-#custom-notification.dnd-inhibited-none {
-    color: @fg;
-}
-
-#network:hover,
-#bluetooth:hover,
-#custom-notification:hover {
-    color: @hover-fg;
-}
-
-#network.disconnected,
-#network.disabled,
-#bluetooth.disabled,
-#bluetooth.off {
-    color: @muted;
-}
-
-/* Right modules */
-
-#pulseaudio {
-    padding: 0 8px;
-    background-color: @bg-1;
-}
-
-#pulseaudio.muted {
-    color: @hover-fg;
-}
-
-#custom-maintenance {
-    padding: 0 8px;
-    background-color: @bg-2;
-}
-
-#custom-power-profile {
-    padding: 0 8px;
-    background-color: @bg-3;
-}
-
-#custom-maintenance.updated {
-    color: @hover-fg;
-}
-
-#custom-maintenance.updates {
-    color: @warning;
-}
-
+#custom-notification.dnd-inhibited-notification,
 #custom-power-profile.performance {
     color: @accent;
 }
@@ -275,29 +161,31 @@ menu separator {
     color: @success;
 }
 
-#pulseaudio:hover,
-#custom-maintenance:hover,
-#custom-power-profile:hover {
-    color: @hover-fg;
-}
-
-#custom-power-menu {
-    padding: 0 19px 0 16px;
-    border-radius: 0;
-    color: @accent;
-    font-size: 16px;
-}
-
-#custom-power-menu:hover {
-    background-color: transparent;
-    color: @accent-strong;
-}
-
-/* Powerline dividers */
-
+/* Two half-height gradients draw each Powerline triangle. They stretch to
+ * the actual bar height independently of font metrics and display scale.
+ * currentColor fills the triangle; the background is the adjoining tile.
+ * Nonempty labels keep Waybar's custom separator modules visible. */
 #custom-left,
 #custom-right {
-    font-size: 19.5px;
+    min-width: 14px;
+    padding: 0;
+    font-size: 0;
+    /* A subpixel overlap avoids a seam at odd heights and fractional scales. */
+    background-size: 100% calc(50% + 0.5px);
+    background-position: top, bottom;
+    background-repeat: no-repeat;
+}
+
+#custom-left {
+    background-image:
+        linear-gradient(to bottom right, transparent 50%, currentColor 50%),
+        linear-gradient(to top right, transparent 50%, currentColor 50%);
+}
+
+#custom-right {
+    background-image:
+        linear-gradient(to bottom left, transparent 50%, currentColor 50%),
+        linear-gradient(to top left, transparent 50%, currentColor 50%);
 }
 
 #custom-left.accent,
@@ -329,5 +217,51 @@ menu separator {
 
 #custom-left.inverse,
 #custom-right.inverse {
-    color: @bg-3;
+    background-color: @bg-3;
+    color: @bg-0;
+}
+
+/* Popups have their own spacing; bar sizing does not affect them. */
+tooltip {
+    border: 2px solid @border;
+    background-color: @bg-0;
+}
+
+tooltip > box {
+    padding: 0 6px;
+}
+
+tooltip label {
+    font-weight: 400;
+}
+
+menu {
+    padding: 4px;
+    border: 1px solid @border;
+    background-color: @bg-3;
+}
+
+menuitem {
+    min-height: 20px;
+    padding: 4px 8px;
+}
+
+menuitem:hover,
+menuitem:focus {
+    background-color: @accent;
+}
+
+menuitem:hover label,
+menuitem:focus label {
+    color: @bg-0;
+}
+
+menuitem:disabled label {
+    color: @muted;
+}
+
+menu separator {
+    min-height: 1px;
+    margin: 4px 0;
+    background-color: @border;
 }
