@@ -133,7 +133,8 @@ load_preferences() {
             waybar: {
                 enabled: true,
                 position: "top",
-                primary_only: true
+                primary_only: true,
+                launcher_icon: ""
             },
             laptop: {
                 idle_timeout: 300,
@@ -780,11 +781,22 @@ waybar_settings() {
         enabled=$(boolean_label "$(preference '.waybar.enabled')")
         position=$(preference '.waybar.position')
         primary=$(boolean_label "$(preference '.waybar.primary_only')")
-        action=$(dialog --menu "Waybar settings" 17 84 7 \
+        launcher_icon=$(preference '.waybar.launcher_icon')
+        if [ -n "$launcher_icon" ]; then
+            launcher_icon_summary=$launcher_icon
+        else
+            launcher_icon_summary='Default (󰀻)'
+        fi
+        set -- \
             "󰐥 enabled" "Waybar: $enabled" \
             "󰘸 position" "Position: $position" \
             "󰹑 primary-only" "Primary display only: $primary" \
-            "󰅖 back" "Back to settings" \
+            "󰀻 launcher-icon" "Launcher icon: $launcher_icon_summary"
+        if [ -n "$launcher_icon" ]; then
+            set -- "$@" "󰑐 reset-icon" "Use the default launcher icon"
+        fi
+        set -- "$@" "󰅖 back" "Back to settings"
+        action=$(dialog --menu "Waybar settings" 20 92 8 "$@" \
             3>&1 1>&2 2>&3) || return
         case $action in
             *" enabled") toggle_preference '.waybar.enabled' waybar ;;
@@ -797,6 +809,21 @@ waybar_settings() {
                 save_preferences waybar
                 ;;
             *" primary-only") toggle_preference '.waybar.primary_only' waybar ;;
+            *" launcher-icon")
+                if ! command -v dotfiles-icon-picker-tui >/dev/null 2>&1; then
+                    message "The icon picker command is not installed."
+                    continue
+                fi
+                selected_icon=$(dotfiles-icon-picker-tui --print) || continue
+                if [ -n "$selected_icon" ]; then
+                    replace_preferences --arg value "$selected_icon" '.waybar.launcher_icon = $value'
+                    save_preferences waybar
+                fi
+                ;;
+            *" reset-icon")
+                replace_preferences '.waybar.launcher_icon = ""'
+                save_preferences waybar
+                ;;
             *" back") return ;;
         esac
     done

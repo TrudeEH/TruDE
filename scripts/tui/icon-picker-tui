@@ -4,11 +4,14 @@ set -u
 usage() {
     printf 'Usage: %s\n\n' "${0##*/}"
     printf 'Search the installed Nerd Font glyphs and copy a selected icon.\n'
+    printf 'Use --print to write the selected icon to standard output instead.\n'
     printf 'Set DOTFILES_NERDFONT_FAMILY to choose a specific installed font.\n'
 }
 
+output_mode=clipboard
 if [ "$#" -gt 0 ]; then
     case $1 in
+        --print) output_mode=stdout; shift ;;
         -h|--help)
             usage
             exit 0
@@ -41,17 +44,19 @@ if [ -z "$font_file" ] || [ ! -r "$font_file" ]; then
     exit 1
 fi
 
-clipboard=
-for command in wl-copy xclip xsel pbcopy; do
-    if command -v "$command" >/dev/null 2>&1; then
-        clipboard=$command
-        break
-    fi
-done
+if [ "$output_mode" = clipboard ]; then
+    clipboard=
+    for command in wl-copy xclip xsel pbcopy; do
+        if command -v "$command" >/dev/null 2>&1; then
+            clipboard=$command
+            break
+        fi
+    done
 
-if [ -z "$clipboard" ]; then
-    printf 'icon_picker.sh: no clipboard command found (tried wl-copy, xclip, xsel, pbcopy).\n' >&2
-    exit 1
+    if [ -z "$clipboard" ]; then
+        printf 'icon_picker.sh: no clipboard command found (tried wl-copy, xclip, xsel, pbcopy).\n' >&2
+        exit 1
+    fi
 fi
 
 terminal_columns=$(tput cols 2>/dev/null || printf '80')
@@ -263,9 +268,13 @@ PY
 icon=$(printf '%s\n' "$selection" | awk -F '	' 'NR == 1 { print $1 }')
 [ -n "$icon" ] || exit 0
 
-case $clipboard in
-    wl-copy) printf '%s' "$icon" | wl-copy ;;
-    xclip) printf '%s' "$icon" | xclip -selection clipboard ;;
-    xsel) printf '%s' "$icon" | xsel --clipboard --input ;;
-    pbcopy) printf '%s' "$icon" | pbcopy ;;
-esac
+if [ "$output_mode" = stdout ]; then
+    printf '%s\n' "$icon"
+else
+    case $clipboard in
+        wl-copy) printf '%s' "$icon" | wl-copy ;;
+        xclip) printf '%s' "$icon" | xclip -selection clipboard ;;
+        xsel) printf '%s' "$icon" | xsel --clipboard --input ;;
+        pbcopy) printf '%s' "$icon" | pbcopy ;;
+    esac
+fi

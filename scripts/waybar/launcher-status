@@ -2,9 +2,16 @@
 set -u
 
 part=${1:-center}
+config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
+preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
 cache_file=$runtime_dir/dotfiles-waybar-launcher-status
 lock_dir=$runtime_dir/dotfiles-waybar-launcher-status.lock
+
+launcher_icon=
+if [ -f "$preferences_file" ] && command -v jq >/dev/null 2>&1; then
+    launcher_icon=$(jq -r '.waybar.launcher_icon // ""' "$preferences_file" 2>/dev/null || :)
+fi
 
 cache_is_fresh() {
     [ -r "$cache_file" ] || return 1
@@ -58,6 +65,8 @@ case $part in
     *)
         if [ "$status" = screensharing ]; then
             text='󰍹'
+        elif [ -n "$launcher_icon" ]; then
+            text=$launcher_icon
         else
             text='󰀻'
         fi
