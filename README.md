@@ -37,7 +37,7 @@ The installer supports **Debian 13 (Trixie) and newer Debian releases**. From a 
 curl -fsSL https://raw.githubusercontent.com/TrudeEH/TruDE/master/bootstrap.sh | sh
 ```
 
-The bootstrap downloads the repository’s `master` branch to `$XDG_DATA_HOME/trude` when `XDG_DATA_HOME` is set, or `$HOME/.local/share/trude` otherwise. Keeping the repository in place lets the installed configuration symlinks continue to resolve. Run it as your regular desktop user; the installer uses `sudo` for system-level setup. It configures Debian package sources, installs the desktop packages, enables selected services, and links the dotfiles into your home directory. Review [`bootstrap.sh`](bootstrap.sh) and [`install.sh`](install.sh) before running if you want to inspect the setup. When it finishes, log out and back in to start the TruDE session.
+The bootstrap installs Git, clones TruDE into `$HOME/dotfiles`, and runs the installer from that checkout. Keeping the repository there lets the installed configuration symlinks continue to resolve. If the same TruDE checkout is already present, bootstrap fast-forwards it; it stops rather than overwriting an unrelated `$HOME/dotfiles` directory. Run it as your regular desktop user; the installer uses `sudo` for system-level setup. It configures Debian package sources, installs the desktop packages, enables selected services, and links the dotfiles into your home directory. Review [`bootstrap.sh`](bootstrap.sh) and [`install.sh`](install.sh) before running if you want to inspect the setup. When it finishes, log out and back in to start the TruDE session.
 
 ## Configuration
 
@@ -57,5 +57,5 @@ The installer links these files into their expected locations. Edit the files in
 | `scripts/hypr/` | Hyprland helpers, including the launcher and screenshot command |
 | `scripts/tui/` | Terminal user interfaces for desktop tasks |
 | `scripts/waybar/` | Waybar status and menu helpers |
-| `bootstrap.sh` | Downloads the repository and starts the installer |
+| `bootstrap.sh` | Installs Git, clones or updates TruDE, and starts the installer |
 | `install.sh` | Debian setup and dotfile installer |
