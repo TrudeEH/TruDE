@@ -112,7 +112,7 @@ load_monitors() {
 
 load_preferences() {
     defaults=$temp_dir/default-preferences.json
-    jq -n --arg wallpaper "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png" '
+    jq -n --arg wallpaper "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg" '
         {
             input: {
                 keyboard_layout: "us",

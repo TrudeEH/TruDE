@@ -251,7 +251,7 @@ link_configs() {
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
     link_config "$repo_dir/configs/hypr/hypridle.conf" "$config_dir/hypr/hypridle.conf"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
-    link_config "$repo_dir/assets/wallpapers/wallpaper.png" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.png"
+    link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
     link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/hypr/start-idle" "$HOME/.local/bin/dotfiles-hypridle"
     link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/dotfiles-mako"

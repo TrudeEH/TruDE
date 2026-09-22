@@ -21,7 +21,7 @@ dotfilesSettings = {
     fileManager        = "footclient --app-id=nnn --title=Files dotfiles-file-manager-tui",
     browser            = "xdg-open https://start.duckduckgo.com",
     launcher           = "dotfiles-app-launcher-toggle",
-    wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png",
+    wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg",
     animationsEnabled  = true,
     blurEnabled        = true,
     gapsIn             = 5,
