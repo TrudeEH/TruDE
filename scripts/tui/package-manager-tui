@@ -162,9 +162,33 @@ run_apt_install() {
 }
 
 install_deb_file() {
-    deb_path=$(dialog --inputbox 'Enter the path to a local .deb package:' 10 78 "" \
-        3>&1 1>&2 2>&3) || return
-    [ -n "$deb_path" ] || return
+    command -v nnn >/dev/null 2>&1 || {
+        message 'nnn is required to select a local .deb package.'
+        return
+    }
+
+    config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
+    if [ -r "$config_dir/nnn/env" ]; then
+        . "$config_dir/nnn/env"
+    fi
+
+    selection_file=$temporary_dir/nnn-selection
+    start_dir=$HOME
+    [ -d "$HOME/Downloads" ] && start_dir=$HOME/Downloads
+
+    clear
+    printf 'Select a .deb package in nnn. Press Enter on a file to choose it; Ctrl-G cancels.\n\n'
+    nnn -p "$selection_file" "$start_dir"
+    picker_status=$?
+    clear
+    [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return
+
+    selection_count=$(wc -l < "$selection_file")
+    [ "$selection_count" -eq 1 ] || {
+        message 'Select one .deb package at a time.'
+        return
+    }
+    deb_path=$(cat "$selection_file")
 
     case $deb_path in
         *.deb) ;;
