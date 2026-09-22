@@ -43,8 +43,8 @@ button {
 
 
 tooltip {
-    border: 1px solid @accent;
-    background-color: @bg-3;
+    border: 1px solid @border;
+    background-color: @bg-2;
 }
 
 tooltip > box {
