@@ -532,18 +532,18 @@ command -v apt-cache >/dev/null 2>&1 || {
 
 while :; do
     choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 7 \
-        'install' '󰐕  Search and install a Debian package, Backport, or Flatpak' \
-        'install-deb' '󰏗  Install a local .deb package file' \
-        'remove' '󰏖  Search and uninstall an installed Debian package or Flatpak' \
-        'refresh' '󰑐  Refresh Debian package lists' \
-        'close' '󰅖  Close' \
+        '󰐕  install' 'Search and install a Debian package, Backport, or Flatpak' \
+        '󰏗  install-deb' 'Install a local .deb package file' \
+        '󰏖  remove' 'Search and uninstall an installed Debian package or Flatpak' \
+        '󰑐  refresh' 'Refresh Debian package lists' \
+        '󰅖  close' 'Close' \
         3>&1 1>&2 2>&3) || exit 0
 
     case $choice in
-        install) install_package ;;
-        install-deb) install_deb_file ;;
-        remove) remove_package ;;
-        refresh) refresh_apt_metadata ;;
-        close) exit 0 ;;
+        '󰐕  install') install_package ;;
+        '󰏗  install-deb') install_deb_file ;;
+        '󰏖  remove') remove_package ;;
+        '󰑐  refresh') refresh_apt_metadata ;;
+        '󰅖  close') exit 0 ;;
     esac
 done
