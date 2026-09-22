@@ -162,6 +162,46 @@ replace_preferences() {
         mv "$preferences_state.new" "$preferences_state"
 }
 
+select_file_with_nnn() {
+    if ! command -v nnn >/dev/null 2>&1; then
+        message "nnn is required to select a file."
+        return 1
+    fi
+
+    config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
+    if [ -r "$config_dir/nnn/env" ]; then
+        . "$config_dir/nnn/env"
+    fi
+
+    selection_file=$temp_dir/nnn-selection
+    start_dir=$1
+    [ -d "$start_dir" ] || start_dir=$HOME
+
+    clear
+    printf 'Select a file in nnn. Press Enter on a file to choose it; Ctrl-G cancels.\n\n'
+    nnn -p "$selection_file" "$start_dir"
+    picker_status=$?
+    clear
+    [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return 1
+
+    selection_count=$(wc -l < "$selection_file")
+    [ "$selection_count" -eq 1 ] || {
+        message "Select one file at a time."
+        return 1
+    }
+    selected_file=$(cat "$selection_file")
+    case $selected_file in
+        /*) ;;
+        *) selected_file=$PWD/$selected_file ;;
+    esac
+    [ -f "$selected_file" ] || {
+        message "The selected file does not exist."
+        return 1
+    }
+
+    printf '%s' "$selected_file"
+}
+
 toggle_preference() {
     preference_path=$1
     preference_scope=$2
@@ -759,10 +799,8 @@ appearance_settings() {
             3>&1 1>&2 2>&3) || return
         case $action in
             *" wallpaper")
-                value=$(dialog --inputbox "󰸉 Absolute path to the wallpaper" \
-                    10 86 "$wallpaper" 3>&1 1>&2 2>&3) || continue
-                case $value in \~/*) value=$HOME/${value#\~/} ;; esac
-                if [ ! -f "$value" ]; then message "That wallpaper file does not exist."; continue; fi
+                wallpaper_dir=$(dirname "$wallpaper")
+                value=$(select_file_with_nnn "$wallpaper_dir") || continue
                 replace_preferences --arg value "$value" '.appearance.wallpaper = $value'
                 save_preferences wallpaper
                 ;;
