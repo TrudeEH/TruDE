@@ -487,6 +487,14 @@ hl.window_rule({
 })
 
 hl.window_rule({
+    name  = "package-manager-tui",
+    match = { class = "package-manager-tui" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
     name  = "app-launcher-tui",
     match = { class = "app-launcher-tui" },
 
