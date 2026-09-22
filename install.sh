@@ -275,6 +275,8 @@ link_configs() {
     link_config "$repo_dir/scripts/nnn/open" "$HOME/.local/bin/dotfiles-nnn-open"
     link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
+    link_config "$repo_dir/scripts/waybar/status-indicators" "$HOME/.local/bin/dotfiles-waybar-status-indicators"
+    link_config "$repo_dir/scripts/waybar/status-menu" "$HOME/.local/bin/dotfiles-waybar-status-menu"
     link_config "$repo_dir/scripts/waybar/power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
     link_config "$repo_dir/scripts/waybar/maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
     link_config "$repo_dir/scripts/waybar/launcher-status" "$HOME/.local/bin/dotfiles-waybar-launcher-status"

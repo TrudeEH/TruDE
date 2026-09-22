@@ -119,11 +119,11 @@ menu separator {
 
 /* Center modules */
 
-#custom-temperature, #memory, #cpu, #network, #clock.time, #clock.date {
+#custom-temperature, #memory, #cpu, #custom-status-indicators, #clock.time, #clock.date {
     padding: 0 8px;
 }
 
-#custom-temperature, #network, #bluetooth, #custom-notification {
+#custom-temperature, #custom-status-indicators {
     background-color: @bg-1;
 }
 
@@ -134,11 +134,6 @@ menu separator {
 #cpu, #clock.time {
     background-color: @bg-3;
 }
-
-#bluetooth, #custom-notification {
-    padding: 0 8px 0 4px
-}
-
 
 #memory.warning,
 #cpu.warning {
@@ -159,24 +154,6 @@ menu separator {
 
 #custom-launcher.screensharing {
     background-color: @critical;
-}
-
-#custom-notification.notification,
-#custom-notification.dnd-notification,
-#custom-notification.inhibited-notification,
-#custom-notification.dnd-inhibited-notification {
-    color: @accent;
-}
-
-#custom-notification.none,
-#custom-notification.dnd-none,
-#custom-notification.inhibited-none,
-#custom-notification.dnd-inhibited-none {
-    color: @fg;
-}
-
-#custom-notification:hover {
-    color: @hover-fg;
 }
 
 #network.disconnected,
