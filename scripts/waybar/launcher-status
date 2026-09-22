@@ -73,4 +73,8 @@ case $part in
         ;;
 esac
 
+if [ "$part" = center ]; then
+    text="<span font_family='JetBrainsMono Nerd Font Propo' stretch='condensed'>$text</span>"
+fi
+
 printf '{"text":"%s","class":"%s"}\n' "$text" "$status"
