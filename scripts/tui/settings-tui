@@ -163,6 +163,7 @@ replace_preferences() {
 }
 
 select_file_with_nnn() {
+    selected_file=
     if ! command -v nnn >/dev/null 2>&1; then
         message "nnn is required to select a file."
         return 1
@@ -198,8 +199,6 @@ select_file_with_nnn() {
         message "The selected file does not exist."
         return 1
     }
-
-    printf '%s' "$selected_file"
 }
 
 toggle_preference() {
@@ -800,7 +799,8 @@ appearance_settings() {
         case $action in
             *" wallpaper")
                 wallpaper_dir=$(dirname "$wallpaper")
-                value=$(select_file_with_nnn "$wallpaper_dir") || continue
+                select_file_with_nnn "$wallpaper_dir" || continue
+                value=$selected_file
                 replace_preferences --arg value "$value" '.appearance.wallpaper = $value'
                 save_preferences wallpaper
                 ;;
