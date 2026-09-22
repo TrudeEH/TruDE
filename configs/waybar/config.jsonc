@@ -123,7 +123,9 @@
             "custom/right#bg-3",
             "clock#date",
             "custom/right#bg-2",
-            "custom/status-indicators",
+            "network",
+            "bluetooth",
+            "custom/notification",
             "custom/right#bg-1"
         ]
     },
@@ -141,15 +143,54 @@
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
-    "custom/status-indicators": {
-        "exec": "dotfiles-waybar-status-indicators",
-        "return-type": "json",
+    "network": {
         "interval": 2,
-        "min-length": 8,
-        "max-length": 8,
-        "align": 0.5,
-        "justify": "center",
-        "on-click": "footclient --app-id=status-menu --title='Quick Settings' --override=colors.regular0=222226 --window-size-chars=42x10 dotfiles-waybar-status-menu",
+        "min-length": 1,
+        "max-length": 1,
+        "format-wifi": "{icon}",
+        "format-ethernet": "󰈀",
+        "format-linked": "󰈀",
+        "format-disconnected": "󰤭",
+        "format-disabled": "󰤭",
+        "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
+        "tooltip-format-ethernet": "Ethernet\n{ipaddr}",
+        "tooltip-format-disconnected": "Offline",
+        "on-click": "footclient --app-id=nmtui --title='Network Settings' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-network-tui"
+    },
+    "bluetooth": {
+        "format": "󰂯",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "format-on": "󰂯",
+        "format-connected": "󰂱 {num_connections}",
+        "min-length": 3,
+        "max-length": 3,
+        "tooltip-format": "Bluetooth: {status}",
+        "tooltip-format-connected": "{num_connections} connected\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}",
+        "on-click": "footclient --app-id=bluetooth-tui --title='Bluetooth' --override=colors.regular0=222226 --window-size-chars=82x26 dotfiles-bluetooth-tui"
+    },
+    "custom/notification": {
+        "tooltip": false,
+        "format": "{icon} {text}",
+        "format-icons": {
+            "notification": "󰂚",
+            "none": "󰂚",
+            "dnd-notification": "󱏨",
+            "dnd-none": "󰂛",
+            "inhibited-notification": "󰂚",
+            "inhibited-none": "󰂚",
+            "dnd-inhibited-notification": "󱏨",
+            "dnd-inhibited-none": "󰂛"
+        },
+        "return-type": "json",
+        "exec": "dotfiles-waybar-notification-status",
+        "interval": 5,
+        "min-length": 4,
+        "max-length": 4,
+        "hide-empty-text": false,
+        "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui",
         "on-click-right": "makoctl mode -t do-not-disturb"
     },
     "pulseaudio": {
