@@ -161,6 +161,44 @@ run_apt_install() {
     pause_after_command
 }
 
+install_deb_file() {
+    deb_path=$(dialog --inputbox 'Enter the path to a local .deb package:' 10 78 "") || return
+    [ -n "$deb_path" ] || return
+
+    case $deb_path in
+        *.deb) ;;
+        *)
+            message 'The selected file must have a .deb extension.'
+            return
+            ;;
+    esac
+
+    case $deb_path in
+        /*) ;;
+        *) deb_path=$PWD/$deb_path ;;
+    esac
+
+    [ -f "$deb_path" ] && [ -r "$deb_path" ] || {
+        message "Cannot read package file:\n\n$deb_path"
+        return
+    }
+
+    if ! dialog --yesno "Install local Debian package?\n\n$deb_path\n\nAPT may install additional dependencies." 12 86; then
+        return
+    fi
+
+    clear
+    printf 'Installing local Debian package: %s\n\n' "$deb_path"
+    sudo apt-get install -y -- "$deb_path"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        printf '\nInstallation completed successfully.\n'
+    else
+        printf '\nInstallation failed.\n'
+    fi
+    pause_after_command
+}
+
 create_flatpak_search_results() {
     query=$1
     raw_file=$temporary_dir/flatpak-search-raw
@@ -468,8 +506,9 @@ command -v apt-cache >/dev/null 2>&1 || {
 }
 
 while :; do
-    choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 6 \
+    choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 7 \
         'install' 'Search and install a Debian package, Backport, or Flatpak' \
+        'install-deb' 'Install a local .deb package file' \
         'remove' 'Search and uninstall an installed Debian package or Flatpak' \
         'refresh' 'Refresh Debian package lists' \
         'close' 'Close' \
@@ -477,6 +516,7 @@ while :; do
 
     case $choice in
         install) install_package ;;
+        install-deb) install_deb_file ;;
         remove) remove_package ;;
         refresh) refresh_apt_metadata ;;
         close) exit 0 ;;
