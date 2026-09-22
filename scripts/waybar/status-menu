@@ -17,7 +17,7 @@ selection=$(printf '%s\n' \
     || exit 0
 
 launch_tui() {
-    nohup footclient "$@" >/dev/null 2>&1 </dev/null &
+    footclient --no-wait "$@"
 }
 
 case $selection in
