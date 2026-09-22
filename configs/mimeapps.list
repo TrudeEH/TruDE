@@ -1,2 +1,3 @@
 [Default Applications]
 inode/directory=dotfiles-file-manager.desktop
+x-scheme-handler/codex=chatgpt.desktop
