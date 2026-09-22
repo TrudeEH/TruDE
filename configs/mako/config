@@ -1,7 +1,7 @@
 font=JetBrainsMono Nerd Font 10
 background-color=#222226ff
 text-color=#ffffffff
-border-color=#ffffff1a
+border-color=#ffbe6fff
 progress-color=over #ffbe6fff
 width=420
 height=140
@@ -22,7 +22,7 @@ default-timeout=8000
 text-color=#aaaaaaff
 
 [urgency=critical]
-border-color=#ffa348ff
+border-color=#ff5e5eff
 default-timeout=0
 
 [mode=do-not-disturb]
