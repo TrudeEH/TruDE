@@ -12,25 +12,25 @@ case $browser in
         exec firefox --new-window "$url"
         ;;
     org.mozilla.firefox.desktop)
-        exec flatpak run --command=firefox org.mozilla.firefox --new-window "$url"
+        exec flatpak run org.mozilla.firefox --new-window "$url"
         ;;
     chromium.desktop|chromium-browser.desktop)
         exec chromium --new-window "$url"
         ;;
     org.chromium.Chromium.desktop)
-        exec flatpak run --command=chromium org.chromium.Chromium --new-window "$url"
+        exec flatpak run org.chromium.Chromium --new-window "$url"
         ;;
     google-chrome.desktop)
         exec google-chrome --new-window "$url"
         ;;
     com.google.Chrome.desktop)
-        exec flatpak run --command=chrome com.google.Chrome --new-window "$url"
+        exec flatpak run com.google.Chrome --new-window "$url"
         ;;
     brave-browser.desktop)
         exec brave-browser --new-window "$url"
         ;;
     com.brave.Browser.desktop)
-        exec flatpak run --command=brave com.brave.Browser --new-window "$url"
+        exec flatpak run com.brave.Browser --new-window "$url"
         ;;
     vivaldi-stable.desktop|vivaldi.desktop)
         exec vivaldi --new-window "$url"
