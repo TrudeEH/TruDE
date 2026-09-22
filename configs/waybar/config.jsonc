@@ -173,6 +173,9 @@
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "format-muted": "󰖁 {volume}%",
+        "format-source": "{source_desc} ({source_volume}%)",
+        "format-source-muted": "{source_desc} (muted)",
+        "tooltip-format": "Output: {desc} ({volume}%)\nMicrophone: {format_source}",
         "format-icons": {
             "default": ["󰕿", "󰖀", "󰕾"]
         },
