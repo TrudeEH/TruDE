@@ -55,6 +55,7 @@
         "return-type": "json",
         "interval": 5,
         "min-length": 8,
+        "max-length": 8,
         "on-click": "footclient --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui"
     },
     "memory": {
@@ -67,6 +68,7 @@
         },
         "interval": 2,
         "min-length": 8,
+        "max-length": 8,
         "tooltip-format": "Memory: {percentage}%",
         "on-click": "footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
@@ -80,6 +82,7 @@
         },
         "interval": 2,
         "min-length": 8,
+        "max-length": 8,
         "tooltip-format": "CPU: {usage}%",
         "on-click": "footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
@@ -129,17 +132,21 @@
     "clock#time": {
         "format": "{:%I:%M %p}",
         "min-length": 8,
+        "max-length": 8,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "clock#date": {
         "format": "󰸗 {:%a %d %b}",
-        "min-length": 13,
+        "min-length": 8,
+        "max-length": 8,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "network": {
         "interval": 2,
+        "min-length": 1,
+        "max-length": 1,
         "format-wifi": "{icon}",
         "format-ethernet": "󰈀",
         "format-linked": "󰈀",
@@ -201,14 +208,15 @@
         "return-type": "json",
         "interval": 300,
         "signal": 8,
-        "min-length": 5,
+        "min-length": 8,
         "on-click": "footclient --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui"
     },
     "custom/power-profile": {
         "exec": "dotfiles-waybar-power-status",
         "return-type": "json",
         "interval": 5,
-        "min-length": 5,
+        "align": 0.5,
+        "min-length": 8,
         "on-click": "footclient --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui"
     },
     "custom/power-menu": {

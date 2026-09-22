@@ -17,13 +17,14 @@
 
 * {
     all: initial;
-}
-
-* {
     font-family: "JetBrainsMono Nerd Font";
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: @fg;
+}
+
+*:hover {
+    color: @hover-fg;
 }
 
 #waybar {
@@ -35,20 +36,11 @@
     background-color: @bg-0;
 }
 
-.module {
-    margin-bottom: -1px;
-}
-
 button {
-    min-width: 16px;
+    min-width: 12px;
     padding: 0 10px;
-    border-radius: 16px;
 }
 
-button:hover {
-    background-color: @hover-bg;
-    color: @hover-fg;
-}
 
 tooltip {
     border: 2px solid @border;
@@ -66,7 +58,7 @@ tooltip label {
 menu {
     padding: 4px;
     border: 1px solid @border;
-    background-color: @bg-3;
+    background-color: @bg-1;
 }
 
 menuitem {
@@ -108,18 +100,12 @@ menu separator {
 
 #workspaces button.active label,
 #workspaces button.focused label {
-    font-size: 18.75px;
+    font-size: 18px;
     color: @accent;
 }
 
 #workspaces button.visible:not(.active) label {
     color: @accent;
-}
-
-#workspaces button,
-#workspaces button:hover {
-    border-radius: 0;
-    background-color: transparent;
 }
 
 #workspaces button:hover label {
@@ -133,24 +119,26 @@ menu separator {
 
 /* Center modules */
 
-#center-left {
-    padding-left: 54px;
+#custom-temperature, #memory, #cpu, #network, #clock.time, #clock.date {
+    padding: 0 8px;
 }
 
-#custom-temperature {
-    padding: 0 8px;
+#custom-temperature, #network, #bluetooth, #custom-notification {
     background-color: @bg-1;
 }
 
-#memory {
-    padding: 0 8px;
+#memory, #clock.date {
     background-color: @bg-2;
 }
 
-#cpu {
-    padding: 0 8px;
+#cpu, #clock.time {
     background-color: @bg-3;
 }
+
+#bluetooth, #custom-notification {
+    padding: 0 8px 0 4px
+}
+
 
 #memory.warning,
 #cpu.warning {
@@ -162,53 +150,15 @@ menu separator {
     color: @critical;
 }
 
-#custom-temperature:hover,
-#memory:hover,
-#cpu:hover {
-    color: @hover-fg;
-}
-
 #custom-launcher {
-    min-width: 18px;
-    padding: 0 9px;
+    padding: 0 14px;
     background-color: @accent;
     color: @accent-text;
-    font-family: "JetBrainsMono Nerd Font Mono";
-    font-size: 21px;
+    font-size: 20px;
 }
 
 #custom-launcher.screensharing {
     background-color: @critical;
-}
-
-#clock.time {
-    padding: 0 6px 0 8px;
-    background-color: @bg-3;
-}
-
-#clock.date {
-    padding: 0 6px;
-    background-color: @bg-2;
-}
-
-#clock.time:hover,
-#clock.date:hover {
-    color: @hover-fg;
-}
-
-#network {
-    padding: 0 6px 0 8px;
-    background-color: @bg-1;
-}
-
-#bluetooth {
-    padding: 0 5px;
-    background-color: @bg-1;
-}
-
-#custom-notification {
-    padding: 0 8px 0 4px;
-    background-color: @bg-1;
 }
 
 #custom-notification.notification,
@@ -225,8 +175,6 @@ menu separator {
     color: @fg;
 }
 
-#network:hover,
-#bluetooth:hover,
 #custom-notification:hover {
     color: @hover-fg;
 }
@@ -240,8 +188,11 @@ menu separator {
 
 /* Right modules */
 
-#pulseaudio {
+#pulseaudio, #custom-maintenance, #custom-power-profile {
     padding: 0 8px;
+}
+
+#pulseaudio {
     background-color: @bg-1;
 }
 
@@ -250,12 +201,10 @@ menu separator {
 }
 
 #custom-maintenance {
-    padding: 0 8px;
     background-color: @bg-2;
 }
 
 #custom-power-profile {
-    padding: 0 8px;
     background-color: @bg-3;
 }
 
@@ -282,14 +231,12 @@ menu separator {
 }
 
 #custom-power-menu {
-    padding: 0 19px 0 16px;
-    border-radius: 0;
+    padding: 0 14px;
     color: @accent;
     font-size: 16px;
 }
 
 #custom-power-menu:hover {
-    background-color: transparent;
     color: @accent-strong;
 }
 
@@ -297,7 +244,7 @@ menu separator {
 
 #custom-left,
 #custom-right {
-    font-size: 19.5px;
+    font-size: 20px;
 }
 
 #custom-left.accent,
