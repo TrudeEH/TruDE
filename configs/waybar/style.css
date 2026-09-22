@@ -48,7 +48,7 @@ tooltip {
 }
 
 tooltip > box {
-    padding: 8px 12px;
+    padding: 2px 6px;
 }
 
 tooltip label {
