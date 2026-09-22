@@ -90,8 +90,6 @@
         "exec": "dotfiles-waybar-launcher-status center",
         "return-type": "json",
         "interval": 1,
-        "min-length": 2,
-        "max-length": 2,
         "align": 0.5,
         "justify": "center",
         "tooltip": false,
