@@ -162,7 +162,8 @@ run_apt_install() {
 }
 
 install_deb_file() {
-    deb_path=$(dialog --inputbox 'Enter the path to a local .deb package:' 10 78 "") || return
+    deb_path=$(dialog --inputbox 'Enter the path to a local .deb package:' 10 78 "" \
+        3>&1 1>&2 2>&3) || return
     [ -n "$deb_path" ] || return
 
     case $deb_path in
