@@ -135,7 +135,7 @@
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "clock#date": {
-        "format": "󰸗 {:%a %d %b}",
+        "format": "{:%a %d %b}",
         "min-length": 8,
         "max-length": 8,
         "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
