@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -eu
+
+# Wait for Hyprland's IPC socket so the output layout is available.
+while :; do
+    monitors=$(hyprctl monitors -j 2>/dev/null || :)
+    if [ -n "$monitors" ] && [ "$(printf '%s' "$monitors" | jq 'length')" -gt 0 ]; then
+        break
+    fi
+    sleep 1
+done
+
+# Treat the output at the layout origin as primary; fall back to the first
+# connected output if a custom layout has no output at 0,0.
+output=$(printf '%s' "$monitors" | jq -r 'first(.[] | select(.x == 0 and .y == 0) | .name) // first(.[] | .name) // empty')
+if [ -z "$output" ]; then
+    echo "Unable to determine the primary Hyprland output" >&2
+    exit 1
+fi
+
+exec mako --output "$output"
