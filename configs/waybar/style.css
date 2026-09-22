@@ -152,6 +152,10 @@ menu separator {
     font-size: 20px;
 }
 
+#custom-launcher label {
+    font-family: "JetBrainsMono Nerd Font Propo";
+}
+
 #custom-launcher.screensharing {
     background-color: @critical;
 }
