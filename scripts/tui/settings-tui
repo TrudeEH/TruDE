@@ -798,7 +798,11 @@ appearance_settings() {
             3>&1 1>&2 2>&3) || return
         case $action in
             *" wallpaper")
-                wallpaper_dir=$(dirname "$wallpaper")
+                wallpaper_dir=$HOME/.local/share/backgrounds
+                if ! mkdir -p "$wallpaper_dir"; then
+                    message "Unable to open the wallpaper folder."
+                    continue
+                fi
                 select_file_with_nnn "$wallpaper_dir" || continue
                 value=$selected_file
                 replace_preferences --arg value "$value" '.appearance.wallpaper = $value'
