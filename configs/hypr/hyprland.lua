@@ -414,125 +414,33 @@ hl.window_rule({
     float = true,
 })
 
-hl.window_rule({
-    name  = "network-tui",
-    match = { class = "nmtui" },
+local centeredTuiWindows = {
+    { name = "network-tui",          class = "nmtui" },
+    { name = "status-menu",          class = "status-menu" },
+    { name = "bluetooth-tui",        class = "bluetooth-tui" },
+    { name = "volume-tui",           class = "pulsemixer" },
+    { name = "power-profiles-tui",   class = "power-profiles-tui" },
+    { name = "power-menu-tui",       class = "power-menu-tui" },
+    { name = "system-monitor-tui",   class = "btop" },
+    { name = "temperature-tui",      class = "temperature-tui" },
+    { name = "maintenance-tui",      class = "maintenance-tui" },
+    { name = "package-manager-tui",  class = "package-manager-tui" },
+    { name = "app-launcher-tui",     class = "app-launcher-tui" },
+    { name = "icon-picker-tui",      class = "icon-picker-tui" },
+    { name = "shortcuts-tui",        class = "shortcuts-tui" },
+    { name = "settings-tui",         class = "settings-tui" },
+    { name = "notification-tui",     class = "notification-tui" },
+}
 
-    float  = true,
-    center = true,
-})
+for _, window in ipairs(centeredTuiWindows) do
+    hl.window_rule({
+        name  = window.name,
+        match = { class = window.class },
 
-hl.window_rule({
-    name  = "status-menu",
-    match = { class = "status-menu" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "bluetooth-tui",
-    match = { class = "bluetooth-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "volume-tui",
-    match = { class = "pulsemixer" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "power-profiles-tui",
-    match = { class = "power-profiles-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "power-menu-tui",
-    match = { class = "power-menu-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "system-monitor-tui",
-    match = { class = "btop" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "temperature-tui",
-    match = { class = "temperature-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "maintenance-tui",
-    match = { class = "maintenance-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "package-manager-tui",
-    match = { class = "package-manager-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "app-launcher-tui",
-    match = { class = "app-launcher-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "icon-picker-tui",
-    match = { class = "icon-picker-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "shortcuts-tui",
-    match = { class = "shortcuts-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "settings-tui",
-    match = { class = "settings-tui" },
-
-    float  = true,
-    center = true,
-})
-
-hl.window_rule({
-    name  = "notification-tui",
-    match = { class = "notification-tui" },
-
-    float  = true,
-    center = true,
-})
+        float  = true,
+        center = true,
+    })
+end
 
 -- Start the bar and authentication agent once per session.
 hl.on("hyprland.start", function ()
