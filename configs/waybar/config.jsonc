@@ -131,14 +131,32 @@
         "format": "{:%I:%M %p}",
         "min-length": 8,
         "max-length": 8,
-        "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+        "tooltip-format": "<tt>{calendar}</tt>",
+        "calendar": {
+            "mode": "month",
+            "format": {
+                "months": "<span foreground='#ffbe6f'><b>{}</b></span>",
+                "days": "<span foreground='#ffffff'>{}</span>",
+                "weekdays": "<span foreground='#aaaaaa'><b>{}</b></span>",
+                "today": "<span foreground='#222226' background='#ffbe6f'><b><u>{}</u></b></span>"
+            }
+        },
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "clock#date": {
-        "format": "{:%a %d %b}",
+        "format": "{:%d %b}",
         "min-length": 8,
         "max-length": 8,
-        "tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+        "tooltip-format": "<tt>{calendar}</tt>",
+        "calendar": {
+            "mode": "month",
+            "format": {
+                "months": "<span foreground='#ffbe6f'><b>{}</b></span>",
+                "days": "<span foreground='#ffffff'>{}</span>",
+                "weekdays": "<span foreground='#aaaaaa'><b>{}</b></span>",
+                "today": "<span foreground='#222226' background='#ffbe6f'><b><u>{}</u></b></span>"
+            }
+        },
         "on-click": "footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui"
     },
     "custom/status-indicators": {
