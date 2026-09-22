@@ -416,13 +416,13 @@ select_installed_package() {
         --ansi \
         --delimiter='\t' \
         --with-nth=3 \
-        --nth=3 \
+        --nth=2,3 \
         --prompt='󰏖  Remove package  ' \
         --pointer='󰜴' \
         --marker='󰄬' \
         --border=sharp \
         --border-label=" Installed packages: $(wc -l < "$results_file") " \
-        --header='Type to search all installed Debian packages and Flatpaks' \
+        --header='Search package names, Flatpak IDs, or display names' \
         --info=inline-right \
         --layout=reverse \
         --no-multi \
