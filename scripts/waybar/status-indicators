@@ -70,7 +70,7 @@ else
     notification_tooltip='Notifications: none'
 fi
 
-text="$network_icon $bluetooth_icon $notification_markup"
+text="$network_icon $bluetooth_icon $notification_markup $notification_count"
 tooltip="$network_tooltip\n$bluetooth_tooltip\n$notification_tooltip"
 jq -cn --arg text "$text" --arg tooltip "$tooltip" \
     '{text: $text, tooltip: $tooltip}'
