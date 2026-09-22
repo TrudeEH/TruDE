@@ -44,15 +44,17 @@ button {
 
 tooltip {
     border: 2px solid @border;
+    border-radius: 8px;
     background-color: @bg-0;
 }
 
 tooltip > box {
-    padding: 0 6px;
+    padding: 8px 12px;
 }
 
 tooltip label {
     font-weight: 400;
+    color: @fg;
 }
 
 menu {
