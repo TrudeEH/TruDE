@@ -2,9 +2,9 @@
 set -u
 
 selection=$(printf '%s\n' \
+    'Notifications' \
     'Network settings' \
     'Bluetooth settings' \
-    'Notifications' \
     | fzf \
         --prompt=' Quick Settings  ' \
         --pointer='󰜴' \
