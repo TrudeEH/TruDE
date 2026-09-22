@@ -423,6 +423,14 @@ hl.window_rule({
 })
 
 hl.window_rule({
+    name  = "status-menu",
+    match = { class = "status-menu" },
+
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
     name  = "bluetooth-tui",
     match = { class = "bluetooth-tui" },
 
