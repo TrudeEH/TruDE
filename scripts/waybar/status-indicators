@@ -1,0 +1,76 @@
+#!/bin/sh
+set -u
+
+network_status=$(nmcli -t -f TYPE,STATE device status 2>/dev/null || :)
+if printf '%s\n' "$network_status" | grep -Fqx 'wifi:connected'; then
+    signal=$(nmcli -t -f IN-USE,SIGNAL device wifi list --rescan no 2>/dev/null \
+        | awk -F: '$1 == "*" { print $2; exit }')
+    case $signal in *[!0-9]*|'') signal=0 ;; esac
+    if [ "$signal" -ge 75 ]; then
+        network_icon='󰤨'
+    elif [ "$signal" -ge 50 ]; then
+        network_icon='󰤥'
+    elif [ "$signal" -ge 25 ]; then
+        network_icon='󰤢'
+    else
+        network_icon='󰤟'
+    fi
+    network_tooltip="Wi-Fi (${signal}%)"
+elif printf '%s\n' "$network_status" | grep -Fqx 'ethernet:connected'; then
+    network_icon='󰈀'
+    network_tooltip='Ethernet connected'
+else
+    network_icon='󰤭'
+    network_tooltip='Offline'
+fi
+
+if bluetooth_info=$(bluetoothctl show 2>/dev/null) \
+    && printf '%s\n' "$bluetooth_info" \
+        | grep -Eq '^[[:space:]]*Powered: yes[[:space:]]*$'; then
+    bluetooth_count=$(bluetoothctl devices Connected 2>/dev/null \
+        | awk '$1 == "Device" { count++ } END { print count + 0 }')
+    case $bluetooth_count in *[!0-9]*|'') bluetooth_count=0 ;; esac
+    if [ "$bluetooth_count" -gt 0 ]; then
+        bluetooth_icon='󰂱'
+        bluetooth_tooltip="Bluetooth: $bluetooth_count connected"
+    else
+        bluetooth_icon='󰂯'
+        bluetooth_tooltip='Bluetooth: on'
+    fi
+else
+    bluetooth_icon='󰂲'
+    bluetooth_tooltip='Bluetooth: off'
+fi
+
+notification_data=$(dotfiles-waybar-notification-status 2>/dev/null \
+    || printf '{"text":"0","alt":"none"}\n')
+notification_count=$(printf '%s\n' "$notification_data" \
+    | jq -r '.text // "0"' 2>/dev/null || printf '0')
+notification_state=$(printf '%s\n' "$notification_data" \
+    | jq -r '.alt // "none"' 2>/dev/null || printf 'none')
+case $notification_count in *[!0-9]*|'') notification_count=0 ;; esac
+
+case $notification_state in
+    dnd-notification|dnd-inhibited-notification)
+        notification_icon='󱏨'
+        ;;
+    dnd-none|dnd-inhibited-none)
+        notification_icon='󰂛'
+        ;;
+    *)
+        notification_icon='󰂚'
+        ;;
+esac
+
+if [ "$notification_count" -gt 0 ]; then
+    notification_markup="<span foreground=\"#ffbe6f\">$notification_icon</span>"
+    notification_tooltip="Notifications: $notification_count"
+else
+    notification_markup=$notification_icon
+    notification_tooltip='Notifications: none'
+fi
+
+text="$network_icon $bluetooth_icon $notification_markup"
+tooltip="$network_tooltip\n$bluetooth_tooltip\n$notification_tooltip"
+jq -cn --arg text "$text" --arg tooltip "$tooltip" \
+    '{text: $text, tooltip: $tooltip}'
