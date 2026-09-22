@@ -43,9 +43,8 @@ button {
 
 
 tooltip {
-    border: 2px solid @border;
-    border-radius: 8px;
-    background-color: @bg-0;
+    border: 1px solid @accent;
+    background-color: @bg-3;
 }
 
 tooltip > box {
