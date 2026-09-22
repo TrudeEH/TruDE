@@ -2,17 +2,23 @@
 set -u
 
 maximum=0
+total=0
+sensor_count=0
 for input in /sys/class/hwmon/hwmon*/temp*_input /sys/class/thermal/thermal_zone*/temp; do
     [ -r "$input" ] || continue
     IFS= read -r value < "$input" 2>/dev/null || continue
     case $value in *[!0-9]*|'') continue ;; esac
+    total=$((total + value))
+    sensor_count=$((sensor_count + 1))
     [ "$value" -gt "$maximum" ] && maximum=$value
 done
 
-if [ "$maximum" -gt 0 ]; then
+if [ "$sensor_count" -gt 0 ]; then
     temperature=$((maximum / 1000))
-    printf '{"text":" %s°C","tooltip":"Maximum temperature: %s°C","percentage":%s}\n' \
-        "$temperature" "$temperature" "$temperature"
+    average_tenths=$((total * 10 / sensor_count / 1000))
+    average="$((average_tenths / 10)).$((average_tenths % 10))"
+    printf '{"text":" %s°C","tooltip":"Maximum temperature: %s°C\\nAverage temperature: %s°C","percentage":%s}\n' \
+        "$temperature" "$temperature" "$average" "$temperature"
 else
     printf '{"text":" —","tooltip":"No temperature sensor found"}\n'
 fi
