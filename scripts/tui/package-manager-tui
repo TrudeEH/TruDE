@@ -415,8 +415,8 @@ select_installed_package() {
     selected=$(fzf \
         --ansi \
         --delimiter='\t' \
-        --with-nth=3 \
-        --nth=2,3 \
+        --with-nth=2,3 \
+        --nth=1,2 \
         --prompt='󰏖  Remove package  ' \
         --pointer='󰜴' \
         --marker='󰄬' \
