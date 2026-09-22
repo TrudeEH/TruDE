@@ -261,13 +261,13 @@ create_unified_install_results() {
     apt_results=$(create_apt_search_results "$query" apt)
     while IFS="$(printf '\t')" read -r package description; do
         [ -n "$package" ] || continue
-        printf 'apt\t%s\t[Debian] %s\t\n' "$package" "$description" >> "$results_file"
+        printf 'apt\t%s\t󰏗  Debian · %s\t\n' "$package" "$description" >> "$results_file"
     done < "$apt_results"
 
     backports_results=$(create_apt_search_results "$query" backports)
     while IFS="$(printf '\t')" read -r package description; do
         [ -n "$package" ] || continue
-        printf 'backports\t%s\t[Backports] %s\t\n' "$package" "$description" >> "$results_file"
+        printf 'backports\t%s\t󰒓  Backports · %s\t\n' "$package" "$description" >> "$results_file"
     done < "$backports_results"
 
     if command -v flatpak >/dev/null 2>&1; then
@@ -278,7 +278,7 @@ create_unified_install_results() {
                 label="$name"
                 [ -n "$version" ] && label="$label — $version"
                 [ -n "$description" ] && label="$label — $(compact_text "$description")"
-                printf 'flatpak\t%s\t[Flatpak:%s] %s\t%s\n' \
+                printf 'flatpak\t%s\t󰏖  Flatpak · %s · %s\t%s\n' \
                     "$application" "$remote" "$label" "$remote" >> "$results_file"
             done < "$flatpak_results"
         fi
@@ -365,10 +365,10 @@ create_installed_package_results() {
             -v reset_color="$reset_color" '
             $4 ~ /installed$/ {
                 color = source_color
-                source = "[Debian]"
+                source = "󰏗  Debian ·"
                 if ($2 ~ /~bpo/) {
                     color = backports_color
-                    source = "[Backports]"
+                    source = "󰒓  Backports ·"
                 }
                 label = color source reset_color " " package_color $1 reset_color " " muted_color "— " $2 reset_color
                 if ($3 == "yes") label = label " " color "[essential]" reset_color
@@ -386,7 +386,7 @@ create_installed_package_results() {
                     -v muted_color="$muted_color" \
                     -v reset_color="$reset_color" '
                     NF >= 1 && $1 != "" {
-                        label = source_color "[Flatpak " substr(source, 9) "]" reset_color " " package_color $2 reset_color
+                        label = source_color "󰏖  Flatpak " substr(source, 9) " ·" reset_color " " package_color $2 reset_color
                         if ($3 != "") label = label " " muted_color "— " $3 reset_color
                         label = label " " muted_color "(" $1 ")" reset_color
                         print source "\t" $1 "\t" label
@@ -532,11 +532,11 @@ command -v apt-cache >/dev/null 2>&1 || {
 
 while :; do
     choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 7 \
-        'install' 'Search and install a Debian package, Backport, or Flatpak' \
-        'install-deb' 'Install a local .deb package file' \
-        'remove' 'Search and uninstall an installed Debian package or Flatpak' \
-        'refresh' 'Refresh Debian package lists' \
-        'close' 'Close' \
+        'install' '󰐕  Search and install a Debian package, Backport, or Flatpak' \
+        'install-deb' '󰏗  Install a local .deb package file' \
+        'remove' '󰏖  Search and uninstall an installed Debian package or Flatpak' \
+        'refresh' '󰑐  Refresh Debian package lists' \
+        'close' '󰅖  Close' \
         3>&1 1>&2 2>&3) || exit 0
 
     case $choice in
