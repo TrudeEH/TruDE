@@ -19,7 +19,7 @@ local adwaita = {
 dotfilesSettings = {
     terminal           = "footclient",
     fileManager        = "footclient --app-id=nnn --title=Files dotfiles-file-manager-tui",
-    browser            = "dotfiles-open-browser",
+    browser            = "xdg-open https://start.duckduckgo.com",
     launcher           = "dotfiles-app-launcher-toggle",
     wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.png",
     animationsEnabled  = true,
