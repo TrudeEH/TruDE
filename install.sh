@@ -147,6 +147,8 @@ configure_flatpak() {
 configure_lightdm() {
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
         /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
+    sudo install -D -m 0644 "$repo_dir/configs/lightdm/trude.desktop" \
+        /usr/share/trude/sessions/trude.desktop
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
         /etc/lightdm/slick-greeter.conf
     sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
@@ -247,7 +249,7 @@ configure_pam() {
 configure_session() {
     cat > "$HOME/.dmrc" <<'DMRC'
 [Desktop]
-Session=hyprland-uwsm
+Session=trude
 DMRC
     chmod 644 "$HOME/.dmrc"
 }
