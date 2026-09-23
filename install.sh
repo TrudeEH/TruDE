@@ -71,9 +71,6 @@ BACKPORTS
 
 install_packages() {
     sudo apt-get update
-    sudo apt-get install -y debconf-utils
-    printf '%s\n' 'lightdm shared/default-x-display-manager select lightdm' \
-        | sudo debconf-set-selections
     sudo apt-get install -y -t "$backports_suite" \
         hyprland hyprland-guiutils hypridle hyprlock uwsm xdg-desktop-portal-hyprland
     sudo apt-get install -y \
