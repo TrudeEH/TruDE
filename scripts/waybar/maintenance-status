@@ -58,7 +58,7 @@ if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
     fi
 fi
 
-total=$((apt_updates + flatpak_updates))
+total=$((apt_updates + flatpak_updates + trude_updates))
 if [ "$trude_updates" -gt 0 ]; then
     text="  $total"
     class=trude-updates

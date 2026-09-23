@@ -122,7 +122,7 @@ collect_status() {
         apt_updated=unknown
     fi
 
-    total_updates=$((apt_updates + flatpak_updates))
+    total_updates=$((apt_updates + flatpak_updates + trude_updates))
     ensure_content "$apt_updates_file" "No APT updates available."
     ensure_content "$flatpak_updates_file" "No Flatpak updates available."
     ensure_content "$held_file" "No packages are held."
