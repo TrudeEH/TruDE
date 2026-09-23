@@ -34,7 +34,10 @@ if [ -n "$battery" ]; then
 $info
 EOF
     if [ "${present:-yes}" = yes ] && [ -n "$percentage" ]; then
-        label="$icon  $percentage%"
+        case $state in
+            charging) label="$icon   $percentage%" ;;
+            *) label="$icon  $percentage%" ;;
+        esac
         tooltip="$tooltip\\nBattery: $percentage%${state:+ ($state)}"
     fi
 fi
