@@ -10,7 +10,8 @@ esac
 
 label=$icon
 tooltip="Power profile: $profile"
-battery=$(upower -e 2>/dev/null | awk '/\/battery_/ { print; exit }')
+devices=$(upower -e 2>/dev/null || :)
+battery=$(printf '%s\n' "$devices" | awk '/\/battery_/ { print; exit }')
 
 if [ -n "$battery" ]; then
     info=$(upower -i "$battery" 2>/dev/null || :)
@@ -34,8 +35,33 @@ if [ -n "$battery" ]; then
 $info
 EOF
     if [ "${present:-yes}" = yes ] && [ -n "$percentage" ]; then
+        line_power_online=
+        if [ "$state" = fully-charged ]; then
+            line_power=$(printf '%s\n' "$devices" | awk '/\/line_power_/ { print; exit }')
+            if [ -n "$line_power" ]; then
+                line_power_info=$(upower -i "$line_power" 2>/dev/null || :)
+                while IFS= read -r line; do
+                    case $line in
+                        *online:*)
+                            value=${line#*:}
+                            line_power_online=${value#"${value%%[![:space:]]*}"}
+                            break
+                            ;;
+                    esac
+                done <<EOF
+$line_power_info
+EOF
+            fi
+        fi
         case $state in
             charging) label="$icon   $percentage%" ;;
+            fully-charged)
+                if [ "$line_power_online" = yes ]; then
+                    label="$icon   $percentage%"
+                else
+                    label="$icon  $percentage%"
+                fi
+                ;;
             *) label="$icon  $percentage%" ;;
         esac
         tooltip="$tooltip\\nBattery: $percentage%${state:+ ($state)}"
