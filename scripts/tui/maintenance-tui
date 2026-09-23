@@ -176,10 +176,14 @@ update_system() {
     if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
         printf '\n󰊢  Updating TruDE…\n\n'
         if git -C "$trude_repo" pull --ff-only; then
+            printf '\nRunning the TruDE installer to apply dependencies and configuration…\n\n'
             if "$trude_repo/install.sh"; then
+                printf '\nReloading Hyprland…\n\n'
                 hyprctl reload || update_failed=1
+                printf '\nRestarting Waybar…\n\n'
                 systemctl --user restart waybar.service || update_failed=1
             else
+                printf '\nThe TruDE installer failed; skipping desktop reload.\n'
                 update_failed=1
             fi
         else
