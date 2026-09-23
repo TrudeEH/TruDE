@@ -1,6 +1,38 @@
 #!/bin/sh
 set -eu
 
+ui_init() {
+    ui_reset=
+    ui_accent=
+    ui_success_color=
+    ui_error_color=
+    ui_muted=
+    if [ -t 1 ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-dumb}" != dumb ]; then
+        ui_reset=$(printf '\033[0m')
+        ui_accent=$(printf '\033[1;38;5;214m')
+        ui_success_color=$(printf '\033[1;38;5;77m')
+        ui_error_color=$(printf '\033[1;38;5;203m')
+        ui_muted=$(printf '\033[38;5;245m')
+    fi
+}
+
+ui_banner() {
+    printf '\n%s  TruDE%s\n' "$ui_accent" "$ui_reset"
+    printf '%s  Debian desktop setup%s\n' "$ui_muted" "$ui_reset"
+}
+
+ui_step() {
+    printf '\n%s==>%s %s\n' "$ui_accent" "$ui_reset" "$1"
+}
+
+ui_success() {
+    printf '\n%s✓%s %s\n' "$ui_success_color" "$ui_reset" "$1"
+}
+
+ui_error() {
+    printf '%sError:%s %s\n' "$ui_error_color" "$ui_reset" "$1" >&2
+}
+
 repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
@@ -9,7 +41,7 @@ debian_components_sources=/etc/apt/sources.list.d/dotfiles-components.sources
 
 check_platform() {
     if [ "$(id -u)" -eq 0 ]; then
-        echo "Run this script as your normal desktop user, not root." >&2
+        ui_error "Run this script as your normal desktop user, not root."
         exit 1
     fi
 
@@ -20,7 +52,7 @@ check_platform() {
         ''|*[!0-9]*) debian_major=0 ;;
     esac
     if [ "${ID:-}" != debian ] || [ "$debian_major" -lt 13 ] || [ -z "${VERSION_CODENAME:-}" ]; then
-        echo "This installer supports Debian 13 (trixie) and newer Debian releases." >&2
+        ui_error "This installer supports Debian 13 (trixie) and newer Debian releases."
         exit 1
     fi
 }
@@ -305,16 +337,31 @@ link_configs() {
 }
 
 main() {
+    ui_init
+    ui_banner
+    ui_step "Checking system requirements"
     check_platform
+
+    ui_step "Configuring Debian package sources"
     configure_debian_sources
     configure_backports
+
+    ui_step "Installing desktop packages"
     install_packages
+
+    ui_step "Installing fonts and configuring Flatpak"
     install_font
     configure_flatpak
+
+    ui_step "Setting up the LightDM login screen"
     configure_lightdm
+
+    ui_step "Configuring networking, power, and printing"
     configure_networking
     configure_hardware_services
     configure_pam
+
+    ui_step "Setting up the desktop session and user configuration"
     configure_session
     link_configs
     configure_theme
@@ -325,7 +372,7 @@ main() {
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 
-    echo "Done. Log out and back in to start the Waybar desktop session."
+    ui_success "Installation complete. Log out and back in to start the TruDE desktop."
 }
 
 main "$@"
