@@ -1,33 +1,44 @@
 # TruDE
 
-**Trude’s Desktop Environment** is a Debian-first desktop built around Hyprland. It brings together a Wayland session, a matching dark theme, keyboard-driven controls, and terminal user interfaces for common desktop tasks.
+**Trude’s Desktop Environment** is an optimized, keyboard-driven Debian desktop built around Hyprland.
 
-## Screenshots
+**Under 200 MB RAM at idle · Everything is a TUI**
 
-<table>
-  <tr>
-    <td align="center"><strong>Empty desktop</strong><br><img src="assets/screenshots/empty-desktop.webp" alt="TruDE desktop with no open windows" width="100%"></td>
-    <td align="center"><strong>Application launcher</strong><br><img src="assets/screenshots/launcher.webp" alt="TruDE application launcher open over the desktop" width="100%"></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>Terminal tools</strong><br><img src="assets/screenshots/tui-scripts.webp" alt="TruDE terminal interfaces for maintenance, power profiles, power actions, and sensors" width="100%"></td>
-    <td align="center"><strong>Settings</strong><br><img src="assets/screenshots/settings.webp" alt="TruDE settings menu" width="100%"></td>
-  </tr>
-  <tr>
-    <td align="center"><strong>Bar when idle</strong><br><img src="assets/screenshots/bar-idle.webp" alt="TruDE Waybar in its idle state" width="100%"></td>
-    <td align="center"><strong>Bar while streaming</strong><br><img src="assets/screenshots/bar-streaming.webp" alt="TruDE Waybar while streaming" width="100%"></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="assets/screenshots/empty-desktop.webp" alt="TruDE on an empty desktop" width="48%">
+  <img src="assets/screenshots/gameplay.webp" alt="A game running alongside TruDE tools" width="48%">
+</p>
 
-<p align="center"><strong>Playing a game</strong><br><img src="assets/screenshots/gameplay.webp" alt="A game running alongside TruDE desktop tools" width="100%"></p>
+## TUIs for every setting
 
-## What’s included
+Instead of keeping a separate applet open for every task, TruDE opens compact terminal interfaces when you need them. The menus and helper scripts are designed to appear immediately and close when you’re done.
 
-- Hyprland desktop session with Waybar, lock screen, idle handling, notifications, and wallpaper.
-- Application launcher and keyboard shortcuts for windows, workspaces, screenshots, audio, and brightness.
-- Terminal interfaces for settings, package management, system maintenance, networking, Bluetooth, power, notifications, file browsing, sensors, and system monitoring.
-- Matching GTK, Qt, terminal, editor, and system-monitor colors using a dark palette with warm orange accents.
-- LightDM with Slick Greeter, PipeWire audio, Flatpak with Flathub, and supporting desktop services.
+The included tools cover package management, system maintenance, app launching, Bluetooth, networking, power profiles, notifications, file browsing, system monitoring, temperatures, and more.
+
+| Terminal tools | Application launcher |
+| --- | --- |
+| ![TruDE terminal tools for maintenance, power, and sensors](assets/screenshots/tui-scripts.webp) | ![TruDE application launcher](assets/screenshots/launcher.webp) |
+
+## APT, Backports and Flatpacks
+
+TruDE configures Debian Backports and Flathub. You can easily install, uninstall and update packages, and be notified when updates are needed.
+![Package manager](assets/screenshots/package-manager.png)
+
+## Customize the desktop from one panel
+
+Easily configure your system without manually editing configuration files. Adjust display layout, keyboard and touchpad behavior, wallpaper, animations, blur, gaps, borders, Waybar, and idle timeouts. Press `Super+I` to open it; `Super` opens the launcher.
+
+![TruDE settings panel](assets/screenshots/settings.webp)
+
+## User-friendly features
+
+TruDE is meant for power users and is mainly keyboard-driven, but most interfaces also support mouse navigation and communicate the state of the desktop intuitively.
+
+You can access a list of shortcuts with `Super+H` or by launching the `Shortcuts` app, or know whether you are sharing your screen with an indicator. System maintenance is made easy with an update counter and simple update menu.
+
+| Customizable Icon | Screen sharing |
+| --- | --- |
+| ![Waybar in its normal state](assets/screenshots/bar-idle.webp) | ![Waybar showing the active screen-sharing indicator](assets/screenshots/bar-streaming.webp) |
 
 ## Installation
 
@@ -37,25 +48,4 @@ The installer supports **Debian 13 (Trixie) and newer Debian releases**. From a 
 curl -fsSL https://raw.githubusercontent.com/TrudeEH/TruDE/master/bootstrap.sh | sh
 ```
 
-The bootstrap installs Git, clones TruDE into `$HOME/dotfiles`, and runs the installer from that checkout. Keeping the repository there lets the installed configuration symlinks continue to resolve. If the same TruDE checkout is already present, bootstrap fast-forwards it; it stops rather than overwriting an unrelated `$HOME/dotfiles` directory. Run it as your regular desktop user; the installer uses `sudo` for system-level setup. It configures Debian package sources, installs the desktop packages, enables selected services, and links the dotfiles into your home directory. Review [`bootstrap.sh`](bootstrap.sh) and [`install.sh`](install.sh) before running if you want to inspect the setup. When it finishes, log out and back in to start the TruDE session.
-
-## Configuration
-
-- `configs/hypr/hyprland.lua` contains the Hyprland desktop settings and keybindings.
-- `configs/waybar/` contains the bar layout and styling.
-- `scripts/tui/` contains the terminal interfaces.
-- `assets/wallpapers/default.jpg` is the default desktop and lock-screen wallpaper.
-
-The installer links these files into their expected locations. Edit the files in this repository to keep changes versioned with the rest of TruDE.
-
-## Repository layout
-
-| Path | Contents |
-| --- | --- |
-| `assets/` | Default wallpaper and README screenshots |
-| `configs/` | Hyprland, Waybar, GTK, Qt, terminal, and application settings |
-| `scripts/hypr/` | Hyprland helpers, including the launcher and screenshot command |
-| `scripts/tui/` | Terminal user interfaces for desktop tasks |
-| `scripts/waybar/` | Waybar status and menu helpers |
-| `bootstrap.sh` | Installs Git, clones or updates TruDE, and starts the installer |
-| `install.sh` | Debian setup and dotfile installer |
+The bootstrap installs Git, clones TruDE into `$HOME/dotfiles`, and runs the installer. When it finishes, log out and back in to start the TruDE session.
