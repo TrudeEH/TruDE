@@ -46,8 +46,23 @@ else
     flatpak_updates=0
 fi
 
+trude_repo=$HOME/dotfiles
+trude_updates=0
+if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
+    GIT_TERMINAL_PROMPT=0 git -C "$trude_repo" \
+        -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
+        fetch --quiet --no-tags origin 2>/dev/null || :
+    trude_upstream=$(git -C "$trude_repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || :)
+    if [ -n "$trude_upstream" ]; then
+        trude_updates=$(git -C "$trude_repo" rev-list --count "HEAD..$trude_upstream" 2>/dev/null || printf '0')
+    fi
+fi
+
 total=$((apt_updates + flatpak_updates))
-if [ "$total" -gt 0 ]; then
+if [ "$trude_updates" -gt 0 ]; then
+    text="  $total"
+    class=trude-updates
+elif [ "$total" -gt 0 ]; then
     text="  $total"
     class=updates
 else
@@ -56,7 +71,7 @@ else
 fi
 
 temporary=$(mktemp "$runtime_dir/dotfiles-waybar-maintenance.XXXXXX") || exit 1
-printf '{"text":"%s","tooltip":"APT updates: %s\\nFlatpak updates: %s","class":"%s"}\n' \
-    "$text" "$apt_updates" "$flatpak_updates" "$class" > "$temporary"
+printf '{"text":"%s","tooltip":"APT updates: %s\\nFlatpak updates: %s\\nTruDE updates: %s","class":"%s"}\n' \
+    "$text" "$apt_updates" "$flatpak_updates" "$trude_updates" "$class" > "$temporary"
 mv "$temporary" "$cache_file"
 cat "$cache_file"

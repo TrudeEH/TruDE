@@ -33,6 +33,7 @@ held_file=$temp_dir/held
 failed_file=$temp_dir/failed
 backports_file=$temp_dir/backports
 summary_file=$temp_dir/summary
+trude_repo=$HOME/dotfiles
 
 dialog() {
     whiptail --title "Debian Maintenance" "$@"
@@ -86,6 +87,18 @@ collect_status() {
         flatpak_installed=0
     fi
 
+    progress 55 "Checking TruDE updates…"
+    trude_updates=0
+    if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
+        GIT_TERMINAL_PROMPT=0 git -C "$trude_repo" \
+            -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
+            fetch --quiet --no-tags origin 2>/dev/null || :
+        trude_upstream=$(git -C "$trude_repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || :)
+        if [ -n "$trude_upstream" ]; then
+            trude_updates=$(git -C "$trude_repo" rev-list --count "HEAD..$trude_upstream" 2>/dev/null || printf '0')
+        fi
+    fi
+
     progress 65 "Checking held packages and failed units…"
     apt-mark showhold 2>/dev/null | sed '/^$/d' > "$held_file"
     held=$(awk 'END { print NR + 0 }' "$held_file")
@@ -120,6 +133,7 @@ collect_status() {
         printf '󰏗  APT packages       %s installed, %s updates\n' "$apt_installed" "$apt_updates"
         printf '󰒓  Backports          %s installed\n' "$backports_installed"
         printf '󰏖  Flatpak apps       %s installed, %s updates\n' "$flatpak_installed" "$flatpak_updates"
+        printf '󰊢  TruDE updates      %s\n' "$trude_updates"
         printf '󰈇  Held packages      %s\n' "$held"
         printf '󰅙  Failed units       %s\n' "$failed"
         printf '󰜉  Reboot             %s\n' "$reboot"
@@ -146,7 +160,7 @@ load_backports() {
 }
 
 update_system() {
-    dialog --yesno "Update APT package lists, upgrade Debian packages, and update Flatpaks?" 10 70 \
+    dialog --yesno "Update Debian packages, Flatpaks, and TruDE? TruDE changes will be installed and Hyprland and Waybar reloaded." 11 74 \
         || return
 
     clear
@@ -157,6 +171,22 @@ update_system() {
     if command -v flatpak >/dev/null 2>&1; then
         printf '\n󰏖  Updating Flatpaks…\n\n'
         flatpak update -y || update_failed=1
+    fi
+
+    if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
+        printf '\n󰊢  Updating TruDE…\n\n'
+        if git -C "$trude_repo" pull --ff-only; then
+            if "$trude_repo/install.sh"; then
+                hyprctl reload || update_failed=1
+                systemctl --user restart waybar.service || update_failed=1
+            else
+                update_failed=1
+            fi
+        else
+            update_failed=1
+        fi
+    else
+        printf '\nTruDE checkout not found at %s; skipping TruDE update.\n' "$trude_repo"
     fi
 
     if [ "$update_failed" -eq 0 ]; then
@@ -174,9 +204,9 @@ update_system() {
 collect_status
 
 while true; do
-    prompt=$(printf 'APT: %s updates / %s installed\nBackports: %s installed\nFlatpak: %s updates / %s installed\nHeld: %s   Failed units: %s   Reboot: %s\nAPT metadata: %s' \
+    prompt=$(printf 'APT: %s updates / %s installed\nBackports: %s installed\nFlatpak: %s updates / %s installed\nTruDE updates: %s\nHeld: %s   Failed units: %s   Reboot: %s\nAPT metadata: %s' \
         "$apt_updates" "$apt_installed" "$backports_installed" \
-        "$flatpak_updates" "$flatpak_installed" "$held" "$failed" \
+        "$flatpak_updates" "$flatpak_installed" "$trude_updates" "$held" "$failed" \
         "$reboot" "$apt_updated")
 
     choice=$(dialog --menu "$prompt" 25 94 10 \
@@ -187,7 +217,7 @@ while true; do
         "󰒓 backports" "Installed backport packages ($backports_installed)" \
         "󰈇 held" "Held packages ($held)" \
         "󰅙 failed" "Failed systemd units ($failed)" \
-        "󰚰 update" "Update Debian packages and Flatpaks" \
+        "󰚰 update" "Update Debian packages, Flatpaks, and TruDE ($trude_updates)" \
         "󰑐 refresh" "Refresh displayed information" \
         "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
 

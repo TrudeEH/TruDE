@@ -194,6 +194,10 @@ menu separator {
     color: @warning;
 }
 
+#custom-maintenance.trude-updates {
+    color: @critical;
+}
+
 #custom-power-profile.performance {
     color: @accent;
 }
