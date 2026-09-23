@@ -5,7 +5,7 @@ repo_url=https://github.com/TrudeEH/TruDE.git
 repo_dir=$HOME/dotfiles
 
 sudo apt-get update
-sudo apt-get install -y git
+sudo apt-get install -y git </dev/tty
 
 if [ -d "$repo_dir/.git" ]; then
     origin=$(git -C "$repo_dir" remote get-url origin)

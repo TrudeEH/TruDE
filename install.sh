@@ -72,7 +72,8 @@ BACKPORTS
 install_packages() {
     sudo apt-get update
     sudo apt-get install -y -t "$backports_suite" \
-        hyprland hyprland-guiutils hypridle hyprlock uwsm xdg-desktop-portal-hyprland
+        hyprland hyprland-guiutils hypridle hyprlock uwsm xdg-desktop-portal-hyprland \
+        </dev/tty
     sudo apt-get install -y \
         atool curl foot micro nnn imv cmus p7zip-full gnome-software-plugin-flatpak \
         flatpak gnome-disk-utility gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
@@ -81,7 +82,8 @@ install_packages() {
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
-        file fontconfig procps xdg-user-dirs xdg-utils
+        file fontconfig procps xdg-user-dirs xdg-utils \
+        </dev/tty
 }
 
 install_font() {
