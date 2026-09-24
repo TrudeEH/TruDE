@@ -33,11 +33,25 @@ confirm() {
 }
 
 logout_session() {
-    if hyprctl dispatch exit >/dev/null 2>&1; then
+    session_id=${XDG_SESSION_ID:-}
+    if [ -n "$session_id" ] && loginctl terminate-session "$session_id" >/dev/null 2>&1; then
         return 0
     fi
 
-    if [ -n "${XDG_SESSION_ID:-}" ] && loginctl terminate-session "$XDG_SESSION_ID" >/dev/null 2>&1; then
+    current_user=${USER:-$(id -un)}
+    sessions=$(loginctl list-sessions --no-legend --no-pager 2>/dev/null || :)
+    while read -r candidate _ username _ _ state _; do
+        [ "$username" = "$current_user" ] || continue
+        [ "$state" = active ] || continue
+        session_type=$(loginctl show-session "$candidate" -p Type --value 2>/dev/null || :)
+        if [ "$session_type" = wayland ] && loginctl terminate-session "$candidate" >/dev/null 2>&1; then
+            return 0
+        fi
+    done <<EOF
+$sessions
+EOF
+
+    if hyprctl dispatch exit >/dev/null 2>&1; then
         return 0
     fi
 
