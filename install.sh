@@ -147,7 +147,7 @@ configure_flatpak() {
 configure_lightdm() {
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
         /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
-    sudo install -D -m 0644 "$repo_dir/configs/lightdm/trude.desktop" \
+    sudo install -D -m 0644 "$repo_dir/configs/lightdm/hyprland-uwsm.desktop" \
         /usr/share/trude/sessions/hyprland-uwsm.desktop
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
         /etc/lightdm/slick-greeter.conf
