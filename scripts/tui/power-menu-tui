@@ -32,19 +32,6 @@ confirm() {
     dialog --yesno "$1" 9 58
 }
 
-logout_session() {
-    if hyprctl dispatch exit >/dev/null 2>&1; then
-        return 0
-    fi
-
-    if [ -n "${XDG_SESSION_ID:-}" ] && loginctl terminate-session "$XDG_SESSION_ID" >/dev/null 2>&1; then
-        return 0
-    fi
-
-    dialog --msgbox "Could not log out. Hyprland could not be reached, and the current logind session could not be terminated." 10 72
-    return 1
-}
-
 choice=$(dialog --menu "Choose an action" 17 64 8 \
     "󰌾 lock" "Lock the session" \
     "󰒲 suspend" "Suspend the computer" \
@@ -61,7 +48,7 @@ case $choice in
         confirm "Suspend the computer?" && systemctl suspend
         ;;
     *" logout")
-        confirm "Log out of Hyprland?" && logout_session
+        confirm "Log out of Hyprland?" && hyprctl dispatch exit
         ;;
     *" reboot")
         confirm "Restart the computer?" && systemctl reboot
