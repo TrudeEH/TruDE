@@ -48,7 +48,7 @@ case $choice in
         confirm "Suspend the computer?" && systemctl suspend
         ;;
     *" logout")
-        confirm "Log out of Hyprland?" && hyprctl dispatch exit
+        confirm "Log out of Hyprland?" && hyprctl dispatch 'hl.dsp.exit()'
         ;;
     *" reboot")
         confirm "Restart the computer?" && systemctl reboot
