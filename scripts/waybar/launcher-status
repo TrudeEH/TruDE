@@ -40,8 +40,17 @@ refresh_status() {
         if pw-dump 2>/dev/null | jq -e '
             any(.[];
                 .type == "PipeWire:Interface:Node" and
-                .info.props["media.class"] == "Stream/Input/Video" and
-                .info.state == "running"
+                (
+                    (
+                        .info.props["media.class"] == "Stream/Input/Video" or
+                        .info.props["media.class"] == "Stream/Output/Video" or
+                        .info.props["media.class"] == "Video/Source"
+                    ) and
+                    (
+                        .info.props["media.role"] == "Screen" or
+                        .info.state == "running"
+                    )
+                )
             )
         ' >/dev/null 2>&1; then
             status=screensharing
