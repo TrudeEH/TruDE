@@ -102,7 +102,7 @@ while IFS= read -r profile; do
     case $profile in
         power-saver) tag="󰌪 power-saver"; description="Power Saver — prioritize efficiency" ;;
         balanced) tag="󰾅 balanced"; description="Balanced — general use" ;;
-        performance) tag="󰓅 performance"; description="Performance — maximum speed" ;;
+        performance) tag="󰓅 performance"; description="Performance — maximum speed, stay awake" ;;
         "") continue ;;
         *) description=$profile ;;
     esac
@@ -128,6 +128,10 @@ choice=$(dialog --radiolist "$dialog_prompt" 21 78 5 "$@" \
 choice=${choice#* }
 
 if output=$(powerprofilesctl set "$choice" 2>&1); then
+    if command -v dotfiles-hypridle >/dev/null 2>&1; then
+        pkill -x hypridle 2>/dev/null || :
+        dotfiles-hypridle >/dev/null 2>&1 &
+    fi
     message "Power profile changed to $choice."
 else
     message "${output:-Unable to change the power profile.}"
