@@ -36,23 +36,22 @@ refresh_status() {
     printf '%s\n' "$$" > "$lock_dir/pid"
     trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
     status=launcher
-    if command -v pw-dump >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-        if pw-dump 2>/dev/null | jq -e '
-            any(.[];
-                .type == "PipeWire:Interface:Node" and
-                (
-                    (
-                        .info.props["media.class"] == "Stream/Input/Video" or
-                        .info.props["media.class"] == "Stream/Output/Video" or
-                        .info.props["media.class"] == "Video/Source"
-                    ) and
-                    (
-                        .info.props["media.role"] == "Screen" or
-                        .info.state == "running"
-                    )
-                )
-            )
-        ' >/dev/null 2>&1; then
+    if command -v pw-cli >/dev/null 2>&1; then
+        if pw-cli ls Node 2>/dev/null | awk '
+            /^[[:space:]]*id [0-9]+, type PipeWire:Interface:Node\// {
+                if (screen && video) found = 1
+                screen = 0
+                video = 0
+            }
+            /media.class = "(Stream\/(Input|Output)\/Video|Video\/Source)"/ {
+                video = 1
+            }
+            /media.role = "Screen"/ { screen = 1 }
+            END {
+                if (screen && video) found = 1
+                exit !found
+            }
+        '; then
             status=screensharing
         fi
     fi
