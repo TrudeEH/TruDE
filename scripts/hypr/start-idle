@@ -5,6 +5,11 @@ config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-hypridle
 runtime_config=$runtime_dir/hypridle.conf
+power_profile=$(powerprofilesctl get 2>/dev/null || :)
+
+if [ "$power_profile" = performance ]; then
+    exit 0
+fi
 
 timeouts='300 600 900'
 if [ -f "$preferences_file" ]; then
@@ -20,7 +25,6 @@ EOF
 case $lock_timeout in ''|*[!0-9]*) lock_timeout=300 ;; esac
 case $screen_timeout in ''|*[!0-9]*) screen_timeout=600 ;; esac
 case $suspend_timeout in ''|*[!0-9]*) suspend_timeout=900 ;; esac
-power_profile=$(powerprofilesctl get 2>/dev/null || :)
 
 umask 077
 mkdir -p "$runtime_dir"
@@ -35,7 +39,7 @@ general {
 }
 EOF
 
-if [ "$power_profile" != performance ] && [ "$lock_timeout" -gt 0 ]; then
+if [ "$lock_timeout" -gt 0 ]; then
     cat >> "$temporary_config" <<EOF
 
 listener {
@@ -45,7 +49,7 @@ listener {
 EOF
 fi
 
-if [ "$power_profile" != performance ] && [ "$screen_timeout" -gt 0 ]; then
+if [ "$screen_timeout" -gt 0 ]; then
     cat >> "$temporary_config" <<EOF
 
 listener {
@@ -56,7 +60,7 @@ listener {
 EOF
 fi
 
-if [ "$power_profile" != performance ] && [ "$suspend_timeout" -gt 0 ]; then
+if [ "$suspend_timeout" -gt 0 ]; then
     cat >> "$temporary_config" <<EOF
 
 listener {
