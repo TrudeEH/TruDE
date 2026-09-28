@@ -252,6 +252,23 @@ DMRC
     chmod 644 "$HOME/.dmrc"
 }
 
+configure_default_file_manager() {
+    mimeapps_file=$config_dir/mimeapps.list
+
+    # Preserve associations from older installations before detaching the
+    # repository-managed file. Applications can then update the local copy.
+    if [ -L "$mimeapps_file" ] && [ "$(readlink -f "$mimeapps_file")" = "$repo_dir/configs/mimeapps.list" ]; then
+        mimeapps_temporary=$(mktemp "$config_dir/mimeapps.list.XXXXXX")
+        if ! cat "$mimeapps_file" > "$mimeapps_temporary"; then
+            rm -f "$mimeapps_temporary"
+            return 1
+        fi
+        mv "$mimeapps_temporary" "$mimeapps_file"
+    fi
+
+    xdg-mime default dotfiles-file-manager.desktop inode/directory
+}
+
 configure_theme() {
     if command -v gsettings >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         gsettings set org.gnome.desktop.interface color-scheme prefer-dark || :
@@ -326,7 +343,6 @@ link_configs() {
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
-    link_config "$repo_dir/configs/mimeapps.list" "$config_dir/mimeapps.list"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
     link_config "$repo_dir/configs/micro/settings.json" "$config_dir/micro/settings.json"
     link_config "$repo_dir/configs/micro/colorschemes/dotfiles.micro" "$config_dir/micro/colorschemes/dotfiles.micro"
@@ -364,6 +380,7 @@ main() {
     ui_step "Setting up the desktop session and user configuration"
     configure_session
     link_configs
+    configure_default_file_manager
     configure_theme
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
