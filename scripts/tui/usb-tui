@@ -28,6 +28,10 @@ dialog() {
     whiptail --title "USB Devices" "$@"
 }
 
+volume_menu() {
+    whiptail --title "USB Devices" --notags --menu "$@"
+}
+
 message() {
     dialog --msgbox "$1" 11 72
 }
@@ -53,16 +57,14 @@ volume_details() {
 }
 
 volume_label() {
-    device=$1
-    label=$2
-    fstype=$3
-    mountpoints=$4
+    label=$1
+    fstype=$2
+    mountpoints=$3
     name=${label:-"Unnamed volume"}
-    filesystem=${fstype:-"no filesystem"}
     if [ -n "$mountpoints" ]; then
-        printf '󰌾  %s  ·  %s  ·  %s' "$name" "$filesystem" "$mountpoints"
+        printf '󰌾  %s  ·  mounted at %s' "$name" "$mountpoints"
     else
-        printf '󰋊  %s  ·  %s  ·  %s' "$name" "$filesystem" "$device"
+        printf '󰋊  %s  ·  %s' "$name" "${fstype:-no filesystem}"
     fi
 }
 
@@ -107,7 +109,7 @@ EOF
     fi
     set -- "$@" '󰁍 back' 'Return to the USB device list'
 
-    choice=$(dialog --menu "$(volume_label "$device" "$label" "$fstype" "$mountpoints")" 18 82 8 "$@" \
+    choice=$(dialog --menu "$(volume_label "$label" "$fstype" "$mountpoints")" 18 82 8 "$@" \
         3>&1 1>&2 2>&3) || return
     case $choice in
         '󰋊 mount')
@@ -165,7 +167,7 @@ EOF
         [ "$label" = - ] && label=
         [ "$fstype" = - ] && fstype=
         [ "$mountpoints" = - ] && mountpoints=
-        description=$(volume_label "$device" "$label" "$fstype" "$mountpoints")
+        description=$(volume_label "$label" "$fstype" "$mountpoints")
         set -- "$@" "$record" "$description"
     done <<EOF
 $records
@@ -181,7 +183,7 @@ EOF
     fi
 
     set -- "$@" '󰑐 refresh' 'Rescan connected USB drives' '󰅖 close' 'Close'
-    choice=$(dialog --menu "Select a USB volume" 22 92 14 "$@" 3>&1 1>&2 2>&3) || exit 0
+    choice=$(volume_menu "Select a USB volume" 22 92 14 "$@" 3>&1 1>&2 2>&3) || exit 0
     case $choice in
         '󰑐 refresh') ;;
         '󰅖 close') exit 0 ;;
