@@ -107,7 +107,7 @@ install_packages() {
         hyprland hyprland-guiutils hypridle hyprlock uwsm xdg-desktop-portal-hyprland \
         </dev/tty
     sudo apt-get install -y \
-        atool bat curl foot micro nnn imv cmus lazygit p7zip-full \
+        atool bat curl fdisk foot micro nnn imv cmus lazygit ncdu p7zip-full \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
