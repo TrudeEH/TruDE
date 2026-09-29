@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Disk Usage
+Comment=Browse disk usage on the root filesystem
+Exec=footclient --app-id=disk-usage --title="Disk Usage" --override=colors.regular0=222226 --window-size-chars=104x32 sudo ncdu -rr -x /
+Terminal=false
+Categories=System;Filesystem;
