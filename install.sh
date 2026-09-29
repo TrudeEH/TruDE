@@ -255,6 +255,7 @@ DMRC
 configure_theme() {
     if command -v gsettings >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         gsettings set org.gnome.desktop.interface color-scheme prefer-dark || :
+        gsettings set org.gnome.desktop.interface accent-color orange || :
     fi
 
     mkdir -p "$config_dir/qt6ct"

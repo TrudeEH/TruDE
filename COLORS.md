@@ -2,7 +2,8 @@
 
 These dotfiles use a libadwaita-inspired dark palette with a light-orange
 accent. The canonical colors are shared by Waybar, Foot, Hyprland, Hyprlock,
-Mako, LightDM, Qt, btop, and the terminal UI scripts.
+Mako, LightDM, Qt, btop, and the terminal UI scripts. GTK apps use the system
+orange accent preference; Qt apps use the exact custom accent from this palette.
 
 ## Core Palette
 
@@ -68,6 +69,10 @@ The Foot selection and cursor use `#ffbe6f` with `#222226` foreground text.
   `#ffffff1a` inactive border in `configs/hypr/hyprland.lua`.
 - **Hyprlock:** Uses the base background, raised surface, primary and muted text,
   and accent outline in `configs/hypr/hyprlock.conf`.
+- **GTK:** Uses the system `orange` accent preference for GTK apps that support
+  system accent colors, set by `install.sh`.
+- **Qt:** Uses the exact `#ffbe6f` accent and `#ffa348` hover color in the
+  custom palette at `configs/qt6ct/colors/dotfiles.conf`.
 
 ## Format Conventions
 
