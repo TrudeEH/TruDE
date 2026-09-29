@@ -2,6 +2,6 @@
 Type=Application
 Name=Partition Manager
 Comment=View and edit disk partition tables
-Exec=footclient --app-id=partition-manager --title="Partition Manager" --override=colors.regular0=222226 --window-size-chars=100x32 sudo cfdisk
+Exec=footclient --app-id=partition-manager --title="Partition Manager" --override=colors.regular0=222226 --window-size-chars=100x32 dotfiles-partition-manager-tui
 Terminal=false
 Categories=System;HardwareSettings;

@@ -1,0 +1,102 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+dialog() {
+    whiptail --title "Partition Manager" "$@"
+}
+
+message() {
+    dialog --msgbox "$1" 10 74
+}
+
+disk_records() {
+    lsblk --json --paths --nodeps --output NAME,SIZE,MODEL,TRAN,TYPE 2>/dev/null \
+        | jq -r '
+            .blockdevices[]
+            | select(.type == "disk")
+            | @base64
+        ' 2>/dev/null || :
+}
+
+disk_details() {
+    printf '%s' "$1" | base64 -d 2>/dev/null
+}
+
+disk_field() {
+    printf '%s' "$1" | jq -r --arg field "$2" '.[$field] // empty'
+}
+
+if ! command -v whiptail >/dev/null 2>&1 \
+    || ! command -v jq >/dev/null 2>&1 \
+    || ! command -v lsblk >/dev/null 2>&1 \
+    || ! command -v cfdisk >/dev/null 2>&1 \
+    || ! command -v sudo >/dev/null 2>&1; then
+    printf '%s\n' 'Partition Manager requires whiptail, jq, lsblk, cfdisk, and sudo.' >&2
+    exit 1
+fi
+
+set --
+records=$(disk_records)
+while IFS= read -r record; do
+    [ -n "$record" ] || continue
+    details=$(disk_details "$record") || continue
+    device=$(disk_field "$details" name)
+    size=$(disk_field "$details" size)
+    model=$(disk_field "$details" model | tr '\n\t' '  ')
+    transport=$(disk_field "$details" tran)
+    [ -n "$device" ] || continue
+
+    description=${size:-Unknown size}
+    [ -n "$transport" ] && description="$description · $transport"
+    [ -n "$model" ] && description="$description · $model"
+    set -- "$@" "$device" "$description"
+done <<EOF
+$records
+EOF
+
+if [ "$#" -eq 0 ]; then
+    message 'No disks were found.'
+    exit 0
+fi
+
+device=$(dialog --notags --menu 'Select a disk to open in cfdisk' 20 90 12 "$@" \
+    3>&1 1>&2 2>&3) || exit 0
+
+case $device in
+    /dev/*) ;;
+    *) exit 1 ;;
+esac
+[ "$(lsblk --nodeps --noheadings --output TYPE "$device" 2>/dev/null)" = disk ] || exit 1
+
+if lsblk --noheadings --paths --output MOUNTPOINTS "$device" 2>/dev/null \
+    | awk 'NF { mounted=1 } END { exit !mounted }'; then
+    prompt="Some volumes on $device are mounted. Editing its partition table can make data unavailable. Continue to cfdisk?"
+else
+    prompt="Open $device in cfdisk? Partition table changes take effect when you choose Write in cfdisk."
+fi
+
+dialog --yesno "$prompt" 12 78 || exit 0
+exec sudo cfdisk "$device"
