@@ -182,7 +182,7 @@ EOF
         continue
     fi
 
-    set -- "$@" '󰑐 refresh' 'Rescan connected USB drives' '󰅖 close' 'Close'
+    set -- "$@" '󰑐 refresh' '󰑐  Rescan connected USB drives' '󰅖 close' 'Close'
     choice=$(volume_menu "Select a USB volume" 22 92 14 "$@" 3>&1 1>&2 2>&3) || exit 0
     case $choice in
         '󰑐 refresh') ;;
