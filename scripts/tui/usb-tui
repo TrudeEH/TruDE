@@ -43,7 +43,7 @@ usb_volumes() {
             | select(.tran == "usb" or .rm == true)
             | .. | objects
             | select(.type == "part" or .type == "crypt" or (.type == "disk" and .fstype != null))
-            | {path: .path, label: .label, fstype: .fstype, mountpoints: .mountpoints}
+            | {path: .name, label: .label, fstype: .fstype, mountpoints: .mountpoints}
             | @base64
         ' 2>/dev/null || :
 }
