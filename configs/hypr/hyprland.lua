@@ -418,6 +418,7 @@ local centeredTuiWindows = {
     { name = "status-menu",          class = "status-menu" },
     { name = "bluetooth-tui",        class = "bluetooth-tui" },
     { name = "usb-tui",              class = "usb-tui" },
+    { name = "partition-manager-tui", class = "partition-manager" },
     { name = "volume-tui",           class = "pulsemixer" },
     { name = "power-profiles-tui",   class = "power-profiles-tui" },
     { name = "power-menu-tui",       class = "power-menu-tui" },
