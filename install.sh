@@ -292,6 +292,7 @@ link_configs() {
     link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/dotfiles-mako"
     link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
     link_config "$repo_dir/scripts/tui/bluetooth-tui" "$HOME/.local/bin/dotfiles-bluetooth-tui"
+    link_config "$repo_dir/scripts/tui/usb-tui" "$HOME/.local/bin/dotfiles-usb-tui"
     link_config "$repo_dir/scripts/tui/power-profiles-tui" "$HOME/.local/bin/dotfiles-power-profiles-tui"
     link_config "$repo_dir/scripts/tui/power-menu-tui" "$HOME/.local/bin/dotfiles-power-menu-tui"
     link_config "$repo_dir/scripts/tui/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"

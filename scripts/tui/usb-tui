@@ -1,0 +1,190 @@
+#!/bin/sh
+set -u
+
+export NEWT_COLORS='root=white,black
+border=white,black
+window=white,black
+shadow=black,black
+title=yellow,black
+button=black,yellow
+actbutton=black,brown
+compactbutton=white,black
+checkbox=white,black
+actcheckbox=black,yellow
+entry=white,black
+label=white,black
+listbox=white,black
+actlistbox=black,yellow
+sellistbox=white,black
+actsellistbox=black,yellow
+textbox=white,black
+acttextbox=black,yellow
+emptyscale=white,black
+fullscale=black,yellow
+helpline=white,black
+roottext=white,black'
+
+dialog() {
+    whiptail --title "USB Devices" "$@"
+}
+
+message() {
+    dialog --msgbox "$1" 11 72
+}
+
+usb_volumes() {
+    lsblk --json --paths --output NAME,TYPE,TRAN,RM,LABEL,FSTYPE,MOUNTPOINTS 2>/dev/null \
+        | jq -r '
+            .blockdevices[]
+            | select(.tran == "usb" or .rm == true)
+            | .. | objects
+            | select(.type == "part" or .type == "crypt" or (.type == "disk" and .fstype != null))
+            | {path: .path, label: .label, fstype: .fstype, mountpoints: .mountpoints}
+            | @base64
+        ' 2>/dev/null || :
+}
+
+volume_details() {
+    printf '%s' "$1" | base64 -d 2>/dev/null | jq -r '
+        [.path, (.label // "-"), (.fstype // "-"),
+         ((.mountpoints // []) | map(select(. != null)) | join(", ") | if . == "" then "-" else . end)]
+        | @tsv
+    '
+}
+
+volume_label() {
+    device=$1
+    label=$2
+    fstype=$3
+    mountpoints=$4
+    name=${label:-"Unnamed volume"}
+    filesystem=${fstype:-"no filesystem"}
+    if [ -n "$mountpoints" ]; then
+        printf '󰌾  %s  ·  %s  ·  %s' "$name" "$filesystem" "$mountpoints"
+    else
+        printf '󰋊  %s  ·  %s  ·  %s' "$name" "$filesystem" "$device"
+    fi
+}
+
+show_device_info() {
+    device=$1
+    details=$(lsblk --paths --output NAME,SIZE,MODEL,SERIAL,TRAN,TYPE,FSTYPE,LABEL,MOUNTPOINTS "$device" 2>/dev/null || :)
+    message "${details:-Unable to read device information.}"
+}
+
+manage_volume() (
+    record=$1
+    details=$(volume_details "$record") || return
+    IFS="$(printf '\t')" read -r device label fstype mountpoints <<EOF
+$details
+EOF
+    [ -n "$device" ] || return
+    [ "$label" = - ] && label=
+    [ "$fstype" = - ] && fstype=
+    [ "$mountpoints" = - ] && mountpoints=
+
+    if [ -n "$mountpoints" ]; then
+        mount_action='󰌾 unmount'
+        mount_description="Unmount from $mountpoints"
+    else
+        mount_action='󰋊 mount'
+        mount_description="Mount ${label:-volume}"
+    fi
+
+    device_type=$(lsblk -ndo TYPE "$device" 2>/dev/null || :)
+    disk_name=$(lsblk -ndo PKNAME "$device" 2>/dev/null || :)
+    disk=
+    if [ "$device_type" = disk ]; then
+        disk=$device
+    elif [ -n "$disk_name" ]; then
+        disk=/dev/$disk_name
+    fi
+
+    set -- "$mount_action" "$mount_description" \
+        '󰋼 info' 'Show device details'
+    if [ -n "$disk" ]; then
+        set -- "$@" '󰐥 power-off' 'Safely power off the USB drive'
+    fi
+    set -- "$@" '󰁍 back' 'Return to the USB device list'
+
+    choice=$(dialog --menu "$(volume_label "$device" "$label" "$fstype" "$mountpoints")" 18 82 8 "$@" \
+        3>&1 1>&2 2>&3) || return
+    case $choice in
+        '󰋊 mount')
+            if [ -z "$fstype" ]; then
+                message "This volume has no recognized filesystem to mount."
+            elif output=$(udisksctl mount --block-device "$device" 2>&1); then
+                message "${output:-Volume mounted.}"
+            else
+                message "${output:-Unable to mount the volume.}"
+            fi
+            ;;
+        '󰌾 unmount')
+            if dialog --yesno "Unmount $device from $mountpoints?" 9 64; then
+                if output=$(udisksctl unmount --block-device "$device" 2>&1); then
+                    message "${output:-Volume unmounted.}"
+                else
+                    message "${output:-Unable to unmount the volume.}"
+                fi
+            fi
+            ;;
+        '󰋼 info') show_device_info "$device" ;;
+        '󰐥 power-off')
+            if lsblk -nrpo MOUNTPOINTS "$disk" 2>/dev/null | awk 'NF { mounted=1 } END { exit !mounted }'; then
+                message "Unmount every volume on $disk before powering off the drive."
+            elif dialog --yesno "Safely power off $disk? This disconnects every volume on the drive." 10 70; then
+                if output=$(udisksctl power-off --block-device "$disk" 2>&1); then
+                    message "${output:-USB drive powered off.}"
+                else
+                    message "${output:-Unable to power off the USB drive.}"
+                fi
+            fi
+            ;;
+    esac
+)
+
+if ! command -v whiptail >/dev/null 2>&1; then
+    printf '%s\n' 'USB Devices requires whiptail.' >&2
+    exit 1
+fi
+if ! command -v jq >/dev/null 2>&1 || ! command -v udisksctl >/dev/null 2>&1; then
+    message "USB Devices requires jq and udisks2 (udisksctl)."
+    exit 1
+fi
+
+while true; do
+    set --
+    records=$(usb_volumes)
+    while IFS= read -r record; do
+        [ -n "$record" ] || continue
+        details=$(volume_details "$record") || continue
+        IFS="$(printf '\t')" read -r device label fstype mountpoints <<EOF
+$details
+EOF
+        [ -n "$device" ] || continue
+        [ "$label" = - ] && label=
+        [ "$fstype" = - ] && fstype=
+        [ "$mountpoints" = - ] && mountpoints=
+        description=$(volume_label "$device" "$label" "$fstype" "$mountpoints")
+        set -- "$@" "$record" "$description"
+    done <<EOF
+$records
+EOF
+
+    if [ "$#" -eq 0 ]; then
+        dialog --msgbox "No USB storage volumes found.\n\nConnect a USB drive and choose Refresh to scan again." 11 66
+        choice=$(dialog --menu "USB Devices" 12 58 3 \
+            '󰑐 refresh' 'Scan for USB devices again' \
+            '󰅖 close' 'Close' 3>&1 1>&2 2>&3) || exit 0
+        [ "$choice" = '󰑐 refresh' ] || exit 0
+        continue
+    fi
+
+    set -- "$@" '󰑐 refresh' 'Rescan connected USB drives' '󰅖 close' 'Close'
+    choice=$(dialog --menu "Select a USB volume" 22 92 14 "$@" 3>&1 1>&2 2>&3) || exit 0
+    case $choice in
+        '󰑐 refresh') ;;
+        '󰅖 close') exit 0 ;;
+        *) manage_volume "$choice" ;;
+    esac
+done

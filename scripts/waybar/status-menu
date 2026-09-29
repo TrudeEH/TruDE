@@ -5,6 +5,7 @@ selection=$(printf '%s\n' \
     'Notifications' \
     'Network settings' \
     'Bluetooth settings' \
+    'USB devices' \
     | fzf \
         --prompt=' Quick Settings  ' \
         --pointer='󰜴' \
@@ -30,6 +31,11 @@ case $selection in
         launch_tui --app-id=bluetooth-tui --title='Bluetooth' \
             --override=colors.regular0=222226 --window-size-chars=82x26 \
             dotfiles-bluetooth-tui
+        ;;
+    'USB devices')
+        launch_tui --app-id=usb-tui --title='USB Devices' \
+            --override=colors.regular0=222226 --window-size-chars=92x26 \
+            dotfiles-usb-tui
         ;;
     'Notifications')
         launch_tui --app-id=notification-tui --title='Notifications' \
