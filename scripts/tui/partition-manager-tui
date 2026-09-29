@@ -49,10 +49,20 @@ disk_field() {
     printf '%s' "$1" | jq -r --arg field "$2" '.[$field] // empty'
 }
 
+if command -v cfdisk >/dev/null 2>&1; then
+    cfdisk_path=$(command -v cfdisk)
+elif [ -x /usr/sbin/cfdisk ]; then
+    cfdisk_path=/usr/sbin/cfdisk
+elif [ -x /sbin/cfdisk ]; then
+    cfdisk_path=/sbin/cfdisk
+else
+    cfdisk_path=
+fi
+
 if ! command -v whiptail >/dev/null 2>&1 \
     || ! command -v jq >/dev/null 2>&1 \
     || ! command -v lsblk >/dev/null 2>&1 \
-    || ! command -v cfdisk >/dev/null 2>&1 \
+    || [ -z "$cfdisk_path" ] \
     || ! command -v sudo >/dev/null 2>&1; then
     printf '%s\n' 'Partition Manager requires whiptail, jq, lsblk, cfdisk, and sudo.' >&2
     exit 1
@@ -99,4 +109,4 @@ else
 fi
 
 dialog --yesno "$prompt" 12 78 || exit 0
-exec sudo cfdisk "$device"
+exec sudo "$cfdisk_path" "$device"
