@@ -49,11 +49,15 @@ usb_volumes() {
 }
 
 volume_details() {
-    printf '%s' "$1" | base64 -d 2>/dev/null | jq -r '
-        [.path, (.label // "-"), (.fstype // "-"),
-         ((.mountpoints // []) | map(select(. != null)) | join(", ") | if . == "" then "-" else . end)]
-        | @tsv
-    '
+    printf '%s' "$1" | base64 -d 2>/dev/null
+}
+
+volume_field() {
+    printf '%s' "$1" | jq -r --arg field "$2" '.[$field] // empty'
+}
+
+volume_mountpoints() {
+    printf '%s' "$1" | jq -r '(.mountpoints // []) | map(select(. != null)) | join(", ")'
 }
 
 volume_label() {
@@ -77,13 +81,11 @@ show_device_info() {
 manage_volume() (
     record=$1
     details=$(volume_details "$record") || return
-    IFS="$(printf '\t')" read -r device label fstype mountpoints <<EOF
-$details
-EOF
+    device=$(volume_field "$details" path)
+    label=$(volume_field "$details" label)
+    fstype=$(volume_field "$details" fstype)
+    mountpoints=$(volume_mountpoints "$details")
     [ -n "$device" ] || return
-    [ "$label" = - ] && label=
-    [ "$fstype" = - ] && fstype=
-    [ "$mountpoints" = - ] && mountpoints=
 
     if [ -n "$mountpoints" ]; then
         mount_action='󰌾 unmount'
@@ -160,13 +162,11 @@ while true; do
     while IFS= read -r record; do
         [ -n "$record" ] || continue
         details=$(volume_details "$record") || continue
-        IFS="$(printf '\t')" read -r device label fstype mountpoints <<EOF
-$details
-EOF
+        device=$(volume_field "$details" path)
+        label=$(volume_field "$details" label)
+        fstype=$(volume_field "$details" fstype)
+        mountpoints=$(volume_mountpoints "$details")
         [ -n "$device" ] || continue
-        [ "$label" = - ] && label=
-        [ "$fstype" = - ] && fstype=
-        [ "$mountpoints" = - ] && mountpoints=
         description=$(volume_label "$label" "$fstype" "$mountpoints")
         set -- "$@" "$record" "$description"
     done <<EOF
