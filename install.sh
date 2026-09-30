@@ -103,10 +103,10 @@ BACKPORTS
 
 install_packages() {
     sudo apt-get update
+    # Resolve the whole desktop together: backported libraries can require
+    # matching backported packages (for example, PipeWire and its modules).
     sudo apt-get install -y -t "$backports_suite" \
         hyprland hyprland-guiutils hypridle hyprlock uwsm xdg-desktop-portal-hyprland \
-        </dev/tty
-    sudo apt-get install -y \
         atool bat curl fdisk foot micro nnn imv cmus lazygit ncdu p7zip-full \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
