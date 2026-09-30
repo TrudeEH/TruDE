@@ -129,14 +129,14 @@ choice=${choice#* }
 
 if output=$(powerprofilesctl set "$choice" 2>&1); then
     pkill -x hypridle 2>/dev/null || :
-    if [ "$choice" != performance ] \
-        && command -v dotfiles-hypridle >/dev/null 2>&1; then
-        attempts=0
-        while pgrep -x hypridle >/dev/null 2>&1 && [ "$attempts" -lt 20 ]; do
-            sleep 0.1
-            attempts=$((attempts + 1))
-        done
-        dotfiles-hypridle >/dev/null 2>&1 &
+    if [ "$choice" != performance ]; then
+        idle_launcher=$HOME/.local/bin/dotfiles-hypridle
+        if [ -x "$idle_launcher" ]; then
+            "$idle_launcher" >/dev/null 2>&1 &
+        else
+            message "Power profile changed, but the Hypridle launcher is missing: $idle_launcher"
+            exit 1
+        fi
     fi
     message "Power profile changed to $choice."
 else

@@ -68,6 +68,7 @@ local browser     = dotfilesSettings.browser
 local menu        = dotfilesSettings.launcher
 local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
+local idleDaemon  = os.getenv("HOME") .. "/.local/bin/dotfiles-hypridle"
 local wallpaper   = dotfilesSettings.wallpaper
 
 
@@ -454,6 +455,6 @@ hl.on("hyprland.start", function ()
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
     hl.exec_cmd("swaybg -i " .. string.format("%q", wallpaper) .. " -m fill")
-    hl.exec_cmd("dotfiles-hypridle")
+    hl.exec_cmd(string.format("%q", idleDaemon))
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)
