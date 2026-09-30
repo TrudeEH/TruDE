@@ -104,7 +104,6 @@ menu separator {
     min-height: 22px;
     font-size: 12px;
     color: @fg;
-    transition: color 180ms ease-out, font-size 180ms ease-out;
 }
 
 /* Occupancy colors apply to hidden workspaces; visibility takes precedence. */
