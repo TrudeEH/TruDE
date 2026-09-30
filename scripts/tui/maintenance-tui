@@ -42,11 +42,11 @@ prompt=${1:-Git authentication}
 case $prompt in
     *[Uu]sername*|*[Ll]ogin*)
         whiptail --title "Git Authentication" --inputbox "$prompt" 10 72 \
-            3>&1 1>&2 2>&3
+            3>&1 1>&2 2>&3 </dev/tty
         ;;
     *)
         whiptail --title "Git Authentication" --passwordbox "$prompt" 10 72 \
-            3>&1 1>&2 2>&3
+            3>&1 1>&2 2>&3 </dev/tty
         ;;
 esac
 EOF
