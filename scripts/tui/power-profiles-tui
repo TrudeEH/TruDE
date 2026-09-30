@@ -128,10 +128,14 @@ choice=$(dialog --radiolist "$dialog_prompt" 21 78 5 "$@" \
 choice=${choice#* }
 
 if output=$(powerprofilesctl set "$choice" 2>&1); then
-    if [ "$choice" = performance ]; then
-        pkill -x hypridle 2>/dev/null || :
-    elif command -v dotfiles-hypridle >/dev/null 2>&1 \
-        && ! pgrep -x hypridle >/dev/null 2>&1; then
+    pkill -x hypridle 2>/dev/null || :
+    if [ "$choice" != performance ] \
+        && command -v dotfiles-hypridle >/dev/null 2>&1; then
+        attempts=0
+        while pgrep -x hypridle >/dev/null 2>&1 && [ "$attempts" -lt 20 ]; do
+            sleep 0.1
+            attempts=$((attempts + 1))
+        done
         dotfiles-hypridle >/dev/null 2>&1 &
     fi
     message "Power profile changed to $choice."
