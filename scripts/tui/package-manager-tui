@@ -86,6 +86,42 @@ backports_version() {
     '
 }
 
+rank_search_results() {
+    # Keep the original tab-separated rows; prefix sort keys only temporarily.
+    awk -F '\t' -v query="$1" -v identifier_field="$2" \
+        -v name_field="${3:-0}" -v application_ids="${4:-0}" '
+        function relevance(name) {
+            if (name == query) return 0
+            if (index(name, query) == 1) return 1
+            if (index(name, query)) return 2
+            return 3
+        }
+        BEGIN { query = tolower(query) }
+        {
+            identifier = tolower($identifier_field)
+            name = name_field ? tolower($name_field) : identifier
+            rank = relevance(identifier)
+            match_length = length(identifier)
+            name_rank = relevance(name)
+            if (name_rank < rank || (name_rank == rank && length(name) < match_length)) {
+                rank = name_rank
+                match_length = length(name)
+            }
+            # Flatpak IDs use a reverse-domain prefix; also match the app component.
+            if ((application_ids || $1 == "flatpak") && identifier ~ /\./) {
+                sub(/^.*\./, "", identifier)
+                identifier_rank = relevance(identifier)
+                if (identifier_rank < rank || (identifier_rank == rank && length(identifier) < match_length)) {
+                    rank = identifier_rank
+                    match_length = length(identifier)
+                }
+            }
+            if (rank == 3) match_length = 0
+            printf "%d\t%d\t%s\t%d\t%s\n", rank, match_length, name, NR, $0
+        }
+    ' | LC_ALL=C sort -t "$(printf '\t')" -k1,1n -k2,2n -k3,3 -k4,4n | cut -f5-
+}
+
 create_apt_search_results() {
     query=$1
     source=$2
@@ -101,7 +137,7 @@ create_apt_search_results() {
             gsub(/[[:space:]]+/, " ", description)
             if (package != "") print package "\t" description
         }
-    ' > "$raw_file"
+    ' | rank_search_results "$query" 1 > "$raw_file"
 
     : > "$results_file"
     result_count=0
@@ -248,7 +284,8 @@ create_flatpak_search_results() {
             if (remote == "") remote = "flathub"
             printf "%s\t%s\t%s\t%s\t%s\n", $1, name, version, remote, description
         }
-    ' "$raw_file" | awk -F '\t' '!seen[$1]++ { print }' | sed -n '1,80p' > "$results_file"
+    ' "$raw_file" | awk -F '\t' '!seen[$1]++ { print }' \
+        | rank_search_results "$query" 1 2 1 | sed -n '1,80p' > "$results_file"
 
     printf '%s\n' "$results_file"
 }
@@ -261,13 +298,13 @@ create_unified_install_results() {
     apt_results=$(create_apt_search_results "$query" apt)
     while IFS="$(printf '\t')" read -r package description; do
         [ -n "$package" ] || continue
-        printf 'apt\t%s\t󰏗  Debian · %s\t\n' "$package" "$description" >> "$results_file"
+        printf 'apt\t%s\t󰏗  Debian · %s\t\t%s\n' "$package" "$description" "$package" >> "$results_file"
     done < "$apt_results"
 
     backports_results=$(create_apt_search_results "$query" backports)
     while IFS="$(printf '\t')" read -r package description; do
         [ -n "$package" ] || continue
-        printf 'backports\t%s\t󰒓  Backports · %s\t\n' "$package" "$description" >> "$results_file"
+        printf 'backports\t%s\t󰒓  Backports · %s\t\t%s\n' "$package" "$description" "$package" >> "$results_file"
     done < "$backports_results"
 
     if command -v flatpak >/dev/null 2>&1; then
@@ -278,11 +315,14 @@ create_unified_install_results() {
                 label="$name"
                 [ -n "$version" ] && label="$label — $version"
                 [ -n "$description" ] && label="$label — $(compact_text "$description")"
-                printf 'flatpak\t%s\t󰏖  Flatpak · %s · %s\t%s\n' \
-                    "$application" "$remote" "$label" "$remote" >> "$results_file"
+                printf 'flatpak\t%s\t󰏖  Flatpak · %s · %s\t%s\t%s\n' \
+                    "$application" "$remote" "$label" "$remote" "$name" >> "$results_file"
             done < "$flatpak_results"
         fi
     fi
+
+    rank_search_results "$query" 2 5 < "$results_file" | cut -f1-4 > "$results_file.sorted"
+    mv "$results_file.sorted" "$results_file"
 
     printf '%s\n' "$results_file"
 }
