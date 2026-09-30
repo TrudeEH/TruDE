@@ -34,6 +34,23 @@ failed_file=$temp_dir/failed
 backports_file=$temp_dir/backports
 summary_file=$temp_dir/summary
 trude_repo=$HOME/dotfiles
+askpass_helper=$temp_dir/git-askpass
+
+cat > "$askpass_helper" <<'EOF'
+#!/bin/sh
+prompt=${1:-Git authentication}
+case $prompt in
+    *[Uu]sername*|*[Ll]ogin*)
+        whiptail --title "Git Authentication" --inputbox "$prompt" 10 72 \
+            3>&1 1>&2 2>&3
+        ;;
+    *)
+        whiptail --title "Git Authentication" --passwordbox "$prompt" 10 72 \
+            3>&1 1>&2 2>&3
+        ;;
+esac
+EOF
+chmod 700 "$askpass_helper"
 
 dialog() {
     whiptail --title "Debian Maintenance" "$@"
@@ -175,7 +192,9 @@ update_system() {
 
     if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
         printf '\n󰊢  Updating TruDE…\n\n'
-        if git -C "$trude_repo" pull --ff-only; then
+        if GIT_TERMINAL_PROMPT=0 GIT_ASKPASS="$askpass_helper" \
+            SSH_ASKPASS="$askpass_helper" SSH_ASKPASS_REQUIRE=force \
+            git -C "$trude_repo" pull --ff-only; then
             printf '\nRunning the TruDE installer to apply dependencies and configuration…\n\n'
             if "$trude_repo/install.sh"; then
                 printf '\nReloading Hyprland…\n\n'
