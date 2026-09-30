@@ -90,7 +90,7 @@ collect_status() {
     progress 55 "Checking TruDE updates…"
     trude_updates=0
     if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
-        GIT_TERMINAL_PROMPT=0 git -C "$trude_repo" \
+        GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git -C "$trude_repo" \
             -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
             fetch --quiet --no-tags origin 2>/dev/null || :
         trude_upstream=$(git -C "$trude_repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || :)
