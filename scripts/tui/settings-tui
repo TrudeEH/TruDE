@@ -117,7 +117,7 @@ load_preferences() {
             input: {
                 keyboard_layout: "us",
                 keyboard_variant: "altgr-intl",
-                natural_scroll: false,
+                natural_scroll: true,
                 tap_to_click: true,
                 sensitivity: 0,
                 accel_profile: "adaptive"
