@@ -105,7 +105,7 @@ install_packages() {
     sudo apt-get update
     # Prefer stable, but allow required backported dependencies and packages
     # that must match their versions in the same transaction (APT 3 / Debian 13).
-    sudo apt-get install -y --solver 3.0 --no-strict-pinning \
+    sudo apt-get install -y --allow-downgrades --solver 3.0 --no-strict-pinning \
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
         "hypridle/$backports_suite" "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
