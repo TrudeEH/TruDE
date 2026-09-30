@@ -299,7 +299,8 @@ apply_wallpaper() {
 apply_idle() {
     command -v dotfiles-hypridle >/dev/null 2>&1 || return
     pkill -x hypridle 2>/dev/null || :
-    dotfiles-hypridle >/dev/null 2>&1 &
+    # Keep hypridle alive when this terminal closes.
+    setsid -f dotfiles-hypridle </dev/null >/dev/null 2>&1
 }
 
 apply_waybar() {
