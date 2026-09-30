@@ -15,10 +15,12 @@ done
 
 if [ "$sensor_count" -gt 0 ]; then
     temperature=$((maximum / 1000))
+    class=normal
+    [ "$temperature" -lt 90 ] || class=critical
     average_tenths=$((total * 10 / sensor_count / 1000))
     average="$((average_tenths / 10)).$((average_tenths % 10))"
-    printf '{"text":" %s°C","tooltip":"Maximum temperature: %s°C\\nAverage temperature: %s°C","percentage":%s}\n' \
-        "$temperature" "$temperature" "$average" "$temperature"
+    printf '{"text":" %s°C","tooltip":"Maximum temperature: %s°C\\nAverage temperature: %s°C","percentage":%s,"class":"%s"}\n' \
+        "$temperature" "$temperature" "$average" "$temperature" "$class"
 else
     printf '{"text":" —","tooltip":"No temperature sensor found"}\n'
 fi

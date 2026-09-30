@@ -153,6 +153,7 @@ menu separator {
     color: @warning;
 }
 
+#custom-temperature.critical,
 #memory.critical,
 #cpu.critical {
     color: @critical;
