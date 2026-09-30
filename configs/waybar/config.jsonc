@@ -39,10 +39,11 @@
         "spacing": 6
     },
     "hyprland/workspaces": {
+        "all-outputs": true,
         "format": "{icon}",
         "format-icons": {
             "active": "",
-            "visible": "",
+            "visible": "",
             "default": ""
         },
         "persistent-workspaces": {

@@ -99,13 +99,26 @@ menu separator {
     background-color: @bg-1;
 }
 
-#workspaces button.active label,
-#workspaces button.focused label {
-    font-size: 18px;
+#workspaces button label {
+    /* Reserve the diamond's height so switching never resizes the bar. */
+    min-height: 22px;
+    font-size: 12px;
+    color: @fg;
+    transition: color 180ms ease-out, font-size 180ms ease-out;
+}
+
+/* Occupancy colors apply to hidden workspaces; visibility takes precedence. */
+#workspaces button:not(.empty):not(.visible):not(.active) label {
     color: @accent;
 }
 
-#workspaces button.visible:not(.active) label {
+#workspaces button.visible label {
+    font-size: 18px;
+    color: @fg;
+}
+
+#workspaces button.active label {
+    font-size: 18px;
     color: @accent;
 }
 
@@ -113,8 +126,8 @@ menu separator {
     color: @hover-fg;
 }
 
-#workspaces button.active:hover label,
-#workspaces button.visible:hover label {
+#workspaces button:not(.empty):not(.visible):hover label,
+#workspaces button.active:hover label {
     color: @accent-strong;
 }
 
