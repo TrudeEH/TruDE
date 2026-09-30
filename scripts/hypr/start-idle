@@ -44,7 +44,7 @@ if [ "$lock_timeout" -gt 0 ]; then
 
 listener {
     timeout = $lock_timeout
-    on-timeout = loginctl lock-session
+    on-timeout = pidof hyprlock >/dev/null || hyprlock --config $HOME/.config/hypr/hyprlock.conf
 }
 EOF
 fi
