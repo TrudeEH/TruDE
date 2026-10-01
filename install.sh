@@ -451,6 +451,12 @@ main() {
     configure_session
     link_configs
     xdg-mime default dotfiles-file-manager.desktop inode/directory
+    sed -n 's/^MimeType=//p' "$repo_dir/configs/applications/dotfiles-text-editor.desktop" |
+        tr ';' '\n' |
+        while IFS= read -r mime_type; do
+            [ -n "$mime_type" ] || continue
+            xdg-mime default dotfiles-text-editor.desktop "$mime_type"
+        done
     configure_theme
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then

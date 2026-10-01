@@ -1,3 +1,14 @@
 [Default Applications]
 inode/directory=dotfiles-file-manager.desktop
 x-scheme-handler/codex=chatgpt.desktop
+text/plain=dotfiles-text-editor.desktop
+text/markdown=dotfiles-text-editor.desktop
+application/x-shellscript=dotfiles-text-editor.desktop
+text/x-shellscript=dotfiles-text-editor.desktop
+text/x-python=dotfiles-text-editor.desktop
+text/x-script.python=dotfiles-text-editor.desktop
+text/x-lua=dotfiles-text-editor.desktop
+application/json=dotfiles-text-editor.desktop
+application/toml=dotfiles-text-editor.desktop
+application/yaml=dotfiles-text-editor.desktop
+text/yaml=dotfiles-text-editor.desktop
