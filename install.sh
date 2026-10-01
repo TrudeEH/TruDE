@@ -451,9 +451,6 @@ main() {
     configure_session
     link_configs
     xdg-mime default dotfiles-file-manager.desktop inode/directory
-    xdg-mime default dotfiles-text-editor.desktop \
-        text/plain text/markdown text/x-shellscript text/x-python text/x-lua \
-        application/json application/toml application/yaml text/yaml
     configure_theme
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then

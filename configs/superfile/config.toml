@@ -1,5 +1,5 @@
-# Edit files in Micro even when the session inherits another EDITOR.
-editor = "micro"
+# Use EDITOR, which defaults to Micro in the shared shell environment.
+editor = ""
 dir_editor = ""
 auto_check_update = false
 cd_on_quit = true # Used by the shell's n() directory-jump helper.
