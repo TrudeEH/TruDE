@@ -120,6 +120,71 @@ install_packages() {
         </dev/tty
 }
 
+install_superfile() (
+    # Keep temporary variables and cleanup traps scoped to this installation.
+    set -eu
+
+    # Prefer Debian packages if Superfile becomes available in the configured repos.
+    candidate=$(apt-cache policy superfile 2>/dev/null | awk '/Candidate:/ { print $2 }')
+    if [ -n "$candidate" ] && [ "$candidate" != '(none)' ]; then
+        sudo apt-get install -y -- superfile </dev/tty
+        exit 0
+    fi
+
+    arch=$(dpkg --print-architecture)
+    case $arch in
+        amd64|arm64) ;;
+        *)
+            ui_error "Superfile has no official Linux release for $arch."
+            exit 1
+            ;;
+    esac
+
+    bin_dir=$HOME/.local/bin
+    mkdir -p "$bin_dir"
+    temporary_dir=$(mktemp -d)
+    staged_binary=
+    trap 'rm -rf "$temporary_dir"; [ -z "$staged_binary" ] || rm -f "$staged_binary"' EXIT
+    trap 'exit 1' HUP INT TERM
+
+    # GitHub's latest-release endpoint excludes drafts and prereleases.
+    curl --fail --location --show-error --retry 3 \
+        --header 'Accept: application/vnd.github+json' \
+        --output "$temporary_dir/release.json" \
+        https://api.github.com/repos/yorukot/superfile/releases/latest
+    release_tag=$(jq -er '.tag_name | select(type == "string" and test("^v[0-9]+[.][0-9]+[.][0-9]+$"))' \
+        "$temporary_dir/release.json")
+    archive=superfile-linux-$release_tag-$arch
+    download_url=$(jq -er --arg name "$archive.tar.gz" \
+        '.assets[] | select(.name == $name) | .browser_download_url' \
+        "$temporary_dir/release.json") || {
+        ui_error "Superfile $release_tag has no Linux archive for $arch."
+        exit 1
+    }
+    checksum=$(jq -er --arg name "$archive.tar.gz" \
+        '.assets[] | select(.name == $name) | .digest | strings
+         | select(test("^sha256:[0-9a-fA-F]{64}$")) | sub("^sha256:"; "")' \
+        "$temporary_dir/release.json") || {
+        ui_error "Superfile $release_tag has no valid SHA-256 digest for $arch."
+        exit 1
+    }
+
+    printf 'Installing Superfile %s for %s (latest official release).\n' "$release_tag" "$arch"
+    curl --fail --location --show-error --retry 3 \
+        --output "$temporary_dir/$archive.tar.gz" "$download_url"
+    if ! printf '%s  %s\n' "$checksum" "$temporary_dir/$archive.tar.gz" | sha256sum --check --status; then
+        ui_error "Superfile $release_tag failed SHA-256 verification."
+        exit 1
+    fi
+    tar -xzf "$temporary_dir/$archive.tar.gz" -C "$temporary_dir" "./dist/$archive/spf"
+
+    # Stage on the same filesystem, then replace the binary atomically.
+    staged_binary=$(mktemp "$bin_dir/.spf.XXXXXX")
+    install -m 0755 "$temporary_dir/dist/$archive/spf" "$staged_binary"
+    mv -f "$staged_binary" "$bin_dir/spf"
+    staged_binary=
+)
+
 install_font() {
     font_dir=$HOME/.local/share/fonts/JetBrainsMonoNerdFont
     case $(fc-match "JetBrainsMono Nerd Font" -f '%{family}') in
@@ -368,7 +433,7 @@ main() {
     install_packages
 
     ui_step "Installing Superfile"
-    sh "$repo_dir/scripts/install_superfile.sh"
+    install_superfile
 
     ui_step "Installing fonts and configuring Flatpak"
     install_font

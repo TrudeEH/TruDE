@@ -1,4 +1,4 @@
-# Superfile 1.6.0. File editing follows EDITOR (Micro by default).
+# File editing follows EDITOR (Micro by default).
 editor = ""
 dir_editor = ""
 auto_check_update = false
