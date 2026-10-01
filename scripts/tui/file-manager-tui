@@ -9,4 +9,12 @@ fi
 export EDITOR="${EDITOR:-micro}"
 export VISUAL="${VISUAL:-$EDITOR}"
 
+# The upstream first-run intro clips in small terminals and consumes the first
+# picker key. Open the file manager directly; built-in help is available with ?.
+first_use_marker=${XDG_DATA_HOME:-"$HOME/.local/share"}/superfile/firstUseCheck
+if [ ! -e "$first_use_marker" ]; then
+    mkdir -p "$(dirname "$first_use_marker")"
+    : > "$first_use_marker"
+fi
+
 exec spf "$@"

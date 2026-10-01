@@ -11,9 +11,9 @@ file_panel_border_active = "#ffbe6f"
 file_panel_top_directory_icon = "#ffbe6f"
 file_panel_top_path = "#ffffff"
 # Superfile renders selected filenames on the panel background, overriding this
-# selection background. Keep the foreground readable on either dark surface.
+# selection background. Use orange text without a separate selection fill.
 file_panel_item_selected_fg = "#ffbe6f"
-file_panel_item_selected_bg = "#38383c"
+file_panel_item_selected_bg = "#222226"
 
 footer_fg = "#aaaaaa"
 footer_bg = "#222226"
@@ -26,7 +26,7 @@ sidebar_title = "#ffbe6f"
 sidebar_border = "#38383c"
 sidebar_border_active = "#ffbe6f"
 sidebar_item_selected_fg = "#ffbe6f"
-sidebar_item_selected_bg = "#38383c"
+sidebar_item_selected_bg = "#222226"
 sidebar_divider = "#38383c"
 
 modal_fg = "#ffffff"

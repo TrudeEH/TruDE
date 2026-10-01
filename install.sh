@@ -415,6 +415,10 @@ link_configs() {
     link_config "$repo_dir/configs/superfile/env" "$config_dir/superfile/env"
     link_config "$repo_dir/configs/superfile/config.toml" "$config_dir/superfile/config.toml"
     link_config "$repo_dir/configs/superfile/theme/dotfiles.toml" "$config_dir/superfile/theme/dotfiles.toml"
+    # Skip the oversized upstream first-run intro, including direct spf launches.
+    superfile_data_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}/superfile
+    mkdir -p "$superfile_data_dir"
+    touch "$superfile_data_dir/firstUseCheck"
     link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 
 }
