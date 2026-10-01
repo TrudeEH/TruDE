@@ -273,3 +273,8 @@ menu separator {
 #custom-right.inverse {
     color: @bg-3;
 }
+
+#custom-right.inverse {
+    /* Compensate for the right divider's one-pixel glyph bearing. */
+    margin-left: -1px;
+}
