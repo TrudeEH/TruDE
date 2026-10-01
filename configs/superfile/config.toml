@@ -1,5 +1,5 @@
-# File editing follows EDITOR (Micro by default).
-editor = ""
+# Edit files in Micro even when the session inherits another EDITOR.
+editor = "micro"
 dir_editor = ""
 auto_check_update = false
 cd_on_quit = true # Used by the shell's n() directory-jump helper.

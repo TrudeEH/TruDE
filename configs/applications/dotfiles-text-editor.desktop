@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Micro Text Editor
+GenericName=Text Editor
+Comment=Edit text files in Micro
+Exec=footclient --app-id=micro --title=Editor micro %F
+Terminal=false
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/markdown;text/x-shellscript;text/x-python;text/x-lua;application/json;application/toml;application/yaml;text/yaml;
