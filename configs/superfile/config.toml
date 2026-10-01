@@ -1,0 +1,69 @@
+# Superfile 1.6.0. File editing follows EDITOR (Micro by default).
+editor = ""
+dir_editor = ""
+auto_check_update = false
+cd_on_quit = true # Used by the shell's n() directory-jump helper.
+default_open_file_preview = true
+show_image_preview = true
+show_panel_footer_info = true
+default_directory = "."
+file_size_use_si = false
+default_sort_type = 4 # Natural ordering: file2 before file10.
+sort_order_reversed = false
+case_sensitive_sort = false
+shell_close_on_success = false
+page_scroll_size = 0
+debug = false
+ignore_missing_fields = false
+file_panel_extra_columns = 0
+file_panel_name_percent = 50
+
+theme = "dotfiles"
+code_previewer = ""
+nerdfont = true
+show_select_icons = true
+transparent_background = false
+file_preview_width = 0
+enable_file_preview_border = true
+sidebar_width = 20
+sidebar_sections = ["home", "pinned", "disks"]
+border_top = '─'
+border_bottom = '─'
+border_left = '│'
+border_right = '│'
+border_top_left = '╭'
+border_top_right = '╮'
+border_bottom_left = '╰'
+border_bottom_right = '╯'
+border_middle_left = '├'
+border_middle_right = '┤'
+
+# Leave optional integrations off unless their dependencies are installed.
+metadata = false
+enable_md5_checksum = false
+zoxide_support = false
+
+# Other files retain Superfile's xdg-open default. Keep this table last.
+[open_with]
+jpg = "dotfiles-superfile-open"
+jpeg = "dotfiles-superfile-open"
+png = "dotfiles-superfile-open"
+gif = "dotfiles-superfile-open"
+webp = "dotfiles-superfile-open"
+bmp = "dotfiles-superfile-open"
+tif = "dotfiles-superfile-open"
+tiff = "dotfiles-superfile-open"
+svg = "dotfiles-superfile-open"
+heic = "dotfiles-superfile-open"
+avif = "dotfiles-superfile-open"
+mp3 = "dotfiles-superfile-open"
+flac = "dotfiles-superfile-open"
+ogg = "dotfiles-superfile-open"
+oga = "dotfiles-superfile-open"
+opus = "dotfiles-superfile-open"
+wav = "dotfiles-superfile-open"
+m4a = "dotfiles-superfile-open"
+aac = "dotfiles-superfile-open"
+wma = "dotfiles-superfile-open"
+aiff = "dotfiles-superfile-open"
+ape = "dotfiles-superfile-open"

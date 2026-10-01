@@ -2,11 +2,11 @@
 set -eu
 
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
-if [ -r "$config_dir/nnn/env" ]; then
-    . "$config_dir/nnn/env"
+if [ -r "$config_dir/superfile/env" ]; then
+    . "$config_dir/superfile/env"
 fi
 
 export EDITOR="${EDITOR:-micro}"
 export VISUAL="${VISUAL:-$EDITOR}"
 
-exec nnn "$@"
+exec spf "$@"

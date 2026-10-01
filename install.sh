@@ -109,7 +109,7 @@ install_packages() {
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
         "hypridle/$backports_suite" "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
-        atool bat curl fdisk foot micro nnn imv cmus lazygit ncdu p7zip-full \
+        atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
@@ -285,6 +285,19 @@ link_config() {
 }
 
 link_configs() {
+    # Retire only symlinks created by older versions of this installer.
+    # Preserve independently managed configurations and commands.
+    for legacy_pair in \
+        "$HOME/.local/bin/dotfiles-nnn-open|$repo_dir/scripts/nnn/open" \
+        "$config_dir/nnn/env|$repo_dir/configs/nnn/env" \
+        "$config_dir/nnn/plugins|$repo_dir/configs/nnn/plugins"; do
+        legacy_target=${legacy_pair%%|*}
+        legacy_source=${legacy_pair#*|}
+        if [ -L "$legacy_target" ] && [ "$(readlink "$legacy_target")" = "$legacy_source" ]; then
+            rm "$legacy_target"
+        fi
+    done
+
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
     link_config "$repo_dir/configs/hypr/hypridle.conf" "$config_dir/hypr/hypridle.conf"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
@@ -312,7 +325,7 @@ link_configs() {
     for desktop_file in "$repo_dir"/configs/applications/*.desktop; do
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
-    link_config "$repo_dir/scripts/nnn/open" "$HOME/.local/bin/dotfiles-nnn-open"
+    link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/dotfiles-superfile-open"
     link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
     link_config "$repo_dir/scripts/waybar/status-indicators" "$HOME/.local/bin/dotfiles-waybar-status-indicators"
@@ -334,8 +347,9 @@ link_configs() {
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
     link_config "$repo_dir/configs/micro/settings.json" "$config_dir/micro/settings.json"
     link_config "$repo_dir/configs/micro/colorschemes/dotfiles.micro" "$config_dir/micro/colorschemes/dotfiles.micro"
-    link_config "$repo_dir/configs/nnn/env" "$config_dir/nnn/env"
-    link_config "$repo_dir/configs/nnn/plugins" "$config_dir/nnn/plugins"
+    link_config "$repo_dir/configs/superfile/env" "$config_dir/superfile/env"
+    link_config "$repo_dir/configs/superfile/config.toml" "$config_dir/superfile/config.toml"
+    link_config "$repo_dir/configs/superfile/theme/dotfiles.toml" "$config_dir/superfile/theme/dotfiles.toml"
     link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 
 }
@@ -352,6 +366,9 @@ main() {
 
     ui_step "Installing desktop packages"
     install_packages
+
+    ui_step "Installing Superfile"
+    sh "$repo_dir/scripts/install_superfile.sh"
 
     ui_step "Installing fonts and configuring Flatpak"
     install_font

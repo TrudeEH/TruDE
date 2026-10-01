@@ -1,0 +1,3 @@
+# Shared editor defaults for interactive shells, the launcher, and file pickers.
+export EDITOR="${EDITOR:-micro}"
+export VISUAL="${VISUAL:-$EDITOR}"

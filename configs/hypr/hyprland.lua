@@ -18,7 +18,7 @@ local adwaita = {
 
 dotfilesSettings = {
     terminal           = "footclient",
-    fileManager        = "footclient --app-id=nnn --title=Files dotfiles-file-manager-tui",
+    fileManager        = "footclient --app-id=superfile --title=Files dotfiles-file-manager-tui",
     browser            = "xdg-open https://start.duckduckgo.com",
     launcher           = "dotfiles-app-launcher-toggle",
     wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg",
@@ -95,6 +95,8 @@ local wallpaper   = dotfilesSettings.wallpaper
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("EDITOR", os.getenv("EDITOR") or "micro")
+hl.env("VISUAL", os.getenv("VISUAL") or os.getenv("EDITOR") or "micro")
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("QT_STYLE_OVERRIDE", "Adwaita-Dark")
 local xdgDataDirs = {}

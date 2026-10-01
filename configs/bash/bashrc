@@ -30,21 +30,25 @@ if command -v tmux >/dev/null 2>&1; then
     alias ta='tmux attach'
 fi
 
-if [ -r "$HOME/.config/nnn/env" ]; then
-    . "$HOME/.config/nnn/env"
-
-    n() {
-        local nnn_tmpfile
-        nnn_tmpfile=$(mktemp)
-        NNN_TMPFILE=$nnn_tmpfile command nnn "$@"
-        if [ -s "$nnn_tmpfile" ]; then
-            # nnn writes the directory-changing command to this private file.
-            # shellcheck disable=SC1090
-            . "$nnn_tmpfile"
-        fi
-        rm -f "$nnn_tmpfile"
-    }
+if [ -r "${XDG_CONFIG_HOME:-$HOME/.config}/superfile/env" ]; then
+    . "${XDG_CONFIG_HOME:-$HOME/.config}/superfile/env"
 fi
+
+# Preserve n's directory-jump behavior using Superfile's documented lastdir file.
+n() {
+    local spf_lastdir spf_status
+    spf_lastdir=${XDG_STATE_HOME:-$HOME/.local/state}/superfile/lastdir
+    rm -f -- "$spf_lastdir"
+    command spf "$@"
+    spf_status=$?
+    if [ "$spf_status" -eq 0 ] && [ -s "$spf_lastdir" ]; then
+        # Superfile writes a shell-quoted cd command here.
+        # shellcheck disable=SC1090
+        . "$spf_lastdir"
+    fi
+    rm -f -- "$spf_lastdir"
+    return "$spf_status"
+}
 
 alias l='ls -alh'
 alias ls='ls --color=auto'
@@ -57,7 +61,7 @@ alias free='free -h'
 alias ip='ip -color=auto'
 alias diff='diff --color=auto'
 alias mkdir='mkdir -pv'
-alias fm=nnn
+alias fm=spf
 
 # History
 HISTSIZE=50000

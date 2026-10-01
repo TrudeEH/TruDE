@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=nnn File Manager
+Name=Superfile File Manager
 GenericName=File Manager
 Comment=Browse and manage files in the terminal
-Exec=footclient --app-id=nnn --title=Files --override=colors.regular0=222226 --window-size-chars=112x32 dotfiles-file-manager-tui %F
+Exec=footclient --app-id=superfile --title=Files --override=colors.regular0=222226 --window-size-chars=112x32 dotfiles-file-manager-tui %F
 Terminal=false
 Categories=System;FileTools;
 MimeType=inode/directory;

@@ -16,7 +16,8 @@ case $extension:$mime_type in
         "$imv" "$path" >/dev/null 2>&1 &
         ;;
     mp3:*|flac:*|ogg:*|oga:*|opus:*|wav:*|m4a:*|aac:*|wma:*|aiff:*|ape:*|*:audio/*)
-        exec "$cmus" "$path"
+        # Superfile detaches open_with commands; give cmus its own terminal.
+        exec footclient --app-id=cmus --title=Music "$cmus" "$path"
         ;;
     *)
         xdg-open "$path" >/dev/null 2>&1 &
