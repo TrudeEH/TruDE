@@ -30,7 +30,7 @@ sidebar_item_selected_bg = "#222226"
 sidebar_divider = "#38383c"
 
 modal_fg = "#ffffff"
-modal_bg = "#38383c"
+modal_bg = "#222226"
 modal_border_active = "#ffa348"
 modal_cancel_fg = "#ffffff"
 modal_cancel_bg = "#222226"
