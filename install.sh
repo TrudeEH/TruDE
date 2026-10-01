@@ -388,10 +388,6 @@ link_configs() {
     link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/dotfiles-icon-picker-tui"
     for desktop_file in "$repo_dir"/configs/applications/*.desktop; do
-        # ChatGPT is optional and is installed independently of these dotfiles.
-        if [ "$(basename "$desktop_file")" = chatgpt.desktop ] && ! command -v chatgpt >/dev/null 2>&1; then
-            continue
-        fi
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
     link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/dotfiles-superfile-open"
