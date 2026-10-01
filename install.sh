@@ -412,6 +412,7 @@ link_configs() {
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
     link_config "$repo_dir/configs/micro/settings.json" "$config_dir/micro/settings.json"
     link_config "$repo_dir/configs/micro/colorschemes/dotfiles.micro" "$config_dir/micro/colorschemes/dotfiles.micro"
+    link_config "$repo_dir/configs/micro/syntax/css.yaml" "$config_dir/micro/syntax/css.yaml"
     link_config "$repo_dir/configs/superfile/env" "$config_dir/superfile/env"
     link_config "$repo_dir/configs/superfile/config.toml" "$config_dir/superfile/config.toml"
     link_config "$repo_dir/configs/superfile/theme/dotfiles.toml" "$config_dir/superfile/theme/dotfiles.toml"
