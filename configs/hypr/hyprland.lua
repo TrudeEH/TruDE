@@ -138,6 +138,12 @@ hl.env("XDG_DATA_DIRS", table.concat(xdgDataDirs, ":"))
 
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
+    -- Render XWayland windows at native resolution. Applications handle their
+    -- own UI scaling; games can use the full monitor resolution.
+    xwayland = {
+        force_zero_scaling = true,
+    },
+
     general = {
         gaps_in  = dotfilesSettings.gapsIn,
         gaps_out = dotfilesSettings.gapsOut,
