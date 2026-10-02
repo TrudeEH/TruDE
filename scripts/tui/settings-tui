@@ -1,28 +1,8 @@
 #!/bin/sh
 set -u
 
-export NEWT_COLORS='root=white,black
-border=white,black
-window=white,black
-shadow=black,black
-title=yellow,black
-button=black,yellow
-actbutton=black,brown
-compactbutton=white,black
-checkbox=white,black
-actcheckbox=black,yellow
-entry=white,black
-label=white,black
-listbox=white,black
-actlistbox=black,yellow
-sellistbox=white,black
-actsellistbox=black,yellow
-textbox=white,black
-acttextbox=black,yellow
-emptyscale=white,black
-fullscale=black,yellow
-helpline=white,black
-roottext=white,black'
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
 
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 settings_dir=$config_home/hypr
@@ -678,7 +658,7 @@ choose_keyboard_layout() {
     else
         current_selection=$current_layout
     fi
-    choice=$(printf '%s\n' "$choices" | fzf \
+    choice=$(printf '%s\n' "$choices" | tui_fzf \
         --no-multi \
         --cycle \
         --layout=reverse \
@@ -686,8 +666,7 @@ choose_keyboard_layout() {
         --delimiter='\t' \
         --with-nth=1,2 \
         --prompt='Keyboard layout  ' \
-        --header="Current: $current_selection — type to search, Enter to select" \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,info:#aaaaaa,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,spinner:#ffbe6f,header:#aaaaaa,border:#77767b') || return 1
+        --header="Current: $current_selection — type to search, Enter to select") || return 1
     printf '%s\n' "$choice" | awk -F '\t' '{ print $3 "|" $4 }'
 }
 

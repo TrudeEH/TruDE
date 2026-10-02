@@ -1,28 +1,8 @@
 #!/bin/sh
 set -u
 
-export NEWT_COLORS='root=white,black
-border=white,black
-window=white,black
-shadow=black,black
-title=yellow,black
-button=black,yellow
-actbutton=black,brown
-compactbutton=white,black
-checkbox=white,black
-actcheckbox=black,yellow
-entry=white,black
-label=white,black
-listbox=white,black
-actlistbox=black,yellow
-sellistbox=white,black
-actsellistbox=black,yellow
-textbox=white,black
-acttextbox=black,yellow
-emptyscale=white,black
-fullscale=black,yellow
-helpline=white,black
-roottext=white,black'
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-package-manager.XXXXXX") || exit 1
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
@@ -444,7 +424,7 @@ select_installed_package() {
         return 1
     }
 
-    selected=$(fzf \
+    selected=$(tui_fzf \
         --ansi \
         --delimiter='\t' \
         --with-nth=3 \
@@ -460,7 +440,6 @@ select_installed_package() {
         --no-multi \
         --no-hscroll \
         --cycle \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
         < "$results_file") || return 1
 
     source=$(printf '%s\n' "$selected" | cut -f1)

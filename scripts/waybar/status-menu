@@ -1,20 +1,22 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+
 selection=$(printf '%s\n' \
     'Notifications' \
     'Network settings' \
     'Bluetooth settings' \
     'USB devices' \
-    | fzf \
+    | tui_fzf \
         --prompt=' Quick Settings  ' \
         --pointer='󰜴' \
         --marker='󰄬' \
         --border=sharp \
         --layout=reverse \
         --no-multi \
-        --cycle \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa') \
+        --cycle) \
     || exit 0
 
 launch_tui() {

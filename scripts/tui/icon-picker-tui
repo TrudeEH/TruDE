@@ -1,6 +1,9 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+
 usage() {
     printf 'Usage: %s\n\n' "${0##*/}"
     printf 'Search the installed Nerd Font glyphs and copy a selected icon.\n'
@@ -246,7 +249,7 @@ PY
             }
         }
     ' \
-    | fzf \
+    | tui_fzf \
         --ansi \
         --delimiter='\t' \
         --with-nth=1,2,3 \
@@ -261,8 +264,7 @@ PY
         --layout=reverse \
         --no-multi \
         --no-hscroll \
-        --cycle \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa'
+        --cycle
 ) || exit 0
 
 icon=$(printf '%s\n' "$selection" | awk -F '	' 'NR == 1 { print $1 }')
