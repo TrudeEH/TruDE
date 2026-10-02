@@ -1,16 +1,15 @@
 #!/bin/sh
 set -eu
 
-mode=${1:-region}
-lock_dir=${XDG_RUNTIME_DIR:-/tmp}/dotfiles-screenshot.lock
+# shellcheck source=scripts/lib/runtime.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
 
-# slurp keeps the selector open until the user confirms or cancels it. Make
-# that interaction single-instance so repeated PrintScreen presses cannot
-# create overlapping selectors.
-if ! mkdir "$lock_dir" 2>/dev/null; then
-    exit 0
-fi
-trap 'rmdir "$lock_dir"' 0 1 2 3 15
+mode=${1:-region}
+runtime_dir=$(dotfiles_runtime_dir) || exit 1
+umask 077
+# The kernel releases flock on exit, including an interrupted screenshot.
+exec 9> "$runtime_dir/dotfiles-screenshot.flock"
+flock -n 9 || exit 0
 
 case "$mode" in
     region|full) ;;
@@ -42,5 +41,5 @@ else
     grim "$output"
 fi
 
-wl-copy --type image/png < "$output"
+wl-copy --type image/png 9>&- < "$output"
 printf 'Screenshot saved to %s\n' "$output"

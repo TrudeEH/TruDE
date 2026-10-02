@@ -1,17 +1,19 @@
 #!/bin/sh
 set -u
 
+runtime_dir=${XDG_RUNTIME_DIR:-}
+if [ -z "$runtime_dir" ]; then
+    # shellcheck source=scripts/lib/runtime.sh
+    . "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
+    runtime_dir=$(dotfiles_runtime_dir) || exit 1
+fi
+
 part=${1:-center}
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 preferences_file=$config_home/dotfiles/settings.json
-runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+umask 077
 cache_file=$runtime_dir/dotfiles-waybar-launcher-status
-lock_dir=$runtime_dir/dotfiles-waybar-launcher-status.lock
-
-launcher_icon=
-if [ -f "$preferences_file" ] && command -v jq >/dev/null 2>&1; then
-    launcher_icon=$(jq -r '.waybar.launcher_icon // ""' "$preferences_file" 2>/dev/null || :)
-fi
+lock_file=$runtime_dir/dotfiles-waybar-launcher-status.flock
 
 cache_is_fresh() {
     [ -r "$cache_file" ] || return 1
@@ -21,20 +23,9 @@ cache_is_fresh() {
 }
 
 refresh_status() {
-    if ! mkdir "$lock_dir" 2>/dev/null; then
-        lock_pid=
-        IFS= read -r lock_pid < "$lock_dir/pid" 2>/dev/null || :
-        case $lock_pid in
-            ''|*[!0-9]*) ;;
-            *) kill -0 "$lock_pid" 2>/dev/null && return ;;
-        esac
-        rm -f "$lock_dir/pid"
-        rmdir "$lock_dir" 2>/dev/null || return
-        mkdir "$lock_dir" 2>/dev/null || return
-    fi
-
-    printf '%s\n' "$$" > "$lock_dir/pid"
-    trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+    exec 9> "$lock_file"
+    flock -n 9 || return
+    cache_is_fresh && return
     status=launcher
     if command -v pw-cli >/dev/null 2>&1; then
         if pw-cli ls Node 2>/dev/null | awk '
@@ -73,16 +64,22 @@ case $part in
     *)
         if [ "$status" = screensharing ]; then
             text='󰍹'
-        elif [ -n "$launcher_icon" ]; then
-            text=$launcher_icon
         else
-            text='󰀻'
+            launcher_icon=
+            if [ -f "$preferences_file" ]; then
+                launcher_icon=$(jq -r '.waybar.launcher_icon | strings
+                    | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;")' \
+                    "$preferences_file" 2>/dev/null || :)
+            fi
+            text=${launcher_icon:-󰀻}
         fi
         ;;
 esac
 
 if [ "$part" = center ]; then
     text="<span font_family='JetBrainsMono Nerd Font Propo' stretch='condensed'>$text</span>"
+    jq -cn --arg text "$text" --arg class "$status" '{text: $text, class: $class}'
+    exit 0
 fi
 
 printf '{"text":"%s","class":"%s"}\n' "$text" "$status"

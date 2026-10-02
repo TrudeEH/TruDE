@@ -1,9 +1,15 @@
 #!/bin/sh
 set -u
 
-runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
+runtime_dir=${XDG_RUNTIME_DIR:-}
+if [ -z "$runtime_dir" ]; then
+    # shellcheck source=scripts/lib/runtime.sh
+    . "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
+    runtime_dir=$(dotfiles_runtime_dir) || exit 1
+fi
+umask 077
 cache_file=$runtime_dir/dotfiles-waybar-maintenance.json
-lock_dir=$runtime_dir/dotfiles-waybar-maintenance.lock
+lock_file=$runtime_dir/dotfiles-waybar-maintenance.flock
 cache_lifetime=240
 
 cache_is_fresh() {
@@ -18,24 +24,19 @@ if cache_is_fresh; then
     exit 0
 fi
 
-if ! mkdir "$lock_dir" 2>/dev/null; then
+# flock is released by the kernel, so a killed refresh cannot leave a stale lock.
+exec 9> "$lock_file"
+if ! flock -n 9; then
     if [ -f "$cache_file" ]; then
         cat "$cache_file"
         exit 0
     fi
-    lock_pid=
-    IFS= read -r lock_pid < "$lock_dir/pid" 2>/dev/null || :
-    case $lock_pid in
-        ''|*[!0-9]*) ;;
-        *) kill -0 "$lock_pid" 2>/dev/null && exit 1 ;;
-    esac
-    rm -f "$lock_dir/pid"
-    rmdir "$lock_dir" 2>/dev/null || exit 1
-    mkdir "$lock_dir" 2>/dev/null || exit 1
+    exit 1
 fi
-
-printf '%s\n' "$$" > "$lock_dir/pid"
-trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
+if cache_is_fresh; then
+    cat "$cache_file"
+    exit 0
+fi
 
 apt_updates=$(apt list --upgradable 2>/dev/null \
     | awk 'NR == 1 && /^Listing/ { next } NF { count++ } END { print count + 0 }')
@@ -49,7 +50,8 @@ fi
 trude_repo=$HOME/dotfiles
 trude_updates=0
 if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
-    GIT_TERMINAL_PROMPT=0 git -C "$trude_repo" \
+    timeout 20s env GIT_TERMINAL_PROMPT=0 \
+        GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git -C "$trude_repo" \
         -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
         fetch --quiet --no-tags origin 2>/dev/null || :
     trude_upstream=$(git -C "$trude_repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || :)
