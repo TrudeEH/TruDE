@@ -1,6 +1,9 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+
 shortcuts=$(hyprctl binds -j 2>/dev/null | jq -r '
     def has_modifier($mask):
         ((. / $mask | floor) % 2) == 1;
@@ -65,7 +68,7 @@ printf '%s\n' "$shortcuts" \
             }
         }
     ' \
-    | fzf \
+    | tui_fzf \
     --ansi \
     --delimiter='\t' \
     --with-nth=1,2 \
@@ -80,5 +83,4 @@ printf '%s\n' "$shortcuts" \
     --no-multi \
     --no-hscroll \
     --no-sort \
-    --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,header:#aaaaaa' \
     >/dev/null

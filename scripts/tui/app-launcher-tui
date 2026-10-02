@@ -1,6 +1,9 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+
 data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
 data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
 raw_search_dirs=$data_home:$HOME/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:$data_dirs
@@ -121,7 +124,7 @@ selection=$(
             }
         }
     ' \
-    | fzf \
+    | tui_fzf \
         --ansi \
         --delimiter='\t' \
         --with-nth=1,2 \
@@ -136,8 +139,7 @@ selection=$(
         --layout=reverse \
         --no-multi \
         --no-hscroll \
-        --cycle \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa'
+        --cycle
 ) || exit 0
 
 desktop_file=$(printf '%s\n' "$selection" | awk -F '\t' '{ print $NF }')

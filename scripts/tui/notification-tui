@@ -1,8 +1,12 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/ui.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-notifications.XXXXXX") || exit 1
-trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
+trap 'rm -rf "$temporary_dir"' 0
+trap 'exit 1' HUP INT TERM
 
 parse_notifications() {
     kind=$1
@@ -77,10 +81,10 @@ while :; do
         cat "$active_file" "$history_file"
     } > "$menu_file"
 
-    selection=$(fzf \
+    selection=$(tui_fzf \
         --delimiter='\t' \
         --with-nth=3 \
-        --nth=3 \
+        --nth=1 \
         --prompt='󰂚  Notifications  ' \
         --pointer='󰜴' \
         --marker='󰄬' \
@@ -90,7 +94,6 @@ while :; do
         --layout=reverse \
         --no-multi \
         --cycle \
-        --color='bg:#222226,bg+:#38383c,fg:#ffffff,fg+:#ffffff,hl:#ffbe6f,hl+:#ffa348,prompt:#ffbe6f,pointer:#ffbe6f,marker:#ffbe6f,border:#55555a,label:#aaaaaa,info:#aaaaaa,spinner:#ffbe6f,header:#aaaaaa' \
         < "$menu_file") || exit 0
 
     kind=$(printf '%s\n' "$selection" | cut -f1)
