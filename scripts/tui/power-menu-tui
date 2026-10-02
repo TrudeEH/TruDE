@@ -32,6 +32,29 @@ confirm() {
     dialog --yesno "$1" 9 58
 }
 
+session_locked() {
+    hyprctl -j locked 2>/dev/null | jq -e '.locked == true' >/dev/null 2>&1
+}
+
+lock_session() {
+    session_locked && return 0
+    if ! pgrep -x hyprlock >/dev/null 2>&1; then
+        # Let the lock survive when the power menu's terminal closes.
+        setsid -f hyprlock --grace 0 --config "$HOME/.config/hypr/hyprlock.conf" \
+            </dev/null >/dev/null 2>&1
+    fi
+
+    # A running process alone does not mean the compositor has locked yet.
+    attempts=0
+    while [ "$attempts" -lt 100 ]; do
+        session_locked && return 0
+        sleep 0.1
+        attempts=$((attempts + 1))
+    done
+    dialog --msgbox "Unable to confirm that the session is locked." 10 72
+    return 1
+}
+
 choice=$(dialog --menu "Choose an action" 17 64 8 \
     "󰌾 lock" "Lock the session" \
     "󰒲 suspend" "Suspend the computer" \
@@ -42,10 +65,10 @@ choice=$(dialog --menu "Choose an action" 17 64 8 \
 
 case $choice in
     *" lock")
-        hyprlock --config "$HOME/.config/hypr/hyprlock.conf" >/dev/null 2>&1 &
+        lock_session
         ;;
     *" suspend")
-        confirm "Suspend the computer?" && systemctl suspend
+        confirm "Lock and suspend the computer?" && lock_session && systemctl suspend
         ;;
     *" logout")
         confirm "Log out of Hyprland?" && hyprctl dispatch 'hl.dsp.exit()'
