@@ -103,11 +103,17 @@ BACKPORTS
 
 install_packages() {
     sudo apt-get update
+    # Retire the idle daemon on systems set up by previous installations.
+    if [ "$(dpkg-query -W -f='${Status}' hypridle 2>/dev/null || :)" = 'install ok installed' ]; then
+        systemctl --user disable --now hypridle.service 2>/dev/null || :
+        pkill -x hypridle 2>/dev/null || :
+        sudo apt-get remove -y --no-auto-remove -- hypridle </dev/tty
+    fi
     # Prefer stable, but allow required backported dependencies and packages
     # that must match their versions in the same transaction (APT 3 / Debian 13).
     sudo apt-get install -y --allow-downgrades --solver 3.0 --no-strict-pinning \
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
-        "hypridle/$backports_suite" "hyprlock/$backports_suite" \
+        "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
@@ -353,6 +359,8 @@ link_configs() {
     # Retire only symlinks created by older versions of this installer.
     # Preserve independently managed configurations and commands.
     for legacy_pair in \
+        "$HOME/.local/bin/dotfiles-hypridle|$repo_dir/scripts/hypr/start-idle" \
+        "$config_dir/hypr/hypridle.conf|$repo_dir/configs/hypr/hypridle.conf" \
         "$HOME/.local/bin/dotfiles-nnn-open|$repo_dir/scripts/nnn/open" \
         "$config_dir/nnn/env|$repo_dir/configs/nnn/env" \
         "$config_dir/nnn/plugins|$repo_dir/configs/nnn/plugins"; do
@@ -364,11 +372,9 @@ link_configs() {
     done
 
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
-    link_config "$repo_dir/configs/hypr/hypridle.conf" "$config_dir/hypr/hypridle.conf"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
     link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
     link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
-    link_config "$repo_dir/scripts/hypr/start-idle" "$HOME/.local/bin/dotfiles-hypridle"
     link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/dotfiles-mako"
     link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
     link_config "$repo_dir/scripts/tui/bluetooth-tui" "$HOME/.local/bin/dotfiles-bluetooth-tui"

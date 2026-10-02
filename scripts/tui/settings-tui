@@ -137,16 +137,14 @@ load_preferences() {
                 launcher_icon: ""
             },
             laptop: {
-                idle_timeout: 300,
-                screen_off_timeout: 600,
-                suspend_timeout: 900,
                 lid_behavior: "default"
             }
         }
     ' > "$defaults"
 
     if [ -f "$preferences_file" ] && jq -e 'type == "object"' "$preferences_file" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1] | del(.defaults, .workspaces, .waybar.auto_hide)' \
+        jq -s '.[0] * .[1] | del(.defaults, .workspaces, .waybar.auto_hide,
+            .laptop.idle_timeout, .laptop.screen_off_timeout, .laptop.suspend_timeout)' \
             "$defaults" "$preferences_file" > "$preferences_state"
     else
         cp "$defaults" "$preferences_state"
@@ -288,13 +286,6 @@ apply_wallpaper() {
     fi
 }
 
-apply_idle() {
-    command -v dotfiles-hypridle >/dev/null 2>&1 || return
-    pkill -x hypridle 2>/dev/null || :
-    # Keep hypridle alive when this terminal closes.
-    setsid -f dotfiles-hypridle </dev/null >/dev/null 2>&1
-}
-
 apply_waybar() {
     if [ "$(preference '.waybar.enabled')" = true ]; then
         systemctl --user reset-failed waybar.service >/dev/null 2>&1 || :
@@ -319,7 +310,6 @@ save_preferences() {
             fi
             ;;
         wallpaper) apply_wallpaper ;;
-        idle) apply_idle ;;
         waybar) apply_waybar ;;
         json) ;;
     esac
@@ -864,20 +854,6 @@ waybar_settings() {
     done
 }
 
-set_timeout() {
-    preference_path=$1
-    title=$2
-    current=$(preference "$preference_path")
-    value=$(dialog --inputbox "$title\n\nUse 0 to disable." \
-        12 72 "$current" 3>&1 1>&2 2>&3) || return
-    if ! is_unsigned_integer "$value" || [ "$value" -gt 86400 ]; then
-        message "Enter a number of seconds from 0 to 86400."
-        return
-    fi
-    replace_preferences --argjson value "$value" "$preference_path = \$value"
-    save_preferences idle
-}
-
 apply_lid_behavior() {
     behavior=$1
     if ! command -v pkexec >/dev/null 2>&1; then
@@ -905,7 +881,6 @@ choose_lid_behavior() {
     choice=$(dialog --menu "󰌢 Lid-close behavior" 16 72 7 \
         "󰘚 default" "Use the Debian system default" \
         "󰒲 suspend" "Suspend the computer" \
-        "󰌾 lock" "Lock the session" \
         "󰅖 ignore" "Do nothing" \
         3>&1 1>&2 2>&3) || return
     behavior=${choice#* }
@@ -917,27 +892,14 @@ choose_lid_behavior() {
     fi
 }
 
-idle_settings() {
+laptop_settings() {
     while :; do
-        idle=$(preference '.laptop.idle_timeout')
-        screen=$(preference '.laptop.screen_off_timeout')
-        suspend=$(preference '.laptop.suspend_timeout')
         lid=$(preference '.laptop.lid_behavior')
-        set -- \
-            "󰌾 idle" "Lock after: ${idle}s (0 disables)" \
-            "󰍹 screen-off" "Turn screen off after: ${screen}s (0 disables)" \
-            "󰒲 suspend" "Suspend after: ${suspend}s (0 disables)"
-        if find /proc/acpi/button/lid -mindepth 1 -maxdepth 1 -type d \
-            -print -quit 2>/dev/null | grep -q .; then
-            set -- "$@" "󰌢 lid" "Lid close: $lid"
-        fi
-        set -- "$@" "󰅖 back" "Back to settings"
-        action=$(dialog --menu "Idle settings" 19 86 9 "$@" \
+        action=$(dialog --menu "Laptop settings" 14 72 4 \
+            "󰌢 lid" "Lid close: $lid" \
+            "󰅖 back" "Back to settings" \
             3>&1 1>&2 2>&3) || return
         case $action in
-            *" idle") set_timeout '.laptop.idle_timeout' "󰌾 Lock timeout in seconds" ;;
-            *" screen-off") set_timeout '.laptop.screen_off_timeout' "󰍹 Screen-off timeout in seconds" ;;
-            *" suspend") set_timeout '.laptop.suspend_timeout' "󰒲 Suspend timeout in seconds" ;;
             *" lid") choose_lid_behavior ;;
             *" back") return ;;
         esac
@@ -947,20 +909,24 @@ idle_settings() {
 load_monitors
 load_preferences
 while :; do
-    section=$(dialog --menu "Choose a settings section" 21 82 10 \
+    set -- \
         "󰍹 displays" "Monitor layout, modes, scale, rotation, and position" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
-        "󰍜 waybar" "Visibility, position, and displays" \
-        "󰌾 idle" "Lock, screen-off, suspend, and lid behavior" \
-        "󰅖 close" "Close settings" \
+        "󰍜 waybar" "Visibility, position, and displays"
+    if find /proc/acpi/button/lid -mindepth 1 -maxdepth 1 -type d \
+        -print -quit 2>/dev/null | grep -q .; then
+        set -- "$@" "󰌢 laptop" "Lid-close behavior"
+    fi
+    set -- "$@" "󰅖 close" "Close settings"
+    section=$(dialog --menu "Choose a settings section" 21 82 10 "$@" \
         3>&1 1>&2 2>&3) || exit 0
     case $section in
         *" displays") display_settings ;;
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
         *" waybar") waybar_settings ;;
-        *" idle") idle_settings ;;
+        *" laptop") laptop_settings ;;
         *" close") exit 0 ;;
     esac
 done
