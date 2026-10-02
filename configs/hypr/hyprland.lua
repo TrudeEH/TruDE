@@ -1,15 +1,5 @@
--- This is an example Hyprland Lua config file.
--- Refer to the wiki for more information.
--- https://wiki.hypr.land/Configuring/Start/
-
--- Please note not all available settings / options are set here.
--- For a full list, see the wiki
-
--- You can (and should!!) split this configuration into multiple files
--- Create your files separately and then require them like this:
--- require("myColors")
-
--- Adwaita dark palette from https://trude.dev/css/style.css.
+-- TruDE desktop configuration. User overrides live in settings.local.lua.
+-- Libadwaita dark palette, shared with the terminal and desktop tools.
 local adwaita = {
     accent        = "ffbe6f",
     accent_strong = "ffa348",
@@ -19,7 +9,6 @@ local adwaita = {
 dotfilesSettings = {
     terminal           = "footclient",
     fileManager        = "footclient --app-id=superfile --title=Files dotfiles-file-manager-tui",
-    browser            = "xdg-open https://start.duckduckgo.com",
     launcher           = "dotfiles-app-launcher-toggle",
     wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg",
     animationsEnabled  = true,
@@ -48,7 +37,10 @@ hl.monitor({
     scale    = "auto",
 })
 
-local configHome = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+local configHome = os.getenv("XDG_CONFIG_HOME")
+if not configHome or configHome == "" then
+    configHome = os.getenv("HOME") .. "/.config"
+end
 local localSettings = configHome .. "/hypr/settings.local.lua"
 local localSettingsFile = io.open(localSettings, "r")
 if localSettingsFile then
@@ -64,27 +56,13 @@ end
 -- Set programs that you use
 local terminal    = dotfilesSettings.terminal
 local fileManager = dotfilesSettings.fileManager
-local browser     = dotfilesSettings.browser
 local menu        = dotfilesSettings.launcher
-local lock        = "hyprlock --config ~/.config/hypr/hyprlock.conf"
+local function shellQuote(value)
+    return "'" .. value:gsub("'", "'\\''") .. "'"
+end
+local lock        = "hyprlock --config " .. shellQuote(configHome .. "/hypr/hyprlock.conf")
 local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
 local wallpaper   = dotfilesSettings.wallpaper
-
-
--------------------
----- AUTOSTART ----
--------------------
-
--- See https://wiki.hypr.land/Configuring/Basics/Autostart/
-
--- Autostart necessary processes (like notifications daemons, status bars, etc.)
--- Or execute your favorite apps at launch like this:
---
--- hl.on("hyprland.start", function () 
---   hl.exec_cmd(terminal)
---   hl.exec_cmd("nm-applet")
---   hl.exec_cmd("waybar & hyprpaper & firefox")
--- end)
 
 
 -------------------------------
@@ -111,25 +89,6 @@ for dataDir in string.gmatch(dataDirCandidates, "[^:]+") do
     end
 end
 hl.env("XDG_DATA_DIRS", table.concat(xdgDataDirs, ":"))
-
-
------------------------
------ PERMISSIONS -----
------------------------
-
--- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Permissions/
--- Please note permission changes here require a Hyprland restart and are not applied on-the-fly
--- for security reasons
-
--- hl.config({
---   ecosystem = {
---     enforce_permissions = true,
---   },
--- })
-
--- hl.permission("/usr/(bin|local/bin)/grim", "screencopy", "allow")
--- hl.permission("/usr/(lib|libexec|lib64)/xdg-desktop-portal-hyprland", "screencopy", "allow")
--- hl.permission("/usr/(bin|local/bin)/hyprpm", "plugin", "allow")
 
 
 -----------------------
@@ -195,7 +154,6 @@ hl.config({
 
 -- Default curves and animations, see https://wiki.hypr.land/Configuring/Advanced-and-Cool/Animations/
 hl.curve("easeOutQuint",   { type = "bezier", points = { {0.23, 1},    {0.32, 1}    } })
-hl.curve("easeInOutCubic", { type = "bezier", points = { {0.65, 0.05}, {0.36, 1}    } })
 hl.curve("linear",         { type = "bezier", points = { {0, 0},       {1, 1}       } })
 hl.curve("almostLinear",   { type = "bezier", points = { {0.5, 0.5},   {0.75, 1}    } })
 hl.curve("quick",          { type = "bezier", points = { {0.15, 0},    {0.1, 1}     } })
@@ -221,42 +179,10 @@ hl.animation({ leaf = "workspacesIn",  enabled = true,  speed = 2.8,  bezier = "
 hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 2.8,  bezier = "easeOutQuint", style = "slide" })
 hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 6.3,  bezier = "quick" })
 
--- Ref https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
--- "Smart gaps" / "No gaps when only"
--- uncomment all if you wish to use that.
--- hl.workspace_rule({ workspace = "w[tv1]", gaps_out = 0, gaps_in = 0 })
--- hl.workspace_rule({ workspace = "f[1]",   gaps_out = 0, gaps_in = 0 })
--- hl.window_rule({
---     name  = "no-gaps-wtv1",
---     match = { float = false, workspace = "w[tv1]" },
---     border_size = 0,
---     rounding    = 0,
--- })
--- hl.window_rule({
---     name  = "no-gaps-f1",
---     match = { float = false, workspace = "f[1]" },
---     border_size = 0,
---     rounding    = 0,
--- })
-
 -- See https://wiki.hypr.land/Configuring/Layouts/Dwindle-Layout/ for more
 hl.config({
     dwindle = {
         preserve_split = true, -- You probably want this
-    },
-})
-
--- See https://wiki.hypr.land/Configuring/Layouts/Master-Layout/ for more
-hl.config({
-    master = {
-        new_status = "master",
-    },
-})
-
--- See https://wiki.hypr.land/Configuring/Layouts/Scrolling-Layout/ for more
-hl.config({
-    scrolling = {
-        fullscreen_on_one_column = true,
     },
 })
 
@@ -308,7 +234,7 @@ hl.gesture({
 
 local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
--- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
+-- Keybindings, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal), { description = "Open terminal" })
 hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("footclient --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
     description = "Show Hyprland shortcuts",
@@ -316,8 +242,7 @@ hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("footclient --app-id=shortcuts-tui --
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("footclient --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui"), {
     description = "Open settings",
 })
-local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
--- closeWindowBind:set_enabled(false)
+hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"), { description = "Open power menu" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })
@@ -328,8 +253,8 @@ hl.bind(mainMod .. " + Super_L", hl.dsp.exec_cmd(menu), { release = true, descri
 hl.bind(mainMod .. " + Super_R", hl.dsp.exec_cmd(menu), { release = true, description = "Open application launcher" })
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo(), { description = "Toggle pseudo-tile" })
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"), { description = "Toggle split direction" })
-hl.bind("Print", hl.dsp.exec_cmd(screenshot .. " region"), { description = "Select area screenshot" })
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshot .. " full"), { description = "Full-screen screenshot" })
+hl.bind("Print", hl.dsp.exec_cmd(shellQuote(screenshot) .. " region"), { description = "Select area screenshot" })
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd(shellQuote(screenshot) .. " full"), { description = "Full-screen screenshot" })
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }), { description = "Focus left" })
@@ -340,7 +265,7 @@ hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }), { descripti
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
 for i = 1, 5 do
-    local key = i % 10 -- 10 maps to key 0
+    local key = i
     hl.bind(mainMod .. " + " .. key,             hl.dsp.focus({ workspace = i}), { description = "Switch to workspace " .. i })
     hl.bind(mainMod .. " + SHIFT + " .. key,     hl.dsp.window.move({ workspace = i }), { description = "Move window to workspace " .. i })
 end
@@ -378,16 +303,13 @@ hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = tr
 -- See https://wiki.hypr.land/Configuring/Basics/Window-Rules/
 -- and https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
 
--- Example window rules that are useful
-
-local suppressMaximizeRule = hl.window_rule({
+hl.window_rule({
     -- Ignore maximize requests from all apps. You'll probably like this.
     name  = "suppress-maximize-events",
     match = { class = ".*" },
 
     suppress_event = "maximize",
 })
--- suppressMaximizeRule:set_enabled(false)
 
 hl.window_rule({
     -- Fix some dragging issues with XWayland
@@ -403,14 +325,6 @@ hl.window_rule({
 
     no_focus = true,
 })
-
--- Layer rules also return a handle.
--- local overlayLayerRule = hl.layer_rule({
---     name  = "no-anim-overlay",
---     match = { namespace = "^my-overlay$" },
---     no_anim = true,
--- })
--- overlayLayerRule:set_enabled(false)
 
 -- Hyprland-run windowrule
 hl.window_rule({
@@ -451,16 +365,16 @@ for _, window in ipairs(centeredTuiWindows) do
     })
 end
 
--- Start the bar and authentication agent once per session.
+-- Services such as Waybar and the authentication agent are managed by UWSM.
 hl.on("hyprland.start", function ()
     -- Libadwaita follows the desktop color-scheme preference. Set it for
     -- sessions started outside GNOME so GTK4 apps use native Adwaita dark.
     hl.exec_cmd("if command -v gsettings >/dev/null; then "
         .. "gsettings reset org.gnome.desktop.interface gtk-theme >/dev/null 2>&1; "
         .. "gsettings reset org.gnome.desktop.interface icon-theme >/dev/null 2>&1; "
-        .. "gsettings reset org.gnome.desktop.interface accent-color >/dev/null 2>&1; "
+        .. "gsettings set org.gnome.desktop.interface accent-color orange >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
-    hl.exec_cmd("swaybg -i " .. string.format("%q", wallpaper) .. " -m fill")
+    hl.exec_cmd("swaybg -i " .. shellQuote(wallpaper) .. " -m fill")
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)
