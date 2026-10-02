@@ -1,11 +1,29 @@
-#!/usr/bin/env sh
+#!/bin/sh
+set -eu
 
 current_url=$(git remote get-url origin)
-if echo "$current_url" | grep -q '^git@'; then
-    echo "Remote origin already uses SSH."
-    exit 0
-fi
-
-ssh_url=$(echo "$current_url" | sed -E 's|https?://([^/]+)/(.+)|git@\1:\2|')
-echo "Changing remote origin from $current_url to $ssh_url"
+case $current_url in
+    git@*|ssh://*)
+        printf '%s\n' 'Remote origin already uses SSH.'
+        exit 0
+        ;;
+    https://*|http://*)
+        remote_path=${current_url#*://}
+        remote_host=${remote_path%%/*}
+        remote_repo=${remote_path#*/}
+        case $remote_host in
+            ''|*[@:]*|*[!a-zA-Z0-9.-]*)
+                printf '%s\n' 'Cannot convert an origin with credentials or a custom port.' >&2
+                exit 1
+                ;;
+        esac
+        [ "$remote_repo" != "$remote_path" ] && [ -n "$remote_repo" ] || exit 1
+        ssh_url=git@$remote_host:$remote_repo
+        ;;
+    *)
+        printf 'Unsupported origin URL: %s\n' "$current_url" >&2
+        exit 1
+        ;;
+esac
+printf 'Changing remote origin from %s to %s\n' "$current_url" "$ssh_url"
 git remote set-url origin "$ssh_url"
