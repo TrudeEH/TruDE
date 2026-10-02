@@ -4,13 +4,11 @@ set -eu
 ui_init() {
     ui_reset=
     ui_accent=
-    ui_success_color=
     ui_error_color=
     ui_muted=
     if [ -t 1 ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-dumb}" != dumb ]; then
         ui_reset=$(printf '\033[0m')
         ui_accent=$(printf '\033[1;38;5;214m')
-        ui_success_color=$(printf '\033[1;38;5;77m')
         ui_error_color=$(printf '\033[1;38;5;203m')
         ui_muted=$(printf '\033[38;5;245m')
     fi
