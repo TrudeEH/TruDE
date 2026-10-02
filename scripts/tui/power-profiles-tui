@@ -128,9 +128,7 @@ choice=$(dialog --radiolist "$dialog_prompt" 21 78 5 "$@" \
 choice=${choice#* }
 
 if output=$(powerprofilesctl set "$choice" 2>&1); then
-    if [ "$choice" = performance ]; then
-        pkill -x hypridle 2>/dev/null || :
-    elif command -v dotfiles-hypridle >/dev/null 2>&1 \
+    if command -v dotfiles-hypridle >/dev/null 2>&1 \
         && ! pgrep -x hypridle >/dev/null 2>&1; then
         # Keep hypridle alive when this terminal closes.
         setsid -f dotfiles-hypridle </dev/null >/dev/null 2>&1
