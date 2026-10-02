@@ -36,7 +36,7 @@ ui_error() {
 repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
-backports_suite=stable-backports
+backports_suite=
 debian_components_sources=/etc/apt/sources.list.d/dotfiles-components.sources
 
 check_platform() {
@@ -55,6 +55,7 @@ check_platform() {
         ui_error "This installer supports Debian 13 (trixie) and newer Debian releases."
         exit 1
     fi
+    backports_suite=$VERSION_CODENAME-backports
 }
 
 write_root_file() {
@@ -72,17 +73,20 @@ write_root_file() {
 }
 
 configure_debian_sources() {
-    if [ ! -f "$debian_components_sources" ] || ! grep -Fqx "Components: main contrib non-free non-free-firmware" "$debian_components_sources"; then
-        write_root_file "$debian_components_sources" 0644 <<'SOURCES'
+    if [ ! -f "$debian_components_sources" ] \
+        || ! grep -Fqx "Suites: $VERSION_CODENAME $VERSION_CODENAME-updates" "$debian_components_sources" \
+        || ! grep -Fqx "Suites: $VERSION_CODENAME-security" "$debian_components_sources" \
+        || ! grep -Fqx "Components: main contrib non-free non-free-firmware" "$debian_components_sources"; then
+        write_root_file "$debian_components_sources" 0644 <<SOURCES
 Types: deb
 URIs: https://deb.debian.org/debian
-Suites: stable stable-updates
+Suites: $VERSION_CODENAME $VERSION_CODENAME-updates
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 
 Types: deb
 URIs: https://deb.debian.org/debian-security
-Suites: stable-security
+Suites: $VERSION_CODENAME-security
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 SOURCES
@@ -116,6 +120,7 @@ install_packages() {
         "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
+        python3 xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
