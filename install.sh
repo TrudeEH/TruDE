@@ -120,7 +120,7 @@ install_packages() {
         "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
-        python3 xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
+        xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
