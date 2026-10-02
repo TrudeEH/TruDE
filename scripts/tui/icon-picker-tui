@@ -23,7 +23,7 @@ if [ "$#" -gt 0 ]; then
     esac
 fi
 
-for command in fc-list fc-match fzf python3; do
+for command in fc-list fc-match fzf od awk sort; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'icon_picker.sh: %s is required.\n' "$command" >&2
         exit 1
@@ -64,150 +64,173 @@ case $terminal_columns in
     ''|*[!0-9]*) terminal_columns=80 ;;
 esac
 
+list_font_icons() {
+    # Read the SFNT directory, then only the cmap and post tables. Keeping the
+    # font outlines out of awk avoids loading the entire font into byte arrays.
+    directory_size=$(od -An -v -tu1 -N 12 "$font_file" | awk '
+        { for (i = 1; i <= NF; i++) bytes[n++] = $i }
+        END {
+            if (n != 12) exit 1
+            print 12 + 16 * (bytes[4] * 256 + bytes[5])
+        }
+    ') || {
+        printf 'Icon picker: font header is unreadable or truncated.\n' >&2
+        return 1
+    }
+    table_locations=$(od -An -v -tu1 -N "$directory_size" "$font_file" | awk '
+        function u32(offset) {
+            return ((bytes[offset] * 256 + bytes[offset + 1]) * 256 + bytes[offset + 2]) * 256 + bytes[offset + 3]
+        }
+        { for (i = 1; i <= NF; i++) bytes[n++] = $i }
+        END {
+            if (n < 12 || n != 12 + 16 * (bytes[4] * 256 + bytes[5])) exit 1
+            for (offset = 12; offset < n; offset += 16) {
+                tag = sprintf("%c%c%c%c", bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3])
+                if (tag == "cmap") { cmap_offset = u32(offset + 8); cmap_length = u32(offset + 12) }
+                if (tag == "post") { post_offset = u32(offset + 8); post_length = u32(offset + 12) }
+            }
+            if (!cmap_length || !post_length) exit 1
+            printf "%.0f %.0f %.0f %.0f\n", cmap_offset, cmap_length, post_offset, post_length
+        }
+    ') || {
+        printf 'Icon picker: font has no readable cmap/post glyph tables.\n' >&2
+        return 1
+    }
+    read -r cmap_offset cmap_length post_offset post_length <<EOF
+$table_locations
+EOF
+    {
+        od -An -v -tu1 -j "$cmap_offset" -N "$cmap_length" "$font_file"
+        od -An -v -tu1 -j "$post_offset" -N "$post_length" "$font_file"
+    } | LC_ALL=C awk -v cmap_length="$cmap_length" -v post_length="$post_length" '
+        function fail(message) {
+            print "Icon picker: " message > "/dev/stderr"
+            exit 1
+        }
+        function byte(data, offset) {
+            if (!(offset in data)) fail("truncated glyph table.")
+            return data[offset]
+        }
+        function u16(data, offset) {
+            return byte(data, offset) * 256 + byte(data, offset + 1)
+        }
+        function u32(data, offset) {
+            return u16(data, offset) * 65536 + u16(data, offset + 2)
+        }
+        function utf8(codepoint) {
+            if (codepoint < 65536)
+                return sprintf("%c%c%c", 224 + int(codepoint / 4096), 128 + int(codepoint / 64) % 64, 128 + codepoint % 64)
+            return sprintf("%c%c%c%c", 240 + int(codepoint / 262144), 128 + int(codepoint / 4096) % 64, 128 + int(codepoint / 64) % 64, 128 + codepoint % 64)
+        }
+        function emit(codepoint, glyph, name) {
+            name = names[glyph]
+            if (glyph && name != "" && name != ".notdef") {
+                gsub(/_/, "-", name)
+                printf "%s\t%s\tU+%04X\n", utf8(codepoint), name, codepoint
+            }
+        }
+        {
+            for (field = 1; field <= NF; field++) {
+                if (n < cmap_length) cmap[n] = $field
+                else post[n - cmap_length] = $field
+                n++
+            }
+        }
+        END {
+            if (n != cmap_length + post_length) fail("truncated glyph tables.")
+            if (u32(post, 0) != 131072) fail("font does not contain searchable glyph names.")
+
+            # Version 2 of post maps glyph IDs to Pascal strings after an index
+            # array. Nerd Font names use these custom strings (indices >= 258).
+            glyph_count = u16(post, 32)
+            cursor = 34 + glyph_count * 2
+            for (glyph = 0; glyph < glyph_count; glyph++) {
+                name_index = u16(post, 34 + glyph * 2)
+                name_indices[glyph] = name_index
+                if (name_index > max_index) max_index = name_index
+            }
+            for (name_index = 258; name_index <= max_index; name_index++) {
+                size = byte(post, cursor++)
+                name = ""
+                for (character = 0; character < size; character++) name = name sprintf("%c", byte(post, cursor++))
+                custom_names[name_index] = name
+            }
+            for (glyph = 0; glyph < glyph_count; glyph++) names[glyph] = custom_names[name_indices[glyph]]
+
+            # Prefer a full Unicode cmap; retain support for BMP-only format 4.
+            records = u16(cmap, 2)
+            for (record = 0; record < records; record++) {
+                offset = 4 + record * 8
+                platform = u16(cmap, offset)
+                encoding = u16(cmap, offset + 2)
+                subtable = u32(cmap, offset + 4)
+                format = u16(cmap, subtable)
+                priority = 0
+                if (format == 12 || format == 13) priority = platform == 3 && encoding == 10 ? 3 : 2
+                else if (format == 4) priority = platform == 3 ? 2 : 1
+                if (priority > best_priority || (priority == best_priority && priority &&
+                    (format > best_format || (format == best_format && subtable > best_subtable)))) {
+                    best_priority = priority
+                    best_format = format
+                    best_subtable = subtable
+                }
+            }
+            if (!best_priority) fail("font has no supported Unicode glyph mapping.")
+            range_start[1] = 57344; range_end[1] = 63743
+            range_start[2] = 983040; range_end[2] = 1048573
+            range_start[3] = 1048576; range_end[3] = 1114109
+
+            if (best_format == 12 || best_format == 13) {
+                groups = u32(cmap, best_subtable + 12)
+                if (best_subtable + 16 + groups * 12 > cmap_length) fail("truncated Unicode glyph groups.")
+                for (group = 0; group < groups; group++) {
+                    offset = best_subtable + 16 + group * 12
+                    first = u32(cmap, offset)
+                    last = u32(cmap, offset + 4)
+                    base_glyph = u32(cmap, offset + 8)
+                    for (range = 1; range <= 3; range++) {
+                        start = first > range_start[range] ? first : range_start[range]
+                        end = last < range_end[range] ? last : range_end[range]
+                        for (codepoint = start; codepoint <= end; codepoint++)
+                            emit(codepoint, best_format == 13 ? base_glyph : base_glyph + codepoint - first)
+                    }
+                }
+            } else {
+                segments = u16(cmap, best_subtable + 6) / 2
+                end_codes = best_subtable + 14
+                start_codes = end_codes + segments * 2 + 2
+                deltas = start_codes + segments * 2
+                range_offsets = deltas + segments * 2
+                for (segment = 0; segment < segments; segment++) {
+                    first = u16(cmap, start_codes + segment * 2)
+                    last = u16(cmap, end_codes + segment * 2)
+                    delta = u16(cmap, deltas + segment * 2)
+                    range_offset = u16(cmap, range_offsets + segment * 2)
+                    start = first > range_start[1] ? first : range_start[1]
+                    end = last < range_end[1] ? last : range_end[1]
+                    for (codepoint = start; codepoint <= end; codepoint++) {
+                        glyph = range_offset ? u16(cmap, range_offsets + segment * 2 + range_offset + (codepoint - first) * 2) : codepoint
+                        if (!range_offset || glyph) emit(codepoint, (glyph + delta) % 65536)
+                    }
+                }
+            }
+        }
+    '
+}
+
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-icons.XXXXXX") || exit 1
+trap 'rm -rf "$temporary_dir"' 0
+trap 'exit 1' HUP INT TERM
+if ! list_font_icons > "$temporary_dir/icons"; then
+    exit 1
+fi
+if [ ! -s "$temporary_dir/icons" ]; then
+    printf 'Icon picker: font contains no named private-use glyphs.\n' >&2
+    exit 1
+fi
+
 selection=$(
-    python3 - "$font_file" <<'PY' |
-import struct
-import sys
-
-
-def u16(data, offset):
-    return struct.unpack_from(">H", data, offset)[0]
-
-
-def i16(data, offset):
-    return struct.unpack_from(">h", data, offset)[0]
-
-
-def u32(data, offset):
-    return struct.unpack_from(">I", data, offset)[0]
-
-
-def tables(data):
-    count = u16(data, 4)
-    result = {}
-    for index in range(count):
-        offset = 12 + index * 16
-        tag = data[offset:offset + 4]
-        result[tag] = (u32(data, offset + 8), u32(data, offset + 12))
-    return result
-
-
-def private_use(codepoint):
-    return (
-        0xE000 <= codepoint <= 0xF8FF
-        or 0xF0000 <= codepoint <= 0xFFFFD
-        or 0x100000 <= codepoint <= 0x10FFFD
-    )
-
-
-def cmap_entries(data, table_offset):
-    count = u16(data, table_offset + 2)
-    candidates = []
-    for index in range(count):
-        record = table_offset + 4 + index * 8
-        platform = u16(data, record)
-        encoding = u16(data, record + 2)
-        subtable = table_offset + u32(data, record + 4)
-        format_number = u16(data, subtable)
-        priority = 0
-        if format_number in (12, 13):
-            priority = 3 if platform == 3 and encoding == 10 else 2
-        elif format_number == 4:
-            priority = 2 if platform == 3 else 1
-        if priority:
-            candidates.append((priority, format_number, subtable))
-
-    if not candidates:
-        return {}
-
-    _, format_number, subtable = max(candidates)
-    entries = {}
-    ranges = ((0xE000, 0xF8FF), (0xF0000, 0xFFFFD), (0x100000, 0x10FFFD))
-
-    if format_number in (12, 13):
-        groups = u32(data, subtable + 12)
-        for index in range(groups):
-            group = subtable + 16 + index * 12
-            first = u32(data, group)
-            last = u32(data, group + 4)
-            glyph = u32(data, group + 8)
-            for range_start, range_end in ranges:
-                start = max(first, range_start)
-                end = min(last, range_end)
-                for codepoint in range(start, end + 1):
-                    entries[codepoint] = glyph if format_number == 13 else glyph + codepoint - first
-        return entries
-
-    segments = u16(data, subtable + 6) // 2
-    end_codes = subtable + 14
-    start_codes = end_codes + segments * 2 + 2
-    deltas = start_codes + segments * 2
-    range_offsets = deltas + segments * 2
-    for index in range(segments):
-        first = u16(data, start_codes + index * 2)
-        last = u16(data, end_codes + index * 2)
-        delta = i16(data, deltas + index * 2)
-        range_offset = u16(data, range_offsets + index * 2)
-        for range_start, range_end in ranges:
-            start = max(first, range_start)
-            end = min(last, range_end)
-            for codepoint in range(start, end + 1):
-                if range_offset == 0:
-                    glyph = (codepoint + delta) & 0xFFFF
-                else:
-                    address = range_offsets + index * 2 + range_offset + (codepoint - first) * 2
-                    glyph = (u16(data, address) + delta) & 0xFFFF
-                if glyph:
-                    entries[codepoint] = glyph
-    return entries
-
-
-def glyph_names(data, table_offset):
-    version = u32(data, table_offset)
-    if version != 0x00020000:
-        return {}
-
-    count = u16(data, table_offset + 32)
-    indices_offset = table_offset + 34
-    indices = [u16(data, indices_offset + index * 2) for index in range(count)]
-    custom_offset = indices_offset + count * 2
-    custom_count = max(indices, default=257) - 257
-    custom = []
-    cursor = custom_offset
-    for _ in range(max(custom_count, 0)):
-        length = data[cursor]
-        cursor += 1
-        custom.append(data[cursor:cursor + length].decode("ascii", "replace"))
-        cursor += length
-
-    names = {}
-    for glyph, name_index in enumerate(indices):
-        if name_index >= 258 and name_index - 258 < len(custom):
-            name = custom[name_index - 258]
-            if name and name != ".notdef":
-                names[glyph] = name.replace("_", "-")
-    return names
-
-
-font_file = sys.argv[1]
-with open(font_file, "rb") as stream:
-    font_data = stream.read()
-font_tables = tables(font_data)
-
-if b"cmap" not in font_tables or b"post" not in font_tables:
-    raise SystemExit("font has no cmap/post glyph tables")
-
-cmap_offset, _ = font_tables[b"cmap"]
-post_offset, _ = font_tables[b"post"]
-codepoints = cmap_entries(font_data, cmap_offset)
-names = glyph_names(font_data, post_offset)
-
-for codepoint, glyph in sorted(codepoints.items()):
-    name = names.get(glyph)
-    if name:
-        print("{}\t{}\tU+{:04X}".format(chr(codepoint), name, codepoint))
-PY
-    LC_ALL=C sort -t "$(printf '\t')" -k2,2f \
+    LC_ALL=C sort -t "$(printf '\t')" -k2,2f "$temporary_dir/icons" \
     | awk -F '\t' -v terminal_columns="$terminal_columns" '
         BEGIN {
             OFS = "\t"
