@@ -2,7 +2,6 @@
 set -eu
 
 backports=/etc/apt/sources.list.d/dotfiles-backports.sources
-backports_suite=stable-backports
 
 if [ "$(id -u)" -eq 0 ]; then
     echo "Run this script as your normal desktop user, not root." >&2
@@ -17,6 +16,12 @@ case $debian_major in
 esac
 if [ "${ID:-}" != debian ] || [ "$debian_major" -lt 13 ] || [ -z "${VERSION_CODENAME:-}" ]; then
     echo "This installer supports Debian 13 (trixie) and newer Debian releases." >&2
+    exit 1
+fi
+
+backports_suite=$VERSION_CODENAME-backports
+if [ "$(dpkg --print-architecture)" != amd64 ]; then
+    echo "Steam requires an amd64 Debian installation." >&2
     exit 1
 fi
 

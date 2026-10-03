@@ -1,4 +1,5 @@
 # Interactive Bash configuration for the dotfiles environment.
+# shellcheck shell=bash
 [[ $- != *i* ]] && return
 
 # Keep user-installed and dotfiles utilities available without growing PATH
@@ -91,9 +92,6 @@ bind '"\e[Z": menu-complete-backward'
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
-# Share history between open shells.
-PROMPT_COMMAND="history -a; history -n; ${PROMPT_COMMAND:-}"
-
 # Pager behavior for terminal-friendly output.
 export LESS='-FRiMX'
 export MANPAGER='less -R'
@@ -120,4 +118,22 @@ __bash_prompt() {
 
     PS1="\n[${white}\u${reset}@${dim}\h${reset}] ${bold}${orange}\w${reset}${status} ${dim}J:${reset}\j\n\\$ "
 }
-PROMPT_COMMAND="__bash_prompt; ${PROMPT_COMMAND:-}"
+
+# Update the prompt before history commands can change the previous exit status.
+__dotfiles_prompt_command() {
+    __bash_prompt
+    history -a
+    history -n
+}
+
+# Preserve existing hooks (including arrays), and add ours only once when this
+# configuration is sourced again.
+__dotfiles_prompt_commands=(__dotfiles_prompt_command)
+for __dotfiles_command in "${PROMPT_COMMAND[@]}"; do
+    case $__dotfiles_command in
+        ''|__dotfiles_prompt_command) continue ;;
+    esac
+    __dotfiles_prompt_commands+=("$__dotfiles_command")
+done
+PROMPT_COMMAND=("${__dotfiles_prompt_commands[@]}")
+unset __dotfiles_prompt_commands __dotfiles_command
