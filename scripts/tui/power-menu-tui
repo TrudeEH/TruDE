@@ -20,7 +20,7 @@ lock_session() {
     session_locked && return 0
     if ! pgrep -x hyprlock >/dev/null 2>&1; then
         # Let the lock survive when the power menu's terminal closes.
-        setsid -f hyprlock --grace 0 --config "$HOME/.config/hypr/hyprlock.conf" \
+        setsid -f hyprlock --grace 0 --config "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf" \
             </dev/null >/dev/null 2>&1
     fi
 

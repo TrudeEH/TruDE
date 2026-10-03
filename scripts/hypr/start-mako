@@ -3,17 +3,19 @@
 set -eu
 
 # Wait for Hyprland's IPC socket so the output layout is available.
-while :; do
+attempt=0
+while [ "$attempt" -lt 25 ]; do
     monitors=$(hyprctl monitors -j 2>/dev/null || :)
-    if [ -n "$monitors" ] && [ "$(printf '%s' "$monitors" | jq 'length')" -gt 0 ]; then
+    if printf '%s\n' "$monitors" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
         break
     fi
-    sleep 1
+    attempt=$((attempt + 1))
+    sleep 0.2
 done
 
 # Treat the output at the layout origin as primary; fall back to the first
 # connected output if a custom layout has no output at 0,0.
-output=$(printf '%s' "$monitors" | jq -r 'first(.[] | select(.x == 0 and .y == 0) | .name) // first(.[] | .name) // empty')
+output=$(printf '%s' "$monitors" | jq -r 'first(.[] | select(.x == 0 and .y == 0) | .name) // first(.[] | .name) // empty' 2>/dev/null || :)
 if [ -z "$output" ]; then
     echo "Unable to determine the primary Hyprland output" >&2
     exit 1
