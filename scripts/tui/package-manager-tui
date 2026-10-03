@@ -5,9 +5,12 @@ set -u
 . "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-package-manager.XXXXXX") || exit 1
-trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
+trap 'rm -rf "$temporary_dir"' 0
+trap 'exit 1' HUP INT TERM
 
-backports_suite=stable-backports
+. /etc/os-release
+debian_suite=${VERSION_CODENAME:?Debian release codename is unavailable}
+backports_suite=$debian_suite-backports
 
 dialog() {
     whiptail --title "Package Manager" "$@"
@@ -31,37 +34,6 @@ compact_text() {
             } else {
                 print
             }
-        }
-    '
-}
-
-has_stable_package() {
-    package_name=$1
-    apt-cache policy "$package_name" 2>/dev/null | awk '
-        /stable-backports\// { next }
-        index($0, "stable/") ||
-        index($0, "stable-updates/") ||
-        index($0, "stable-security/") { found=1 }
-        END { exit !found }
-    '
-}
-
-has_backports_package() {
-    package_name=$1
-    apt-cache policy "$package_name" 2>/dev/null | awk -v suite="$backports_suite" '
-        index($0, suite "/") { found=1 }
-        END { exit !found }
-    '
-}
-
-backports_version() {
-    package_name=$1
-    apt-cache policy "$package_name" 2>/dev/null | awk -v suite="$backports_suite" '
-        /^[[:space:]]+[0-9][^[:space:]]*[[:space:]]*$/ { version=$1 }
-        /^[[:space:]]+\*+ [0-9]/ { version=$2 }
-        index($0, suite "/") && version != "" {
-            print version
-            exit
         }
     '
 }
@@ -106,40 +78,65 @@ create_apt_search_results() {
     query=$1
     source=$2
     raw_file=$temporary_dir/apt-search-raw
-    results_file=$temporary_dir/apt-search-results
+    availability_file=$temporary_dir/apt-availability
+    results_file=$temporary_dir/apt-search-$source
 
-    apt-cache search "$query" 2>/dev/null | awk '
-        {
-            separator = index($0, " - ")
-            if (!separator) next
-            package = substr($0, 1, separator - 1)
-            description = substr($0, separator + 3)
-            gsub(/[[:space:]]+/, " ", description)
-            if (package != "") print package "\t" description
+    if [ ! -f "$raw_file" ]; then
+        apt-cache search -- "$query" 2>/dev/null | awk '
+            {
+                separator = index($0, " - ")
+                if (!separator) next
+                package = substr($0, 1, separator - 1)
+                description = substr($0, separator + 3)
+                gsub(/[[:space:]]+/, " ", description)
+                if (package != "" && !seen[package]++) print package "\t" description
+            }
+        ' | rank_search_results "$query" 1 > "$raw_file"
+
+        # Read package policies in batches instead of starting APT for every
+        # result, and reuse the same search for Debian and Backports.
+        cut -f1 "$raw_file" | xargs -r apt-cache policy -- 2>/dev/null | awk -v suite="$debian_suite" '
+            function emit() {
+                if (package != "") print package "\t" stable "\t" backports "\t" backport_version
+            }
+            /^[^[:space:]]+:$/ {
+                emit()
+                package = $0
+                sub(/:$/, "", package)
+                stable = backports = 0
+                version = backport_version = ""
+                next
+            }
+            $1 == "***" { version = $2; next }
+            NF == 2 && $2 ~ /^[0-9]+$/ { version = $1; next }
+            $NF == "Packages" {
+                split($3, repository, "/")
+                release = repository[1]
+                if (release == suite || release == suite "-updates" || release == suite "-security" ||
+                    release == "stable" || release == "stable-updates" || release == "stable-security") stable = 1
+                if (release == suite "-backports" || release == "stable-backports") {
+                    backports = 1
+                    if (backport_version == "") backport_version = version
+                }
+            }
+            END { emit() }
+        ' > "$availability_file"
+    fi
+
+    awk -F '\t' -v source="$source" '
+        FILENAME == ARGV[1] {
+            available[$1] = source == "apt" ? $2 : $3
+            versions[$1] = $4
+            next
         }
-    ' | rank_search_results "$query" 1 > "$raw_file"
-
-    : > "$results_file"
-    result_count=0
-    while IFS="$(printf '\t')" read -r package description; do
-        [ -n "$package" ] || continue
-        case $source in
-            apt) has_stable_package "$package" || continue ;;
-            backports) has_backports_package "$package" || continue ;;
-        esac
-        if awk -F '\t' -v package="$package" '$1 == package { found=1; exit } END { exit !found }' "$results_file"; then
-            continue
-        fi
-        version=
-        [ "$source" = backports ] && version=$(backports_version "$package")
-        description=$(compact_text "$description")
-        if [ -n "$version" ]; then
-            description="$description — $version"
-        fi
-        printf '%s\t%s\n' "$package" "$description" >> "$results_file"
-        result_count=$((result_count + 1))
-        [ "$result_count" -ge 80 ] && break
-    done < "$raw_file"
+        available[$1] {
+            description = $2
+            if (length(description) > 86) description = substr(description, 1, 83) "..."
+            if (source == "backports" && versions[$1] != "") description = description " — " versions[$1]
+            print $1 "\t" description
+            if (++count >= 80) exit
+        }
+    ' "$availability_file" "$raw_file" > "$results_file"
 
     printf '%s\n' "$results_file"
 }
@@ -253,6 +250,7 @@ create_flatpak_search_results() {
             description = $5
             gsub(/[[:space:]]+/, " ", description)
             if (name == "") name = $1
+            sub(/,.*/, "", remote)
             if (remote == "") remote = "flathub"
             printf "%s\t%s\t%s\t%s\t%s\n", $1, name, version, remote, description
         }
@@ -266,6 +264,7 @@ create_unified_install_results() {
     query=$1
     results_file=$temporary_dir/install-results
     : > "$results_file"
+    rm -f "$temporary_dir/apt-search-raw" "$temporary_dir/apt-availability"
 
     apt_results=$(create_apt_search_results "$query" apt)
     while IFS="$(printf '\t')" read -r package description; do
@@ -282,14 +281,18 @@ create_unified_install_results() {
     if command -v flatpak >/dev/null 2>&1; then
         flatpak_results=$(create_flatpak_search_results "$query") || flatpak_results=
         if [ -n "$flatpak_results" ] && [ -s "$flatpak_results" ]; then
-            while IFS="$(printf '\t')" read -r application name version remote description; do
+            # Tab is IFS whitespace: read would collapse an empty version and
+            # shift the remote into its place. A non-whitespace separator keeps it.
+            field_separator=$(printf '\037')
+            tr '\t' '\037' < "$flatpak_results" > "$flatpak_results.fields"
+            while IFS="$field_separator" read -r application name version remote description; do
                 [ -n "$application" ] || continue
                 label="$name"
                 [ -n "$version" ] && label="$label — $version"
                 [ -n "$description" ] && label="$label — $(compact_text "$description")"
                 printf 'flatpak\t%s\t󰏖  Flatpak · %s · %s\t%s\t%s\n' \
                     "$application" "$remote" "$label" "$remote" "$name" >> "$results_file"
-            done < "$flatpak_results"
+            done < "$flatpak_results.fields"
         fi
     fi
 
@@ -375,7 +378,7 @@ create_installed_package_results() {
             -v package_color="$package_color" \
             -v muted_color="$muted_color" \
             -v reset_color="$reset_color" '
-            $4 ~ /installed$/ {
+            $4 == "install ok installed" {
                 color = source_color
                 source = "󰏗  Debian ·"
                 if ($2 ~ /~bpo/) {
