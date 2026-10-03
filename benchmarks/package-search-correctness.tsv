@@ -1,0 +1,7 @@
+mode	query	identical_ids	rows
+apt	^jq$	yes	1
+apt	nmap	yes	39
+apt	^git(-|$)	yes	72
+apt	browser	yes	110
+apt	dotfiles-benchmark-no-match-8ec051	yes	0
+full	nmap	yes	41
