@@ -1,11 +1,15 @@
 #!/bin/sh
 set -eu
 
+# shellcheck source=scripts/lib/runtime.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
+
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 config_file=$config_home/waybar/config.jsonc
 style_file=$config_home/waybar/style.css
 preferences_file=$config_home/dotfiles/settings.json
-runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar
+runtime_dir=$(dotfiles_runtime_dir) || exit 1
+runtime_dir=$runtime_dir/dotfiles-waybar
 runtime_config=$runtime_dir/config.json
 
 waybar_enabled=true
@@ -53,7 +57,8 @@ fi
 umask 077
 mkdir -p "$runtime_dir"
 temporary_config=$(mktemp "$runtime_dir/config.XXXXXX") || exit 1
-trap 'rm -f "$temporary_config"' 0 HUP INT TERM
+trap 'rm -f "$temporary_config"' 0
+trap 'exit 1' HUP INT TERM
 jq \
     --arg output "$primary_output" \
     --arg position "$position" \

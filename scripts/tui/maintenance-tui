@@ -1,11 +1,23 @@
 #!/bin/sh
 set -u
 
+# shellcheck source=scripts/lib/runtime.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
+
 # shellcheck source=scripts/lib/ui.sh
 . "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
 
-temp_dir=$(mktemp -d)
-trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
+temp_dir=$(mktemp -d) || exit 1
+progress_pid=
+cleanup() {
+    if [ -n "$progress_pid" ]; then
+        kill "$progress_pid" 2>/dev/null || :
+        wait "$progress_pid" 2>/dev/null || :
+    fi
+    rm -rf "$temp_dir"
+}
+trap cleanup 0
+trap 'exit 1' HUP INT TERM
 
 apt_updates_file=$temp_dir/apt-updates
 flatpak_updates_file=$temp_dir/flatpak-updates
@@ -66,10 +78,10 @@ collect_status() {
     apt_updates=$(awk 'END { print NR + 0 }' "$apt_updates_file")
 
     progress 20 "Counting installed Debian packages…"
-    apt_installed=$(dpkg-query -W -f='${binary:Package}\n' 2>/dev/null \
-        | awk 'NF { count++ } END { print count + 0 }')
-    backports_installed=$(dpkg-query -W -f='${binary:Package}\t${Version}\n' 2>/dev/null \
-        | awk '$2 ~ /~bpo[0-9]+/ { count++ } END { print count + 0 }')
+    apt_installed=$(dpkg-query -W -f='${Status}\n' 2>/dev/null \
+        | awk '$0 == "install ok installed" { count++ } END { print count + 0 }')
+    backports_installed=$(dpkg-query -W -f='${binary:Package}\t${Version}\t${Status}\n' 2>/dev/null \
+        | awk -F '\t' '$3 == "install ok installed" && $2 ~ /~bpo[0-9]+/ { count++ } END { print count + 0 }')
 
     progress 40 "Checking Flatpak updates…"
     if command -v flatpak >/dev/null 2>&1; then
@@ -87,7 +99,8 @@ collect_status() {
     progress 55 "Checking TruDE updates…"
     trude_updates=0
     if [ -d "$trude_repo/.git" ] && command -v git >/dev/null 2>&1; then
-        GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git -C "$trude_repo" \
+        timeout 20s env GIT_TERMINAL_PROMPT=0 \
+            GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=10' git -C "$trude_repo" \
             -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
             fetch --quiet --no-tags origin 2>/dev/null || :
         trude_upstream=$(git -C "$trude_repo" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || :)
@@ -147,12 +160,13 @@ collect_status() {
     progress 100 "Maintenance status ready."
     exec 3>&-
     wait "$progress_pid" || :
+    progress_pid=
     rm -f "$progress_pipe"
 }
 
 load_backports() {
-    dpkg-query -W -f='${binary:Package}\t${Version}\n' 2>/dev/null \
-        | awk '$2 ~ /~bpo[0-9]+/ { print }' > "$backports_file"
+    dpkg-query -W -f='${binary:Package}\t${Version}\t${Status}\n' 2>/dev/null \
+        | awk -F '\t' '$3 == "install ok installed" && $2 ~ /~bpo[0-9]+/ { print $1 "\t" $2 }' > "$backports_file"
     ensure_content "$backports_file" "No installed backport packages found."
 }
 
@@ -199,7 +213,8 @@ update_system() {
     fi
     printf 'Press Enter to return to maintenance status.'
     IFS= read -r _
-    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar-maintenance.json"
+    runtime_dir=$(dotfiles_runtime_dir) || return 1
+    rm -f "$runtime_dir/dotfiles-waybar-maintenance.json"
     pkill -RTMIN+8 waybar 2>/dev/null || :
     collect_status
 }

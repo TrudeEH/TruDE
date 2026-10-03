@@ -1,11 +1,16 @@
 #!/bin/sh
 set -u
 
-config_root=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-btop
+# shellcheck source=scripts/lib/runtime.sh
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/runtime.sh"
+
+runtime_dir=$(dotfiles_runtime_dir) || exit 1
+config_root=$runtime_dir/dotfiles-btop
 config_dir=$config_root/btop
 theme_source=${XDG_CONFIG_HOME:-"$HOME/.config"}/btop/themes/dotfiles.theme
 
-mkdir -p "$config_dir/themes"
+umask 077
+mkdir -p "$config_dir/themes" || exit 1
 ln -sf "$theme_source" "$config_dir/themes/dotfiles.theme"
 
 if [ ! -f "$config_dir/btop.conf" ]; then
