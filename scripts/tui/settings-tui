@@ -13,12 +13,13 @@ monitor_begin_marker='-- dotfiles-monitor-settings:begin'
 monitor_end_marker='-- dotfiles-monitor-settings:end'
 preferences_begin_marker='-- dotfiles-preferences:begin'
 preferences_end_marker='-- dotfiles-preferences:end'
-temp_dir=$(mktemp -d)
+temp_dir=$(mktemp -d) || exit 1
 monitor_state=$temp_dir/monitors.json
 preferences_state=$temp_dir/preferences.json
 monitor_block=$temp_dir/monitor-settings.lua
 preferences_block=$temp_dir/preferences.lua
-trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
+trap 'rm -rf "$temp_dir"' 0
+trap 'exit 1' HUP INT TERM
 
 dialog() {
     whiptail --title "Settings" "$@"
@@ -182,19 +183,23 @@ replace_local_section() {
     begin_marker=$1
     end_marker=$2
     block_file=$3
-    mkdir -p "$settings_dir"
-    new_settings=$(mktemp "$settings_dir/settings.local.lua.XXXXXX")
+    mkdir -p "$settings_dir" || return 1
+    new_settings=$(mktemp "$settings_dir/settings.local.lua.XXXXXX") || return 1
 
     has_begin=false
-    has_end=false
     if [ -f "$settings_file" ]; then
+        # Accept one complete section, or no section. Reversed or duplicated
+        # markers would otherwise discard user configuration during replacement.
+        if ! awk -v begin="$begin_marker" -v end="$end_marker" '
+            $0 == begin { if (++begins > 1 || ends) invalid=1 }
+            $0 == end { if (++ends > 1 || !begins) invalid=1 }
+            END { exit (invalid || begins != ends) }
+        ' "$settings_file"; then
+            rm -f "$new_settings"
+            message "A managed section in settings.local.lua is malformed. No changes were saved."
+            return 1
+        fi
         grep -Fqx -e "$begin_marker" "$settings_file" && has_begin=true
-        grep -Fqx -e "$end_marker" "$settings_file" && has_end=true
-    fi
-    if [ "$has_begin" != "$has_end" ]; then
-        rm -f "$new_settings"
-        message "A managed section in settings.local.lua is incomplete. No changes were saved."
-        return 1
     fi
 
     if [ "$has_begin" = true ]; then
@@ -240,17 +245,20 @@ write_preferences_block() {
             "dotfilesSettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
             "dotfilesSettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
             "dotfilesSettings.accelProfile = " + (.input.accel_profile | @json)
-        ' "$preferences_state"
+        ' "$preferences_state" || return 1
         printf '%s\n' "$preferences_end_marker"
     } > "$preferences_block"
 }
 
 save_preferences_json() {
-    mkdir -p "$preferences_dir"
-    new_preferences=$(mktemp "$preferences_dir/settings.json.XXXXXX")
-    cp "$preferences_state" "$new_preferences"
-    chmod 600 "$new_preferences"
-    mv "$new_preferences" "$preferences_file"
+    mkdir -p "$preferences_dir" || return 1
+    new_preferences=$(mktemp "$preferences_dir/settings.json.XXXXXX") || return 1
+    if ! cp "$preferences_state" "$new_preferences" \
+        || ! chmod 600 "$new_preferences" \
+        || ! mv "$new_preferences" "$preferences_file"; then
+        rm -f "$new_preferences"
+        return 1
+    fi
 }
 
 apply_wallpaper() {
@@ -278,10 +286,10 @@ apply_waybar() {
 
 save_preferences() {
     preference_scope=$1
-    write_preferences_block
+    write_preferences_block || return 1
     replace_local_section "$preferences_begin_marker" "$preferences_end_marker" \
         "$preferences_block" || return 1
-    save_preferences_json
+    save_preferences_json || return 1
     case $preference_scope in
         hypr)
             if ! output=$(hyprctl reload 2>&1); then
@@ -558,13 +566,13 @@ write_monitor_block() {
                 "    disabled = true,\n" +
                 "})\n"
             end
-        ' "$monitor_state"
+        ' "$monitor_state" || return 1
         printf '%s\n' "$monitor_end_marker"
     } > "$monitor_block"
 }
 
 save_monitor_settings() {
-    write_monitor_block
+    write_monitor_block || return 1
     replace_local_section "$monitor_begin_marker" "$monitor_end_marker" \
         "$monitor_block" || return 1
     if output=$(hyprctl reload 2>&1); then
@@ -577,6 +585,7 @@ save_monitor_settings() {
 }
 
 display_settings() {
+    load_monitors
     while :; do
         monitor_list=$(jq -r '.[] |
             [
@@ -885,7 +894,6 @@ laptop_settings() {
     done
 }
 
-load_monitors
 load_preferences
 while :; do
     set -- \
