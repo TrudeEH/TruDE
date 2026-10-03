@@ -243,7 +243,8 @@ create_flatpak_search_results() {
 
     : > "$results_file"
     awk -F '\t' '
-        NF >= 1 && $1 != "" {
+        # Search status messages are plain text, not tab-separated package rows.
+        NF >= 4 && $1 != "" {
             name = $2
             version = $3
             remote = $4
