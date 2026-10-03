@@ -1,0 +1,13 @@
+mode	query	version	search_calls	policy_calls	rows
+apt	^jq$	old	2	2	1
+apt	^jq$	new	1	1	1
+apt	nmap	old	2	72	39
+apt	nmap	new	1	1	39
+apt	^git(-|$)	old	2	142	72
+apt	^git(-|$)	new	1	1	72
+apt	browser	old	2	1302	110
+apt	browser	new	1	1	110
+apt	dotfiles-benchmark-no-match-8ec051	old	2	0	0
+apt	dotfiles-benchmark-no-match-8ec051	new	1	0	0
+full	nmap	old	2	72	41
+full	nmap	new	1	1	41
