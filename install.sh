@@ -165,6 +165,26 @@ install_superfile() (
         https://api.github.com/repos/yorukot/superfile/releases/latest
     release_tag=$(jq -er '.tag_name | select(type == "string" and test("^v[0-9]+[.][0-9]+[.][0-9]+$"))' \
         "$temporary_dir/release.json")
+
+    # Avoid downloading and replacing an existing installation when it already
+    # matches the latest official release. Check our install location first in
+    # case it is not on PATH yet.
+    installed_spf=$bin_dir/spf
+    if [ ! -x "$installed_spf" ]; then
+        installed_spf=$(command -v spf || :)
+    fi
+    if [ -n "$installed_spf" ] && [ -x "$installed_spf" ]; then
+        installed_version=$(
+            "$installed_spf" --version 2>&1 \
+                | sed -n 's/.*version v\([0-9][0-9.]*\).*/\1/p' \
+                | head -n 1
+        )
+        if [ "$installed_version" = "${release_tag#v}" ]; then
+            printf 'Superfile %s is already installed; skipping download.\n' "$release_tag"
+            exit 0
+        fi
+    fi
+
     archive=superfile-linux-$release_tag-$arch
     download_url=$(jq -er --arg name "$archive.tar.gz" \
         '.assets[] | select(.name == $name) | .browser_download_url' \
