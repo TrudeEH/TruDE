@@ -457,6 +457,12 @@ static void button(UI *u, int x, int y, const char *label, int id) {
     draw_text(u, x + 2, y, w - 4, label, color, 0, 0);
     hit(u, x, y, w, 1, id, 0);
 }
+static void icon_button(UI *u, int x, int y, wchar_t icon, int id) {
+    int color = u->focus == id ? HOVER : SELECTED;
+    fill(u, x, y, 3, 1, color);
+    cell(u, x + 1, y, icon, color, 0);
+    hit(u, x, y, 3, 1, id, 0);
+}
 static void actions(UI *u, int x, int y, int width, const char *const *labels, const int *ids,
                     int count) {
     box(u, x, y, width, 3, "Actions", 0);
@@ -664,7 +670,8 @@ static void help(UI *u) {
               "last request and retry\n/compact    Summarize old context, retaining full "
               "history\n/attach PATH  Add a workspace text file through MCP\n/export     Export "
               "the complete transcript as Markdown\n/events     Show activity and errors\n/help    "
-              "   Open this help\n\nHistory: one click opens a saved chat. Find, Rename and "
+              "   Open this help\n\nHistory: + New · ⌕ Find · ✎ Rename · × Delete\n"
+              "One click opens a saved chat. Find, Rename and "
               "Delete\nmanage saved chats. Retry preserves prior tool side effects.\n\nDialogs: "
               "Enter submits single-line fields; Ctrl+S saves forms.");
     (void)m;
@@ -1765,17 +1772,17 @@ static void draw_chat(UI *u) {
         side = 22;
     int body = u->h - 4;
     box(u, 0, 3, side, body, "History", u->focus == 102);
-    button(u, 2, 5, "+ New", 101);
-    button(u, 13, 5, "Find", 103);
-    int rows = body - 8, start = u->history_sel >= rows ? u->history_sel - rows + 1 : 0;
+    icon_button(u, 2, 5, L'+', 101);
+    icon_button(u, 7, 5, L'⌕', 103);
+    icon_button(u, 12, 5, L'✎', 104);
+    icon_button(u, 17, 5, L'×', 110);
+    int rows = body - 5, start = u->history_sel >= rows ? u->history_sel - rows + 1 : 0;
     for (int i = 0; i < rows && u->history && i + start < (int)u->history->len; i++) {
         int index = i + start, c = index == u->history_sel ? SELECTED : NORMAL;
         fill(u, 2, 7 + i, side - 4, 1, c);
         draw_text(u, 3, 7 + i, side - 6, gs(u->history->v[index], "title"), c, 0, 0);
         hit(u, 2, 7 + i, side - 4, 1, 102, index);
     }
-    button(u, 2, u->h - 4, "Rename", 104);
-    button(u, 13, u->h - 4, "Delete", 110);
     int x = side, width = u->w - side;
     int logheight = u->h - 13;
     if (logheight < 5)
