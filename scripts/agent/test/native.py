@@ -531,7 +531,7 @@ class NativeTests(unittest.TestCase):
             s.wait("Arguments")
             s.click("filesystem / read_file")
             self.assertNotIn("Arguments",s.screen.text)
-            s.click("+")
+            s.click("\uf067")
             self.assertNotIn("filesystem / read_file",s.screen.text)
             x,y=s.screen.find("old chat")
             self.assertNotEqual(s.screen.grid[y][x][2],"#ffbe6f")

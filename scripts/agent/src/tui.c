@@ -670,7 +670,7 @@ static void help(UI *u) {
               "last request and retry\n/compact    Summarize old context, retaining full "
               "history\n/attach PATH  Add a workspace text file through MCP\n/export     Export "
               "the complete transcript as Markdown\n/events     Show activity and errors\n/help    "
-              "   Open this help\n\nHistory: + New · ⌕ Find · ✎ Rename · × Delete\n"
+              "   Open this help\n\nHistory: \uf067 New · \uf002 Find · \uf040 Rename · \uf1f8 Delete\n"
               "One click opens a saved chat. Find, Rename and "
               "Delete\nmanage saved chats. Retry preserves prior tool side effects.\n\nDialogs: "
               "Enter submits single-line fields; Ctrl+S saves forms.");
@@ -1772,10 +1772,12 @@ static void draw_chat(UI *u) {
         side = 22;
     int body = u->h - 4;
     box(u, 0, 3, side, body, "History", u->focus == 102);
-    icon_button(u, 2, 5, L'+', 101);
-    icon_button(u, 7, 5, L'⌕', 103);
-    icon_button(u, 12, 5, L'✎', 104);
-    icon_button(u, 17, 5, L'×', 110);
+    int toolbar_x = (side - (4 * 3 + 3 * 2)) / 2;
+    /* Nerd Font Font Awesome: plus, search, pencil, trash. */
+    icon_button(u, toolbar_x, 5, L'\uf067', 101);
+    icon_button(u, toolbar_x + 5, 5, L'\uf002', 103);
+    icon_button(u, toolbar_x + 10, 5, L'\uf040', 104);
+    icon_button(u, toolbar_x + 15, 5, L'\uf1f8', 110);
     int rows = body - 5, start = u->history_sel >= rows ? u->history_sel - rows + 1 : 0;
     for (int i = 0; i < rows && u->history && i + start < (int)u->history->len; i++) {
         int index = i + start, c = index == u->history_sel ? SELECTED : NORMAL;
