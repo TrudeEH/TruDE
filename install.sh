@@ -127,7 +127,7 @@ install_packages() {
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
-        file fontconfig procps xdg-user-dirs xdg-utils nodejs npm \
+        file fontconfig procps xdg-user-dirs xdg-utils \
         </dev/tty
 }
 
@@ -471,7 +471,7 @@ main() {
     ui_step "Installing Superfile"
     install_superfile
 
-    ui_step "Installing Seth dependencies"
+    ui_step "Preparing native Seth"
     "$repo_dir/scripts/agent/setup.sh"
 
     ui_step "Installing fonts and configuring Flatpak"

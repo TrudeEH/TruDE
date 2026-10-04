@@ -7,12 +7,19 @@ OpenAI-compatible server, then select its endpoint and a model that supports too
 ## Start
 
 From this checkout, run `scripts/agent/setup.sh` once, then `scripts/tui/agent-tui`.
-The desktop installer installs Node.js/npm, the locked dependencies, an application
-launcher, and the `dotfiles-agent-tui` command. Node.js 20 or newer is required.
+The desktop installer links the application launcher and the `dotfiles-agent-tui`
+command. Seth is written entirely in C, with POSIX sh launch/build scripts. The
+provided amd64 executable is about 1.2 MB and statically linked. Starting it needs
+no compiler, Node.js, npm, Python, ncurses, or downloaded library tree. HTTP/TLS uses
+`curl` and the system certificate store, which the Debian installer already includes.
+Other Debian CPU architectures can rebuild from source with an existing C compiler;
+the installer never adds a compiler or another runtime package.
 The scheduler timer is installed but stays disabled until enabled in the TUI.
 
 Options: `--workspace DIR`, `--help`, `--check` (connect MCP servers), `--run-due`,
-and `--run-task ID`. Headless runs use the same settings and saved chats.
+and `--run-task ID`. `--prompt TEXT` runs a request in the terminal without the TUI
+(using the configured permission policy; Ask declines changes without a dialog).
+Headless runs use the same settings and saved chats.
 
 ## Interface and chat features
 
@@ -69,9 +76,12 @@ servers that do not require them. Environment variables take precedence over sav
 
 ## MCP servers
 
-The official MCP SDK v2 (locked version 2.3.0) supplies transport, discovery,
-protocol negotiation, schema checking, progress/cancellation, and modern in-band
-input handling. Bundled servers use the 2026 protocol and reject legacy openings.
+The native MCP client implements the MCP v2 / 2026-07-28 wire protocol directly:
+`server/discover`, per-request version/client/capability envelopes, modern result
+types, in-band `input_required` responses, roots, typed form elicitation, and tool-list
+subscriptions. It has no SDK or third-party library dependency. Bundled servers use
+the 2026 protocol and reject legacy openings. Compatibility was checked against
+the official MCP v2 client as well as isolated stdio/HTTP fixtures.
 External servers negotiate automatically; legacy servers remain usable and are
 identified in their status. Transports: stdio, Streamable HTTP, and explicit legacy SSE.
 
@@ -126,34 +136,50 @@ API-key environment variables must also exist in the systemd user service enviro
 
 ## Storage and code layout
 
+The native port reads the existing settings, chat and schedule JSON formats directly.
+It also preserves hashed tool aliases used in old chats and automation permissions.
+No migration, history conversion, or fresh setup is needed. Previous npm runtime
+folders are unused; neither startup nor setup reads or downloads them.
+
 Uses XDG directories, defaulting to:
 
 - `~/.config/dotfiles-agent/settings.json`: provider and MCP settings (0600).
 - `~/.local/share/dotfiles-agent/chats/`: complete chat JSON files (0600).
 - `~/.local/share/dotfiles-agent/automations.json`: schedules and last results.
-- `~/.local/share/dotfiles-agent/runtime/`: installed dependency tree.
 - `~/.local/state/dotfiles-agent/checkpoints/`: private file restore checkpoints.
 - `~/.local/state/dotfiles-agent/*.lock`: live-process concurrency guards.
 
 | File | Purpose |
 | --- | --- |
-| `../tui/agent-tui` | POSIX sh entry point; resolves checkout and installed runtime |
-| `main.cjs` | Interactive/headless command dispatch |
-| `tui.cjs` | Tabs, panes, editor, settings forms, approvals, history |
-| `terminal.cjs` | Foot compatibility and exact RGB palette output |
-| `input.cjs` | Enhanced terminal keys, Shift+Enter, and bracketed paste |
-| `agent.cjs` | Small model/tool loop, permissions, compaction, cancellation |
-| `provider.cjs` | OpenAI-compatible HTTP and streaming parser |
-| `mcp.cjs` | SDK v2 clients, tool registry, resource/prompt bridges |
-| `store.cjs` | Defaults, validation, private atomic storage, locks |
-| `automation.cjs` | Native schedule tools, cron, background execution |
-| `servers/filesystem.cjs` | Separate MCP filesystem/checkpoint/shell server |
-| `servers/web.cjs` | Separate MCP free-search/page-fetch server |
-| `setup.sh`, `package*.json` | Locked, isolated dependency installation |
-| `test/agent.test.cjs` | Integration tests with local mock endpoints and real MCP servers |
+| `../tui/agent-tui` | POSIX sh launcher; chooses the native CPU binary |
+| `bin/seth-amd64`, `bin/SHA256SUMS` | Static native executable and release checksum |
+| `src/main.c` | Interactive/headless dispatch and bundled server modes |
+| `src/tui.c` | Terminal rendering, tabs, mouse/keyboard editor, dialogs and history |
+| `src/agent.c` | Model/tool loop, permissions, context compaction and cancellation |
+| `src/provider.c` | OpenAI-compatible generation, model discovery and SSE parsing |
+| `src/mcp.c` | MCP v2 connections, legacy negotiation, resources/prompts and subscriptions |
+| `src/server.c` | Separate stdio MCP server dispatch |
+| `src/filesystem.c` | Workspace files, search, edits, checkpoints and shell tools |
+| `src/web.c` | Free DuckDuckGo search and source-page text extraction |
+| `src/automation.c` | Native cron/timezone handling, schedule tools and background execution |
+| `src/store.c` | Settings, private atomic JSON storage, history and process locks |
+| `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
+| `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |
+| `build.sh`, `setup.sh` | Optional native rebuild and dependency-free setup |
+| `src/tests.c`, `test/native.py`, `test.sh` | Native checks and development-only integration fixtures |
 
 Desktop integration lives in `configs/applications/dotfiles-agent.desktop`, the two
 `configs/systemd/user/dotfiles-agent.*` units, `configs/hypr/hyprland.lua`, and `install.sh`.
 
-Run verification with `npm test` in `scripts/agent`. Tests use temporary XDG directories
-and mock model endpoints; they do not depend on a real model server or change user settings.
+Run `scripts/agent/test.sh` to rebuild and verify with a C compiler. The native
+self-tests need no other test runtime. If Python 3 is already available, the script
+also runs standard-library integration tests with isolated model/MCP endpoints and
+pseudo-terminal interactions. Python is only a development test helper; the agent,
+installer, scheduler, and bundled servers never invoke it. Tests use temporary XDG
+directories and do not contact a real model server or change user settings.
+
+To rebuild the packaged executable, run `scripts/agent/build.sh`. It uses only the
+compiler, standard Linux libc headers/archive, and the linker; no dependency fetch
+or package manager is involved. `CC` selects a compiler. Native server processes
+use the same executable with `--mcp-filesystem` or `--mcp-web`; all their actions
+remain MCP requests rather than being moved into the agent loop.

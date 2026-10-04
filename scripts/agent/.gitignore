@@ -1,1 +1,3 @@
-node_modules/
+*.o
+build/
+__pycache__/

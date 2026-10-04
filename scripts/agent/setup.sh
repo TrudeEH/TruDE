@@ -1,10 +1,22 @@
 #!/bin/sh
 set -eu
 agent_source=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
-agent_runtime=${XDG_DATA_HOME:-"$HOME/.local/share"}/dotfiles-agent/runtime
-node -e 'if (Number(process.versions.node.split(".")[0]) < 20) { console.error("Node.js 20 or newer is required."); process.exit(1); }'
-mkdir -p "$agent_runtime"
-chmod 700 "$agent_runtime"
-cp "$agent_source/package.json" "$agent_source/package-lock.json" "$agent_runtime/"
-npm ci --prefix "$agent_runtime" --ignore-scripts --no-audit --no-fund
-printf 'Seth dependencies installed. Start dotfiles-agent-tui.\n'
+case $(uname -m) in
+    x86_64) agent_arch=amd64 ;;
+    aarch64) agent_arch=arm64 ;;
+    *) agent_arch=$(uname -m) ;;
+esac
+if ! command -v curl >/dev/null 2>&1; then
+    printf 'Seth uses curl, which is already included in the dotfiles Debian package list.\n' >&2
+    exit 1
+fi
+if [ ! -x "$agent_source/bin/seth-$agent_arch" ]; then
+    "$agent_source/build.sh"
+fi
+if [ -f "$agent_source/bin/SHA256SUMS" ]; then
+    if ! (cd "$agent_source/bin" && sha256sum --check --status SHA256SUMS); then
+        printf 'The Seth binary checksum does not match. Rebuild with scripts/agent/build.sh.\n' >&2
+        exit 1
+    fi
+fi
+printf 'Native Seth is ready. Start dotfiles-agent-tui. No runtime installation is needed.\n'

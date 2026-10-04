@@ -1,12 +1,14 @@
 #!/bin/sh
 set -eu
 agent_dir=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/../agent" && pwd)
-runtime_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}/dotfiles-agent/runtime
-if ! command -v node >/dev/null 2>&1; then
-    printf 'The local AI agent needs Node.js 20 or newer. Run the dotfiles installer.\n' >&2
+case $(uname -m) in
+    x86_64) agent_arch=amd64 ;;
+    aarch64) agent_arch=arm64 ;;
+    *) agent_arch=$(uname -m) ;;
+esac
+agent_binary=$agent_dir/bin/seth-$agent_arch
+if [ ! -x "$agent_binary" ]; then
+    printf 'No native Seth binary for %s. Rebuild with scripts/agent/build.sh on this Debian machine.\n' "$agent_arch" >&2
     exit 1
 fi
-if [ -d "$runtime_dir/node_modules" ]; then
-    export NODE_PATH="$runtime_dir/node_modules${NODE_PATH:+:$NODE_PATH}"
-fi
-exec node "$agent_dir/main.cjs" "$@"
+exec "$agent_binary" "$@"
