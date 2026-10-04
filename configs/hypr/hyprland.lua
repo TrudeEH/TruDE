@@ -375,6 +375,6 @@ hl.on("hyprland.start", function ()
         .. "gsettings set org.gnome.desktop.interface accent-color orange >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
-    hl.exec_cmd("swaybg -i " .. shellQuote(wallpaper) .. " -m fill")
+    hl.exec_cmd("dotfiles-set-wallpaper " .. shellQuote(wallpaper))
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)

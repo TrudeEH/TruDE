@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+    exit 1
+fi
+
+wallpaper=$(readlink -f -- "$1") || exit 1
+background_dir=$HOME/.local/share/backgrounds
+current_wallpaper=$background_dir/current-wallpaper
+
+mkdir -p "$background_dir"
+ln -sfn -- "$wallpaper" "$current_wallpaper"
+exec swaybg -i "$current_wallpaper" -m fill

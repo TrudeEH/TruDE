@@ -269,7 +269,7 @@ apply_wallpaper() {
     wallpaper_generation=$((wallpaper_generation + 1))
     if ! systemd-run --user --quiet --collect \
         --unit="dotfiles-wallpaper-$$-$wallpaper_generation" \
-        swaybg -i "$wallpaper" -m fill >/dev/null 2>&1; then
+        "$HOME/.local/bin/dotfiles-set-wallpaper" "$wallpaper" >/dev/null 2>&1; then
         message "Unable to start the wallpaper service."
     fi
 }
