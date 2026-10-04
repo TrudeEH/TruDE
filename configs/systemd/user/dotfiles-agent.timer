@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Seth schedules every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+AccuracySec=1s
+Unit=dotfiles-agent.service
+
+[Install]
+WantedBy=timers.target

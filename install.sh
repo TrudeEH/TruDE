@@ -127,7 +127,7 @@ install_packages() {
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
-        file fontconfig procps xdg-user-dirs xdg-utils \
+        file fontconfig procps xdg-user-dirs xdg-utils nodejs npm \
         </dev/tty
 }
 
@@ -419,6 +419,7 @@ link_configs() {
     link_config "$repo_dir/scripts/tui/settings-tui" "$HOME/.local/bin/dotfiles-settings-tui"
     link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/dotfiles-icon-picker-tui"
+    link_config "$repo_dir/scripts/tui/agent-tui" "$HOME/.local/bin/dotfiles-agent-tui"
     for desktop_file in "$repo_dir"/configs/applications/*.desktop; do
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
@@ -436,6 +437,8 @@ link_configs() {
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/systemd/user/waybar.service.d/override.conf" "$config_dir/systemd/user/waybar.service.d/override.conf"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.service" "$config_dir/systemd/user/dotfiles-agent.service"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/dotfiles-agent.timer"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
@@ -467,6 +470,9 @@ main() {
 
     ui_step "Installing Superfile"
     install_superfile
+
+    ui_step "Installing Seth dependencies"
+    "$repo_dir/scripts/agent/setup.sh"
 
     ui_step "Installing fonts and configuring Flatpak"
     install_font

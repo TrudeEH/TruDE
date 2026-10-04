@@ -1,0 +1,16 @@
+{
+  "name": "dotfiles-local-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Debian terminal AI agent with MCP SDK v2",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.cjs" },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.0",
+    "@modelcontextprotocol/server": "2.3.0",
+    "blessed": "0.1.81",
+    "cron-parser": "5.10.1",
+    "he": "1.2.0",
+    "zod": "^4.0.0"
+  }
+}

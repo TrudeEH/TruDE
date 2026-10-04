@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+agent_dir=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/../agent" && pwd)
+runtime_dir=${XDG_DATA_HOME:-"$HOME/.local/share"}/dotfiles-agent/runtime
+if ! command -v node >/dev/null 2>&1; then
+    printf 'The local AI agent needs Node.js 20 or newer. Run the dotfiles installer.\n' >&2
+    exit 1
+fi
+if [ -d "$runtime_dir/node_modules" ]; then
+    export NODE_PATH="$runtime_dir/node_modules${NODE_PATH:+:$NODE_PATH}"
+fi
+exec node "$agent_dir/main.cjs" "$@"
