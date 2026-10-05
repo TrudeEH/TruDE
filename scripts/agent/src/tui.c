@@ -2225,7 +2225,7 @@ static void render(UI *u) {
         draw_settings(u);
     int working = u->busy && u->job != 9 && u->job != 10;
     char *status = fmt(
-        "%s  %s / %s · %s · Context ≈ %zu / %.0f",
+        "%s  %s: %s · %s · Context ≈ %zu / %.0f",
         working                   ? u->progress && *u->progress ? u->progress : "Working…"
         : u->notice && *u->notice ? u->notice
                                   : "Ready",
