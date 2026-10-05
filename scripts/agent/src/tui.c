@@ -451,14 +451,17 @@ static void fill(UI *u, int x, int y, int w, int h, int color) {
         for (int i = 0; i < w; i++)
             cell(u, x + i, y + j, L' ', color, 0);
 }
-static void button(UI *u, int x, int y, const char *label, int id) {
-    int w = (int)strlen(label) + 4;
+static void padded_button(UI *u, int x, int y, const char *label, int id, int padding) {
+    int w = (int)strlen(label) + 2 * padding;
     if (x + w > u->w - 1)
         return;
     int color = u->focus == id ? HOVER : SELECTED;
     fill(u, x, y, w, 1, color);
-    draw_text(u, x + 2, y, w - 4, label, color, 0, 0);
+    draw_text(u, x + padding, y, w - 2 * padding, label, color, 0, 0);
     hit(u, x, y, w, 1, id, 0);
+}
+static void button(UI *u, int x, int y, const char *label, int id) {
+    padded_button(u, x, y, label, id, 2);
 }
 static void icon_button(UI *u, int x, int y, wchar_t icon, int id) {
     int color = u->focus == id ? HOVER : SELECTED;
@@ -466,14 +469,15 @@ static void icon_button(UI *u, int x, int y, wchar_t icon, int id) {
     cell(u, x + 1, y, icon, color, 0);
     hit(u, x, y, 3, 1, id, 0);
 }
-static void actions(UI *u, int x, int y, int width, const char *const *labels, const int *ids,
-                    int count, int height) {
-    box(u, x, y, width, height, "Actions", 0);
+static int actions(UI *u, int x, int y, int width, const char *const *labels, const int *ids,
+                   int count, int padding) {
+    box(u, x, y, width, 3, "Actions", 0);
     int left = x + 2;
     for (int i = 0; i < count; i++) {
-        button(u, left, y + 1, labels[i], ids[i]);
-        left += (int)strlen(labels[i]) + 6;
+        padded_button(u, left, y + 1, labels[i], ids[i], padding);
+        left += (int)strlen(labels[i]) + 3 * padding;
     }
+    return left;
 }
 static Lines wrap(Lines *source, int width) {
     Lines out = {0};
@@ -1821,7 +1825,7 @@ static void draw_chat(UI *u) {
         hit(u, 2, 7 + i, side - 4, 1, 102, index);
     }
     int x = side, width = u->w - side;
-    int logheight = u->h - 14;
+    int logheight = u->h - 13;
     if (logheight < 5)
         logheight = 5;
     box(u, x, 3, width, logheight, gs(u->chat, "title"), u->focus == 108);
@@ -1835,13 +1839,20 @@ static void draw_chat(UI *u) {
     hit(u, x + 1, cy + 1, width - 2, 4, 100, 0);
     const char *labels[] = {"Send", "Stop", "Compact", "Export"};
     int ids[] = {105, 106, 107, 109};
-    actions(u, x, cy + 6, width, labels, ids, 4, 4);
-    int color = u->focus == 116 ? HOVER : SURFACE;
-    fill(u, x + 2, cy + 8, width - 4, 1, color);
+    int padding = width < 70 ? 1 : 2;
+    int left = actions(u, x, cy + 6, width, labels, ids, 4, padding);
+    int color = u->focus == 116 ? HOVER : SELECTED;
     char *workspace = fmt("Workspace: %s", gs(u->chat, "workspace"));
-    draw_text(u, x + 3, cy + 8, width - 6, workspace, color, 0, 0);
+    int available = x + width - 2 - left;
+    int w = (int)strlen(workspace) + 2 * padding;
+    if (w > available)
+        w = available;
+    fill(u, left, cy + 7, w, 1, color);
+    draw_text(u, left + padding, cy + 7, w - 2 * padding, workspace, color, 0, 0);
+    if ((int)strlen(workspace) > w - 2 * padding)
+        cell(u, left + w - padding - 1, cy + 7, L'…', color, 0);
     free(workspace);
-    hit(u, x + 2, cy + 8, width - 4, 1, 116, 0);
+    hit(u, left, cy + 7, w, 1, 116, 0);
 }
 static void draw_mcp(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;
@@ -1904,7 +1915,7 @@ static void draw_mcp(UI *u) {
     lines_free(&l);
     const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect"};
     int ids[] = {201, 202, 203, 204, 205, 206, 207};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 3);
+    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
 }
 static void draw_tasks(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;
@@ -1950,7 +1961,7 @@ static void draw_tasks(UI *u) {
     lines_free(&l);
     const char *labels[] = {"New", "Edit", "Pause", "Run", "Result", "Delete", "Timer"};
     int ids[] = {402, 403, 404, 405, 406, 407, 408};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 3);
+    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
 }
 static void draw_settings(UI *u) {
     int width = u->w / 2;

@@ -59,7 +59,7 @@ multiline settings fields.
 
 Commands: `/new`, `/fork`, `/continue`, `/retry`, `/compact`, `/attach PATH`,
 `/workspace`, `/export`, `/events`, and `/help`. `/workspace` opens a directory field
-for the current chat; the clickable workspace path after Export in Actions opens
+for the current chat; the clickable workspace path to the right of Export in Actions opens
 the same dialog. The workspace is saved with the chat and restored when reopened.
 Settings' default workspace applies to new chats without changing existing chats.
 Retry and branch preserve previous transcripts;
