@@ -16,7 +16,8 @@ if ! command -v "$compiler" >/dev/null 2>&1; then
 fi
 "$compiler" -std=c11 -D_GNU_SOURCE -O2 -Wall -Wextra -Wpedantic -Wformat=2 -Wshadow \
     -fstack-protector-strong -D_FORTIFY_SOURCE=2 -pthread -static-pie -s \
-    "$agent_dir"/src/*.c -o "$output" -Wl,-z,relro,-z,now ${LDFLAGS:-}
+    -I"$agent_dir/src" "$agent_dir"/src/*.c "$agent_dir"/src/servers/*.c \
+    -o "$output" -Wl,-z,relro,-z,now ${LDFLAGS:-}
 if [ "$output" = "$agent_dir/bin/seth-$arch" ]; then
     (cd "$agent_dir/bin" && sha256sum seth-* > SHA256SUMS)
 fi

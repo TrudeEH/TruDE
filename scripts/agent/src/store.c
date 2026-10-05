@@ -49,7 +49,8 @@ int validate_server(const char *name, J *s) {
     if (!s || s->type != JOBJ)
         return fail("Server must be an object");
     if (*gs(s, "builtin")) {
-        if (strcmp(gs(s, "builtin"), "filesystem") && strcmp(gs(s, "builtin"), "web"))
+        if (strcmp(gs(s, "builtin"), "filesystem") && strcmp(gs(s, "builtin"), "web") &&
+            strcmp(gs(s, "builtin"), "shell") && strcmp(gs(s, "builtin"), "memory"))
             return fail("Unknown bundled server");
     } else if (*gs(s, "url")) {
         if (valid_url(gs(s, "url"), 1))
@@ -135,9 +136,24 @@ int validate_config(J *c) {
             return -1;
     return 0;
 }
+static void add_bundled(J *servers, const char *kind, int enabled) {
+    for (size_t i = 0; i < servers->len; i++)
+        if (!strcmp(gs(servers->v[i], "builtin"), kind))
+            return;
+    char *name = strdup(kind);
+    for (int i = 1; jg(servers, name); i++) {
+        free(name);
+        name = fmt("bundled-%s-%d", kind, i);
+    }
+    J *server = jo();
+    jset(server, "builtin", js(kind));
+    jset(server, "enabled", jb(enabled));
+    jset(servers, name, server);
+    free(name);
+}
 J *load_config(void) {
     J *d = jo();
-    jset(d, "version", jnum(1));
+    jset(d, "version", jnum(2));
     jset(d, "profile", js("lmstudio"));
     J *p = jo();
     const char *names[] = {"lmstudio", "ollama", "9router", "custom"},
@@ -164,23 +180,40 @@ J *load_config(void) {
     jset(d, "permissions", js("ask"));
     jset(d, "systemPrompt", js(prompt));
     J *s = jo();
-    for (int i = 0; i < 2; i++) {
-        J *v = jo();
-        jset(v, "builtin", js(i ? "web" : "filesystem"));
-        jset(v, "enabled", jb(1));
-        jset(s, i ? "web" : "filesystem", v);
-    }
+    const char *bundled[] = {"filesystem", "web", "shell", "memory"};
+    for (size_t i = 0; i < sizeof bundled / sizeof *bundled; i++)
+        add_bundled(s, bundled[i], 1);
     jset(d, "mcpServers", s);
     char *path = fmt("%s/settings.json", config_dir);
     J *c = readjson(path, d);
     free(path);
     jf(d);
+    int migrated = c && gn(c, "version", 1) < 2;
+    if (migrated) {
+        J *servers = jg(c, "mcpServers");
+        if (servers && servers->type == JOBJ) {
+            int shell_enabled = 0;
+            for (size_t i = 0; i < servers->len; i++) {
+                J *server = servers->v[i];
+                if (!strcmp(gs(server, "builtin"), "filesystem") && gb(server, "enabled", 1) &&
+                    !contains(jg(server, "disabledTools"), "shell"))
+                    shell_enabled = 1;
+            }
+            add_bundled(servers, "shell", shell_enabled);
+            add_bundled(servers, "memory", 1);
+            jset(c, "version", jnum(2));
+        }
+    }
     if (c && !strncmp(gs(c, "systemPrompt"), "You are a local Debian AI agent.", 31)) {
         char *v = fmt("You are Seth, a local Debian AI agent.%s", gs(c, "systemPrompt") + 31);
         jset(c, "systemPrompt", js(v));
         free(v);
     }
     if (c && validate_config(c)) {
+        jf(c);
+        return NULL;
+    }
+    if (migrated && save_config(c)) {
         jf(c);
         return NULL;
     }

@@ -1,4 +1,4 @@
-#include "seth.h"
+#include "servers.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -108,16 +108,6 @@ static char *resolve(const char *p, int create) {
     free(candidate);
     bfree(&tail);
     return out;
-}
-static J *result(const char *text, int error) {
-    J *j = jo(), *a = ja(), *v = jo();
-    jset(v, "type", js("text"));
-    jset(v, "text", js(text));
-    jadd(a, v);
-    jset(j, "content", a);
-    if (error)
-        jset(j, "isError", jb(1));
-    return j;
 }
 static char *checkpoint(const char *file) {
     struct stat st;
@@ -260,17 +250,6 @@ J *fs_call(const char *name, J *a) {
                gs(rows->v[i], "file"));
         jf(rows);
         err[0] = 0;
-    } else if (!strcmp(name, "shell")) {
-        const char *cmd = gs(a, "command");
-        int timeout = gn(a, "timeout", 60), code = 0;
-        if (!*cmd || timeout < 1 || timeout > 300) {
-            fail("Command required; timeout must be 1–300 seconds");
-            goto done;
-        }
-        char *args[] = {"/bin/sh", "-c", (char *)cmd, NULL};
-        text = command(args, root, timeout, 24000, &code);
-        if (text)
-            bf(&b, "Exit %d\n%s", code, text);
     } else if (!strcmp(name, "restore_checkpoint")) {
         const char *key = gs(a, "id");
         if (strlen(key) != 36 || strspn(key, "0123456789abcdef-") != 36) {
@@ -420,22 +399,12 @@ J *fs_call(const char *name, J *a) {
             fail("Unknown filesystem tool");
     }
 done:;
-    J *r = result(*err ? err : b.s ? b.s : "No entries.", !!*err);
+    J *r = server_result(*err ? err : b.s ? b.s : "No entries.", !!*err);
     free(p);
     free(text);
     free(id);
     bfree(&b);
     return r;
-}
-static void tool(J *a, const char *name, const char *description, const char *schema, int safe) {
-    J *j = jo(), *s = jp(schema, NULL), *an = jo();
-    jset(j, "name", js(name));
-    jset(j, "description", js(description));
-    jset(j, "inputSchema", s);
-    jset(an, "readOnlyHint", jb(safe));
-    jset(an, "destructiveHint", jb(!safe));
-    jset(j, "annotations", an);
-    jadd(a, j);
 }
 J *fs_tools(void) {
     if (!*root) {
@@ -446,42 +415,38 @@ J *fs_tools(void) {
         }
     }
     J *a = ja();
-    tool(a, "list_directory", "List workspace directory entries.",
+    server_tool(a, "list_directory", "List workspace directory entries.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\",\"default\":\".\"}}}",
          1);
-    tool(a, "read_file", "Read UTF-8 text, with optional line range.",
+    server_tool(a, "read_file", "Read UTF-8 text, with optional line range.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"start\":{\"type\":"
          "\"integer\",\"minimum\":1},\"lines\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":"
          "1000}},\"required\":[\"path\"]}",
          1);
-    tool(a, "file_info", "Inspect size, permissions and modification time.",
+    server_tool(a, "file_info", "Inspect size, permissions and modification time.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":["
          "\"path\"]}",
          1);
-    tool(a, "search_files", "Find names or literal content recursively; skips symlinks and .git.",
+    server_tool(a, "search_files", "Find names or literal content recursively; skips symlinks and .git.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"query\":{\"type\":"
          "\"string\"},\"content\":{\"type\":\"boolean\"}},\"required\":[\"query\"]}",
          1);
-    tool(a, "write_file",
+    server_tool(a, "write_file",
          "Write text with a checkpoint. expected_content prevents conflicting overwrites.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{"
          "\"type\":\"string\"},\"expected_content\":{\"type\":\"string\"}},\"required\":[\"path\","
          "\"content\"]}",
          0);
-    tool(a, "edit_file", "Replace one exact occurrence of text, with a checkpoint.",
+    server_tool(a, "edit_file", "Replace one exact occurrence of text, with a checkpoint.",
          "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"old_text\":{"
          "\"type\":\"string\"},\"new_text\":{\"type\":\"string\"}},\"required\":[\"path\",\"old_"
          "text\",\"new_text\"]}",
          0);
-    tool(a, "list_checkpoints", "List recent restore checkpoints in this workspace.",
+    server_tool(a, "list_checkpoints", "List recent restore checkpoints in this workspace.",
          "{\"type\":\"object\",\"properties\":{}}", 1);
-    tool(
+    server_tool(
         a, "restore_checkpoint", "Restore a file version; checkpoint the current version first.",
         "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         0);
-    tool(a, "shell", "Run /bin/sh with the user's OS permissions; commands are not sandboxed.",
-         "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"},\"timeout\":{"
-         "\"type\":\"integer\",\"minimum\":1,\"maximum\":300}},\"required\":[\"command\"]}",
-         0);
     return a;
 }

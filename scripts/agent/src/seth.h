@@ -86,7 +86,6 @@ int mcp_connect(MCP *), mcp_refresh(MCP *), mcp_poll(MCP *);
 J *mcp_definitions(MCP *), *mcp_request(MCP *, Server *, const char *, J *, int);
 Tool *mcp_tool(MCP *, const char *);
 char *mcp_call(MCP *, const char *, J *), *mcp_guidance(MCP *);
-J *fs_tools(void), *web_tools(void), *fs_call(const char *, J *), *web_call(const char *, J *);
 J *parse_search_html(const char *, int);
 int server_main(const char *);
 extern char executable[PATH_MAX], config_dir[PATH_MAX], data_dir[PATH_MAX], state_dir[PATH_MAX];

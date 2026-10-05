@@ -66,7 +66,7 @@ int selftest(void) {
     MCP m;
     mcp_init(&m, config);
     int rc = mcp_connect(&m);
-    check(!rc && m.toolcount == 11, "Real MCP v2 subprocess discovery");
+    check(!rc && m.count == 4 && m.toolcount == 16, "Real MCP v2 subprocess discovery");
     Tool *read = NULL, *write = NULL, *edit = NULL, *restore = NULL;
     for (size_t i = 0; i < m.toolcount; i++) {
         Tool *t = m.tools[i];

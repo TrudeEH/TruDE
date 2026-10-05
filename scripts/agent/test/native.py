@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Development-only integration tests; Seth itself never invokes Python."""
 import codecs
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import http.server
 import json
@@ -85,6 +86,7 @@ class Mock(http.server.ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.requests = []
         self.mode = "text"
+        self.memory_id = ""
         self.events = queue.Queue()
         self.counter = 0
         self.started = threading.Event()
@@ -188,14 +190,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         messages = body["messages"]
         tool_results = [m for m in messages if m["role"] == "tool"]
         requested = self.server.mode
-        if requested in ("read", "write", "shell", "external", "resource", "fetch") and not tool_results:
+        if requested in ("read", "write", "shell", "external", "resource", "fetch", "remember", "recall") and not tool_results:
             tool, args = {
                 "read": (alias("filesystem", "read_file"), {"path": "seed.txt"}),
                 "write": (alias("filesystem", "write_file"), {"path": "new.txt", "content": "native write\n"}),
-                "shell": (alias("filesystem", "shell"), {"command": "sleep 30", "timeout": 60}),
+                "shell": (alias("shell", "shell"), {"command": "sleep 30", "timeout": 60}),
                 "external": (alias("external", "echo"), {"text": "echoed natively"}),
                 "resource": (alias("external", "$read"), {"uri": "test://note"}),
                 "fetch": (alias("web", "fetch_page"), {"url": f"http://127.0.0.1:{self.server.server_port}/redirect"}),
+                "remember": (alias("memory", "store_memory"), {"title":"Preference","content":"Use the dark theme."}),
+                "recall": (alias("memory", "read_memory"), {"id":self.server.memory_id}),
             }[requested]
             if body.get("stream"):
                 return [{"choices": [{"delta": {"content": "I'll inspect it.\n"}}]}, {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call-1", "function": {"name": tool, "arguments": json.dumps(args)}}]}, "finish_reason": "tool_calls"}]}]
@@ -385,6 +389,95 @@ class NativeTests(unittest.TestCase):
         self.assertIn(str(path),s.screen.text)
         s.send("\x1b")
         s.send("\x0c")
+    def bundled(self,kind,method,params=None,env=None):
+        request={"jsonrpc":"2.0","id":1,"method":method,"params":(params or {})|{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}
+        p=subprocess.run([BINARY,"--mcp-"+kind],input=json.dumps(request)+"\n",env=env or self.env,text=True,capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        response=json.loads(p.stdout)
+        self.assertNotIn("error",response)
+        return response["result"]
+    def memory(self,name,args,env=None):
+        result=self.bundled("memory","tools/call",{"name":name,"arguments":args},env)
+        self.assertFalse(result.get("isError"),result)
+        return json.loads(result["content"][0]["text"])
+    def test_bundled_servers_are_independent_and_settings_migrate(self):
+        tools={kind:{t["name"] for t in self.bundled(kind,"tools/list")["tools"]} for kind in ("filesystem","web","shell","memory")}
+        self.assertNotIn("shell",tools["filesystem"])
+        self.assertEqual(tools["shell"],{"shell"})
+        self.assertEqual(tools["memory"],{"store_memory","read_memory","search_memories","list_memories","delete_memory"})
+        result=self.bundled("shell","tools/call",{"name":"shell","arguments":{"command":"pwd"}},self.env|{"AGENT_WORKSPACE":str(self.workspace)})
+        self.assertIn(str(self.workspace),result["content"][0]["text"])
+        self.config["mcpServers"]["filesystem"]["disabledTools"]=["shell"]
+        self.config["mcpServers"]["shell"]={"command":"/bin/false","enabled":False}
+        self.save()
+        self.run_agent()
+        saved=json.loads(self.settings.read_text())
+        self.assertEqual(saved["version"],2)
+        self.assertEqual(saved["mcpServers"]["shell"],self.config["mcpServers"]["shell"])
+        migrated=next(s for s in saved["mcpServers"].values() if s.get("builtin")=="shell")
+        self.assertFalse(migrated["enabled"])
+        self.assertTrue(saved["mcpServers"]["memory"]["enabled"])
+        saved["mcpServers"].pop("memory")
+        self.settings.write_text(json.dumps(saved))
+        self.run_agent()
+        self.assertNotIn("memory",json.loads(self.settings.read_text())["mcpServers"])
+    def test_memory_persists_updates_searches_and_deletes_across_workspaces(self):
+        record=self.memory("store_memory",{"title":"Editor preference","content":"Use Micro for text files."})
+        file=self.root/"data/dotfiles-agent/memories.json"
+        self.assertEqual(file.stat().st_mode&0o777,0o600)
+        other=self.root/"other"
+        other.mkdir()
+        self.assertEqual(self.memory("read_memory",{"id":record["id"]},self.env|{"AGENT_WORKSPACE":str(other)}),record)
+        found=self.memory("search_memories",{"query":"MICRO"})
+        self.assertEqual(found,[record])
+        changed=self.memory("store_memory",{"id":record["id"],"content":"Use Vim."})
+        self.assertEqual(changed["title"],record["title"])
+        self.assertEqual(changed["created"],record["created"])
+        self.assertEqual(self.memory("list_memories",{}),[changed])
+        self.assertEqual(self.memory("search_memories",{"query":"micro"}),[])
+        self.memory("delete_memory",{"id":record["id"]})
+        self.assertEqual(self.memory("list_memories",{}),[])
+        result=self.bundled("memory","tools/call",{"name":"read_memory","arguments":{"id":record["id"]}})
+        self.assertTrue(result["isError"])
+        self.assertIn("Memory not found",result["content"][0]["text"])
+    def test_memory_concurrent_saves_and_corrupt_storage_are_safe(self):
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            records=list(pool.map(lambda i:self.memory("store_memory",{"content":f"Memory {i}"}),range(12)))
+        saved=self.memory("list_memories",{"limit":100})
+        self.assertEqual({r["id"] for r in saved},{r["id"] for r in records})
+        for args in [{"id":"../"*12,"content":"Invalid identifier"},{"content":""},{"content":"x"*16385}]:
+            result=self.bundled("memory","tools/call",{"name":"store_memory","arguments":args})
+            self.assertTrue(result["isError"])
+        file=self.root/"data/dotfiles-agent/memories.json"
+        for corrupt in ["broken json","{}",'[{}]']:
+            file.write_text(corrupt)
+            result=self.bundled("memory","tools/call",{"name":"store_memory","arguments":{"content":"Keep existing data"}})
+            self.assertTrue(result["isError"])
+            self.assertEqual(file.read_text(),corrupt)
+    def test_memory_tools_follow_agent_permissions(self):
+        self.mock.mode="remember"
+        self.run_agent("Remember my preference")
+        file=self.root/"data/dotfiles-agent/memories.json"
+        self.assertFalse(file.exists())
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("Remember my preference\r")
+            s.wait("Tool permission")
+            self.assertFalse(file.exists())
+            s.click("Allow once")
+            s.wait("Héllo 🙂 from Seth.")
+        finally:
+            s.close()
+        self.mock.memory_id=json.loads(file.read_text())[0]["id"]
+        self.config["permissions"]="read-only"
+        self.save()
+        self.mock.mode="recall"
+        self.run_agent("Recall my preference")
+        self.assertIn("Use the dark theme",self.chat()["messages"][2]["content"])
+        self.mock.mode="remember"
+        self.run_agent("Remember another preference")
+        self.assertEqual(len(json.loads(file.read_text())),1)
     def test_streaming_tool_loop_and_private_storage(self):
         self.mock.mode="read"
         p=self.run_agent()
@@ -441,7 +534,7 @@ class NativeTests(unittest.TestCase):
         try:
             s.wait("MCP tools connected")
             s.send("run a command\r")
-            s.wait("filesystem / shell")
+            s.wait("shell / shell")
             start=time.monotonic()
             s.send("\x1b")
             s.wait("Stopped")

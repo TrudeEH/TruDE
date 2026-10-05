@@ -100,13 +100,25 @@ methods. Form elicitation can ask the user for input; URL requests display a sig
 
 Bundled defaults:
 
-- `filesystem`: list/read/search files, inspect metadata, write/edit text, list/restore
-  checkpoints, and run `/bin/sh` commands. File tools reject paths and symlinks outside
+- `filesystem`: list/read/search files, inspect metadata, write/edit text, and list/restore
+  checkpoints. File tools reject paths and symlinks outside
   the workspace. Editing text files up to 2 MB creates a private restore checkpoint.
   Recursive search skips symlinks, `.git`, and `node_modules`.
 - `web`: free DuckDuckGo search (titles, source links, snippets) and text-page fetching.
   No API key or paid search subscription. Public search can rate limit or challenge
   requests; replace or add a search MCP server when needed.
+- `shell`: run `/bin/sh` commands in the selected workspace, with a bounded timeout
+  and output. It can be enabled or disabled independently of filesystem tools.
+- `memory`: `store_memory`, `read_memory`, `search_memories`, `list_memories`, and
+  `delete_memory`. Store a title and content; supply the returned ID to update,
+  retrieve, or delete that memory. Literal search ignores case. Memories persist
+  across chats and workspaces in private `memories.json` under the agent's XDG data
+  directory. Reads are permitted in read-only mode; saving and deleting follow the
+  normal tool approval rules. Concurrent server processes use a lock and atomic saves.
+
+Existing version 1 settings migrate once to version 2, adding memory and the separate
+shell server. A disabled filesystem server or shell tool keeps shell disabled. Explicit
+shell grants in schedules now refer to the shell server's tool; select it in Allowed tools.
 
 Shell commands and external MCP processes have the user's OS permissions. Workspace
 checks apply to the bundled file tools; they are not a sandbox for arbitrary programs.
@@ -162,9 +174,11 @@ Uses XDG directories, defaulting to:
 | `src/agent.c` | Model/tool loop, permissions, context compaction and cancellation |
 | `src/provider.c` | OpenAI-compatible generation, model discovery and SSE parsing |
 | `src/mcp.c` | MCP v2 connections, legacy negotiation, resources/prompts and subscriptions |
-| `src/server.c` | Separate stdio MCP server dispatch |
-| `src/filesystem.c` | Workspace files, search, edits, checkpoints and shell tools |
-| `src/web.c` | Free DuckDuckGo search and source-page text extraction |
+| `src/servers/server.c`, `src/servers/servers.h` | Shared bundled stdio MCP dispatch and tool helpers |
+| `src/servers/filesystem.c` | Workspace files, search, edits and checkpoints |
+| `src/servers/web.c` | Free DuckDuckGo search and source-page text extraction |
+| `src/servers/shell.c` | Independent workspace shell commands |
+| `src/servers/memory.c` | Persistent memory storage, lookup and search |
 | `src/automation.c` | Native cron/timezone handling, schedule tools and background execution |
 | `src/store.c` | Settings, private atomic JSON storage, history and process locks |
 | `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
@@ -185,5 +199,6 @@ directories and do not contact a real model server or change user settings.
 To rebuild the packaged executable, run `scripts/agent/build.sh`. It uses only the
 compiler, standard Linux libc headers/archive, and the linker; no dependency fetch
 or package manager is involved. `CC` selects a compiler. Native server processes
-use the same executable with `--mcp-filesystem` or `--mcp-web`; all their actions
+use the same executable with `--mcp-filesystem`, `--mcp-web`, `--mcp-shell`, or
+`--mcp-memory`; all their actions
 remain MCP requests rather than being moved into the agent loop.

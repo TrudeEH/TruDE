@@ -508,7 +508,10 @@ static void add_tool(MCP *m, Server *s, const char *name, const char *descriptio
               (!strcmp(b, "filesystem") &&
                (!strcmp(name, "list_directory") || !strcmp(name, "read_file") ||
                 !strcmp(name, "search_files") || !strcmp(name, "file_info") ||
-                !strcmp(name, "list_checkpoints")));
+                !strcmp(name, "list_checkpoints"))) ||
+              (!strcmp(b, "memory") &&
+               (!strcmp(name, "read_memory") || !strcmp(name, "search_memories") ||
+                !strcmp(name, "list_memories")));
     J *d = jo(), *f = jo();
     jset(d, "type", js("function"));
     jset(f, "name", js(t->public));

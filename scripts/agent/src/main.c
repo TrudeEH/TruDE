@@ -55,6 +55,10 @@ int main(int argc, char **argv) {
             server = "filesystem";
         else if (!strcmp(argv[i], "--mcp-web"))
             server = "web";
+        else if (!strcmp(argv[i], "--mcp-shell"))
+            server = "shell";
+        else if (!strcmp(argv[i], "--mcp-memory"))
+            server = "memory";
         else {
             fprintf(stderr, "Unknown or incomplete option: %s\n", argv[i]);
             return 2;
