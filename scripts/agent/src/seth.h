@@ -101,7 +101,7 @@ char *clipboard_image(void);
 J *image_content(const char *, J *);
 J *completion(J *, J *, J *, int, int, Chunk, void *, J **, char **);
 typedef struct Agent {
-    J *config, *chat, *background, *images;
+    J *config, *chat, *background, *images, *steering;
     MCP *mcp;
     pthread_mutex_t *mutex;
     int (*approve)(Tool *, J *, void *);

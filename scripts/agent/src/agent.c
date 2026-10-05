@@ -202,6 +202,20 @@ static void delta(const char *s, size_t n, void *opaque) {
     update(a, "delta", text);
     free(text);
 }
+/* Consume queued user messages only outside assistant/tool-call transactions. */
+static int steering(Agent *a) {
+    lock(a);
+    int count = a->steering ? (int)a->steering->len : 0;
+    for (int i = 0; i < count; i++)
+        jadd(jg(a->chat, "messages"), jc(a->steering->v[i]));
+    while (a->steering && a->steering->len)
+        jremove(a->steering, 0);
+    int saved = count ? save_chat(a->chat) : 0;
+    unlock(a);
+    if (count)
+        update(a, "message", "");
+    return saved ? -1 : count;
+}
 int agent_run(Agent *a, const char *prompt, int resume) {
     char *lockname = fmt("chat-%s", gs(a->chat, "id"));
     if (lock_store(lockname)) {
@@ -261,6 +275,10 @@ int agent_run(Agent *a, const char *prompt, int resume) {
             result = fail("Stopped");
             break;
         }
+        if (steering(a) < 0) {
+            result = -1;
+            break;
+        }
         int refreshed = mcp_refresh(a->mcp);
         if (refreshed || agent_compact(a, 0)) {
             result = -1;
@@ -306,6 +324,13 @@ int agent_run(Agent *a, const char *prompt, int resume) {
             if (finish && !strcmp(finish, "length"))
                 notice(a, "Response reached the output limit. Continue or increase output tokens.");
             free(finish);
+            int queued = steering(a);
+            if (queued < 0) {
+                result = -1;
+                break;
+            }
+            if (queued > 0)
+                continue;
             goto done;
         }
         free(finish);

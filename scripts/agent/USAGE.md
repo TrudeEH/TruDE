@@ -229,7 +229,7 @@ Removing a label removes its attachment when the message is submitted.
 
 Model discovery reads vision capability metadata when the provider supplies it.
 Unknown and non-vision models reject image pastes with a warning. For providers
-that omit capability metadata, set **Vision for this model** to `true` in Provider
+that omit capability metadata, switch **Vision for this model** to **On** in Provider
 settings only if that model supports images. This setting applies to the model
 ID in that provider profile, not all models. Switching to a non-vision model
 also blocks submitting a draft containing images.
@@ -237,3 +237,18 @@ also blocks submitting a draft containing images.
 Images are sent as OpenAI-compatible `image_url` content with inline data URLs.
 Image data is stored in the local chat history so continued chats and retries
 retain their attachments; exported text includes only the placeholder labels.
+
+## Steering and activity
+
+Send another message while Seth is thinking or running tools to queue steering.
+Queued messages enter the context at the next safe model-turn boundary, after
+any current tool-call batch finishes. Running commands are not interrupted.
+The queued text is visible in chat until consumed. Errors or cancellation leave
+unconsumed steering queued; `/continue` resumes it.
+
+The footer and unresolved tool calls show an animated activity indicator while
+working. Footer errors use red text. Context summaries appear at their
+compaction boundary, before the messages that follow them.
+
+The vision switch in Provider settings is an On/Off toggle; click it or use
+Space, Enter, or the left/right arrow keys. Save with Ctrl+S.

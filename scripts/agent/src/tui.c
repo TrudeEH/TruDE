@@ -12,7 +12,7 @@
 
 /* The terminal renderer and editor need only libc. All coordinates are cells;
  * text positions are UTF-8 byte offsets. No escape from remote text is emitted. */
-enum { NORMAL, MUTED, ACCENT, SURFACE, SELECTED, BORDER, FOCUS, CODE, HOVER };
+enum { NORMAL, MUTED, ACCENT, SURFACE, SELECTED, BORDER, FOCUS, CODE, HOVER, ERROR };
 typedef struct {
     wchar_t c;
     unsigned char color, bold;
@@ -91,7 +91,7 @@ typedef struct {
     atomic_int finished, dirty, approval;
     char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
          *memory_target;
-    J *request_params, *response, *images, *jobimages;
+    J *request_params, *response, *images, *jobimages, *steering;
     unsigned image_number;
     int request_kind;
     Buf partial, input, pasted;
@@ -266,6 +266,10 @@ static void text_lines(Lines *l, const char *s, int color, int markdown) {
     }
     free(copy);
 }
+static const char *spinner(void) {
+    static const char *frames[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+    return frames[(int)(mono() * 10) % 10];
+}
 static void transcript(UI *u) {
     lines_free(&u->transcript);
     J *m = jg(u->chat, "messages"), *results = jo(), *waiting = jo(), *matched = jo();
@@ -288,7 +292,15 @@ static void transcript(UI *u) {
         }
     }
     int speaker = 0;
-    for (size_t i = 0; m && i < m->len; i++) {
+    for (size_t i = 0; m && i <= m->len; i++) {
+        if (i == (size_t)gn(u->chat, "compacted", 0) && *gs(u->chat, "summary")) {
+            line(&u->transcript, "", NORMAL, 0, NULL);
+            line(&u->transcript, "Context summary", ACCENT, 0, NULL);
+            text_lines(&u->transcript, gs(u->chat, "summary"), MUTED, 0);
+            speaker = 0;
+        }
+        if (i == m->len)
+            break;
         J *v = m->v[i];
         const char *role = gs(v, "role"), *content = gs(v, "content");
         J *calls = jg(v, "tool_calls");
@@ -319,7 +331,7 @@ static void transcript(UI *u) {
                 J *call = calls->v[k], *f = jg(call, "function");
                 char *key = fmt("%s:%zu:%zu", gs(u->chat, "id"), i, k);
                 J *r = jg(results, key);
-                const char *result = jstr(r), *status = !r ? "pending"
+                const char *result = jstr(r), *status = !r ? u->busy ? spinner() : "interrupted"
                                                         : !strncmp(result, "Tool denied", 11)
                                                             ? "denied"
                                                         : !strncmp(result, "Tool error:", 11) ||
@@ -354,6 +366,11 @@ static void transcript(UI *u) {
             }
         }
     }
+    for (size_t i = 0; u->steering && i < u->steering->len; i++) {
+        line(&u->transcript, "", NORMAL, 0, NULL);
+        line(&u->transcript, "Queued steering message", ACCENT, 0, NULL);
+        text_lines(&u->transcript, gs(u->steering->v[i], "content"), NORMAL, 0);
+    }
     if (u->partial.n) {
         if (speaker != 2) {
             line(&u->transcript, "", NORMAL, 0, NULL);
@@ -361,11 +378,6 @@ static void transcript(UI *u) {
         } else
             line(&u->transcript, "", NORMAL, 0, NULL);
         text_lines(&u->transcript, u->partial.s, NORMAL, 1);
-    }
-    if (*gs(u->chat, "summary")) {
-        line(&u->transcript, "", NORMAL, 0, NULL);
-        line(&u->transcript, "Context summary", ACCENT, 0, NULL);
-        text_lines(&u->transcript, gs(u->chat, "summary"), MUTED, 0);
     }
     if (!u->transcript.len)
         text_lines(&u->transcript,
@@ -724,6 +736,8 @@ static void start_job(UI *, int, const char *);
 static void fresh(UI *u) {
     if (u->busy)
         return;
+    while (u->steering->len)
+        jremove(u->steering, 0);
     jf(u->chat);
     u->chat = new_chat(u->config);
     u->history_sel = -1;
@@ -748,6 +762,8 @@ static void open_chat(UI *u, const char *id) {
         error_ui(u);
         return;
     }
+    while (u->steering->len)
+        jremove(u->steering, 0);
     reconnect = strcmp(gs(chat, "workspace"), gs(u->mcp.config, "workspace")) != 0;
     jf(u->chat);
     u->chat = chat;
@@ -909,7 +925,7 @@ static void *worker(void *opaque) {
                .mutex = &u->mutex,
                .approve = approve_worker,
                .update = update_worker,
-               .opaque = u, .images = u->jobimages};
+               .opaque = u, .images = u->jobimages, .steering = u->steering};
     switch (u->job) {
     case 1:
         result = agent_run(&a, u->prompt, 0);
@@ -1061,7 +1077,7 @@ static void provider_form(UI *u) {
     field_add(m, "apiKey", "API key", gs(p, "apiKey"), 0, 0);
     m->fields[2].e.secret = 1;
     field_add(m, "apiKeyEnv", "API key environment variable", gs(p, "apiKeyEnv"), 0, 0);
-    field_add(m, "vision", "Vision for this model (true/false)", model_vision(u->config) ? "true" : "false", 0, 1);
+    field_add(m, "vision", "Vision for this model", model_vision(u->config) ? "true" : "false", 0, 4);
 }
 static void mcp_form(UI *u, int edit) {
     J *cfg = jg(u->config, "mcpServers"), *s = edit ? ji(cfg, (size_t)u->server_sel) : NULL;
@@ -1195,7 +1211,7 @@ static int paste_image(UI *u) {
     return 1;
 }
 static void submit(UI *u) {
-    if (u->busy)
+    if (u->busy && u->job != 1 && u->job != 2 && u->job != 3)
         return;
     prune_images(u);
     if (u->images && u->images->len && !model_vision(u->config)) {
@@ -1204,6 +1220,22 @@ static void submit(UI *u) {
     }
     char *text = strdup(u->composer.s);
     if (!*text) {
+        free(text);
+        return;
+    }
+    if (u->busy) {
+        J *msg = jo();
+        jset(msg, "role", js("user"));
+        jset(msg, "content", js(text));
+        if (u->images && u->images->len)
+            jset(msg, "images", jc(u->images));
+        pthread_mutex_lock(&u->mutex);
+        jadd(u->steering, msg);
+        pthread_mutex_unlock(&u->mutex);
+        es(&u->composer, "");
+        jf(u->images);
+        u->images = NULL;
+        notice_ui(u, "Steering message queued for the next model turn");
         free(text);
         return;
     }
@@ -1253,7 +1285,9 @@ static J *form_value(Modal *m) {
         if (m->action == A_ELICIT && !f->e.s[0] && !contains(jg(m->value, "required"), f->key))
             continue;
         J *value = NULL;
-        if (f->kind == 1) {
+        if (f->kind == 4)
+            value = jb(!strcmp(f->e.s, "true"));
+        else if (f->kind == 1) {
             char *end;
             double n = strtod(f->e.s, &end);
             if (!*f->e.s || *end) {
@@ -1963,7 +1997,12 @@ static void modal_draw(UI *u) {
             if (row + h > bottom)
                 break;
             box(u, x + 2, row, width - 4, h, f->label, m->focus == i);
-            editor_draw(u, &f->e, x + 3, row + 1, width - 6, h - 2, m->focus == i);
+            if (f->kind == 4)
+                draw_text(u, x + 3, row + 1, width - 6,
+                          !strcmp(f->e.s, "true") ? "[●] On" : "[ ] Off",
+                          m->focus == i ? ACCENT : NORMAL, 0, 0);
+            else
+                editor_draw(u, &f->e, x + 3, row + 1, width - 6, h - 2, m->focus == i);
             hit(u, x + 3, row + 1, width - 6, h - 2, 800, i);
             row += h + 1;
         }
@@ -2264,7 +2303,8 @@ static const char *styles[] = {
     "\033[38;2;255;190;111m\033[48;2;34;34;38m", "\033[38;2;255;255;255m\033[48;2;56;56;60m",
     "\033[38;2;34;34;38m\033[48;2;255;190;111m", "\033[38;2;170;170;170m\033[48;2;34;34;38m",
     "\033[38;2;255;190;111m\033[48;2;34;34;38m", "\033[38;2;255;255;255m\033[48;2;56;56;60m",
-    "\033[38;2;34;34;38m\033[48;2;255;163;72m"};
+    "\033[38;2;34;34;38m\033[48;2;255;163;72m",
+    "\033[38;2;246;97;81m\033[48;2;34;34;38m"};
 static size_t active_estimate(J *chat) {
     J *a = ja(), *m = jg(chat, "messages");
     for (size_t i = (size_t)gn(chat, "compacted", 0); m && i < m->len; i++)
@@ -2310,14 +2350,15 @@ static void render(UI *u) {
         draw_settings(u);
     int working = u->busy && u->job != 9 && u->job != 10;
     char *status = fmt(
-        "%s  %s: %s · %s · Context ≈ %zu / %.0f",
+        "%s%s%s  %s: %s · %s · Context ≈ %zu / %.0f",
+        working ? spinner() : "", working ? " " : "",
         working                   ? u->progress && *u->progress ? u->progress : "Working…"
         : u->notice && *u->notice ? u->notice
                                   : "Ready",
         gs(profile(u->config), "label"),
         *gs(profile(u->config), "model") ? gs(profile(u->config), "model") : "choose a model",
         gs(u->config, "permissions"), active_estimate(u->chat), gn(u->config, "contextWindow", 0));
-    draw_text(u, 1, u->h - 1, u->w - 2, status, working ? ACCENT : MUTED, 0, 0);
+    draw_text(u, 1, u->h - 1, u->w - 2, status, working ? ACCENT : u->notice && !strncmp(u->notice, "Error:", 6) ? ERROR : MUTED, 0, 0);
     free(status);
     if (u->modal)
         modal_draw(u);
@@ -2411,8 +2452,12 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
             continue;
         if (u->modal) {
             Modal *m = u->modal;
-            if (h->id == 800)
+            if (h->id == 800) {
                 m->focus = h->index;
+                Field *f = &m->fields[m->focus];
+                if (f->kind == 4)
+                    es(&f->e, !strcmp(f->e.s, "true") ? "false" : "true");
+            }
             else if (h->id == 801)
                 save_modal(u, 1);
             else if (h->id == 802)
@@ -2482,6 +2527,12 @@ static void key(UI *u, int code, const char *text) {
             return;
         }
         if (m->kind == FORM) {
+            if (m->focus < m->count && m->fields[m->focus].kind == 4) {
+                Editor *e = &m->fields[m->focus].e;
+                if (code == 13 || code == 32 || code == 1004 || code == 1005)
+                    es(e, !strcmp(e->s, "true") ? "false" : "true");
+                return;
+            }
             if (code == 13) {
                 if (m->focus >= m->count)
                     save_modal(u, m->focus == m->count);
@@ -2671,6 +2722,9 @@ static void consume_input(UI *u, int flush) {
                                 ? &u->modal->fields[u->modal->focus].e
                             : u->tab == 0 && u->focus == 100 ? &u->composer
                                                              : NULL;
+                if (u->modal && u->modal->kind == FORM && u->modal->focus < u->modal->count &&
+                    u->modal->fields[u->modal->focus].kind == 4)
+                    e = NULL;
                 if (e && !(e == &u->composer && !u->pasted.n && paste_image(u))) {
                     Buf clean = {0};
                     for (size_t i = 0; i < u->pasted.n; i++) {
@@ -2920,6 +2974,10 @@ static void finish_job(UI *u) {
     if (!u->tasklist)
         u->tasklist = ja();
     u->dirty = 1;
+    if (u->steering->len && !u->result && (u->job == 1 || u->job == 2 || u->job == 3)) {
+        start_job(u, 2, "");
+        return;
+    }
     if (u->memory_reload && u->tab == 3 && !u->modal) {
         u->memory_reload = 0;
         start_job(u, 10, "");
@@ -2938,6 +2996,7 @@ int tui(J *config) {
         return fail(
             "Seth needs an interactive terminal (use --check or --run-due for headless runs)");
     UI u = {0};
+    u.steering = ja();
     u.config = config;
     u.chat = new_chat(config);
     u.expanded = jo();
@@ -3029,6 +3088,8 @@ int tui(J *config) {
             show_request(&u);
             pthread_mutex_unlock(&u.mutex);
         }
+        if (u.busy)
+            u.dirty = 1;
         if (u.dirty)
             render(&u);
         struct pollfd p = {0, POLLIN, 0};
@@ -3083,6 +3144,7 @@ int tui(J *config) {
     free(u.composer.s);
     jf(u.images);
     jf(u.jobimages);
+    jf(u.steering);
     free(u.cells);
     free(u.old);
     bfree(&u.partial);

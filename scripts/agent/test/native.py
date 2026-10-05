@@ -1062,6 +1062,79 @@ esac
             self.assertNotIn("ACTIVITY",s.screen.text)
         finally:
             s.close()
+    def test_tui_steering_and_animated_footer(self):
+        self.mock.mode="slow"
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("first request\r")
+            s.wait("Thinking")
+            first=s.screen.text.splitlines()[-1]
+            s.read(.16)
+            self.assertNotEqual(first,s.screen.text.splitlines()[-1])
+            s.send("focus on the tests\r")
+            s.wait("Queued steering message")
+            until=time.monotonic()+10
+            while time.monotonic()<until:
+                s.read(.1)
+                requests=[body for path,body,_ in self.mock.requests if path=="/v1/chat/completions"]
+                if len(requests)>1 and "Thinking" not in s.screen.text.splitlines()[-1]:
+                    break
+            self.assertEqual([m["content"] for m in requests[-1]["messages"] if m["role"]=="user"],
+                             ["first request","focus on the tests"])
+            self.assertEqual([m["content"] for m in self.chat()["messages"] if m["role"]=="user"],
+                             ["first request","focus on the tests"])
+        finally:
+            s.close()
+
+    def test_tui_tool_call_has_animated_indicator(self):
+        self.mock.mode="shell"
+        self.config["permissions"]="auto"
+        self.config["mcpServers"]["shell"]={"builtin":"shell","enabled":True}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("run command\r")
+            s.wait("shell / shell")
+            first=next(line for line in s.screen.text.splitlines() if "shell / shell" in line)
+            s.read(.16)
+            second=next(line for line in s.screen.text.splitlines() if "shell / shell" in line)
+            self.assertNotIn("pending",first)
+            self.assertNotEqual(first,second)
+            s.send("\x1b")
+            s.wait("Stopped")
+        finally:
+            s.close()
+
+    def test_tui_error_footer_is_red(self):
+        self.config["profiles"]["lmstudio"]["model"]=""
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("hello\r")
+            s.wait("Error:")
+            self.assertTrue(all(fg=="#f66151" for char,fg,_ in s.screen.grid[-1] if char.strip()))
+        finally:
+            s.close()
+
+    def test_tui_vision_toggle(self):
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("\x1b[15~")
+            s.click("Edit connection")
+            s.send("\t\t\t\t")
+            s.wait("Vision for this model")
+            s.send(" ")
+            s.wait("On")
+            s.send("\x13")
+            saved=json.loads(self.settings.read_text())
+            self.assertIs(saved["profiles"]["lmstudio"]["visionModels"]["test-model"],True)
+        finally:
+            s.close()
+
     def test_context_compaction_preserves_full_transcript(self):
         self.config.update(contextWindow=4096,maxTokens=256)
         self.config["mcpServers"]["web"]["enabled"]=False
@@ -1086,6 +1159,8 @@ esac
             self.assertEqual(saved["messages"][:len(messages)],messages)
             self.assertEqual(saved["compacted"],24)
             self.assertTrue(saved["summary"])
+            self.assertLess(s.screen.text.index("Context summary"),s.screen.text.index("latest request"))
+            self.assertLess(s.screen.text.index("Context summary"),s.screen.text.index("Héllo 🙂 from Seth."))
             self.assertTrue(any(not body.get("stream") for path,body,_ in self.mock.requests if path=="/v1/chat/completions"))
         finally:
             s.close()
