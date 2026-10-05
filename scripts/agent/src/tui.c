@@ -2040,15 +2040,16 @@ static void render(UI *u) {
         draw_tasks(u);
     else
         draw_settings(u);
+    int working = u->busy && u->job != 9; /* Periodic MCP refresh is idle housekeeping. */
     char *status = fmt(
         "%s  %s / %s · %s · Context ≈ %zu / %.0f",
-        u->busy                   ? u->progress && *u->progress ? u->progress : "Working…"
+        working                   ? u->progress && *u->progress ? u->progress : "Working…"
         : u->notice && *u->notice ? u->notice
                                   : "Ready",
         gs(profile(u->config), "label"),
         *gs(profile(u->config), "model") ? gs(profile(u->config), "model") : "choose a model",
         gs(u->config, "permissions"), active_estimate(u->chat), gn(u->config, "contextWindow", 0));
-    draw_text(u, 1, u->h - 1, u->w - 2, status, u->busy ? ACCENT : MUTED, 0, 0);
+    draw_text(u, 1, u->h - 1, u->w - 2, status, working ? ACCENT : MUTED, 0, 0);
     free(status);
     if (u->modal)
         modal_draw(u);

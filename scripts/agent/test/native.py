@@ -669,6 +669,12 @@ class NativeTests(unittest.TestCase):
         s=Session(self.env)
         try:
             s.wait("MCP tools connected")
+            idle_status=s.screen.text.splitlines()[-1]
+            until=time.monotonic()+6
+            while time.monotonic()<until:
+                s.read(.01)
+                self.assertEqual(s.screen.text.splitlines()[-1],idle_status)
+                self.assertTrue(all(fg=="#aaaaaa" for char,fg,_ in s.screen.grid[-1] if char.strip()))
             for seq,title in [("\x1bOQ","Server details"),("\x1bOR","Task details"),("\x1bOS","Connection")]:
                 s.send(seq)
                 self.assertIn(title,s.screen.text)
@@ -678,8 +684,10 @@ class NativeTests(unittest.TestCase):
             self.mock.mode="slow"
             s.send("waiting\r")
             s.wait("Thinking")
+            self.assertTrue(all(fg=="#ffbe6f" for char,fg,_ in s.screen.grid[-1] if char.strip()))
             s.send("\x1b")
             s.wait("Stopped")
+            self.assertTrue(all(fg=="#aaaaaa" for char,fg,_ in s.screen.grid[-1] if char.strip()))
             self.assertNotIn("ACTIVITY",s.screen.text)
         finally:
             s.close()
