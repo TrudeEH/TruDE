@@ -4,6 +4,7 @@
 #include <poll.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 #include <wchar.h>
@@ -63,6 +64,7 @@ enum {
     A_MODEL,
     A_LIMITS,
     A_WORKSPACE,
+    A_CHAT_WORKSPACE,
     A_PROMPT,
     A_PERMISSION,
     A_TIMER,
@@ -77,7 +79,7 @@ typedef struct Modal {
     struct Modal *parent;
 } Modal;
 typedef struct {
-    J *config, *chat, *history, *tasklist, *expanded, *jobresult;
+    J *config, *chat, *history, *tasklist, *expanded, *jobresult, *mcp_config;
     MCP mcp;
     pthread_mutex_t mutex;
     pthread_cond_t condition;
@@ -364,8 +366,9 @@ static void transcript(UI *u) {
     if (!u->transcript.len)
         text_lines(&u->transcript,
                    "Seth · your local assistant\n\nChoose a provider and model in Settings, then "
-                   "send a message.\n\nFiles and shell commands use the workspace in "
-                   "Settings.\nWeb search and file tools are enabled by default.",
+                   "send a message.\n\nFiles and shell commands use this chat's workspace, shown "
+                   "under Actions.\nUse /workspace or click the path to change it.\nWeb search "
+                   "and file tools are enabled by default.",
                    NORMAL, 0);
     jf(results);
     jf(waiting);
@@ -464,8 +467,8 @@ static void icon_button(UI *u, int x, int y, wchar_t icon, int id) {
     hit(u, x, y, 3, 1, id, 0);
 }
 static void actions(UI *u, int x, int y, int width, const char *const *labels, const int *ids,
-                    int count) {
-    box(u, x, y, width, 3, "Actions", 0);
+                    int count, int height) {
+    box(u, x, y, width, height, "Actions", 0);
     int left = x + 2;
     for (int i = 0; i < count; i++) {
         button(u, left, y + 1, labels[i], ids[i]);
@@ -668,7 +671,8 @@ static void help(UI *u) {
               "scroll the conversation\n\n/new        Start a new chat\n/fork       Branch this "
               "conversation\n/continue   Continue the current task\n/retry      Branch before the "
               "last request and retry\n/compact    Summarize old context, retaining full "
-              "history\n/attach PATH  Add a workspace text file through MCP\n/export     Export "
+              "history\n/workspace  Choose a workspace for this chat only\n/attach PATH  Add a "
+              "workspace text file through MCP\n/export     Export "
               "the complete transcript as Markdown\n/events     Show activity and errors\n/help    "
               "   Open this help\n\nHistory: \uf067 New · \uf002 Find · \uf040 Rename · \uf1f8 Delete\n"
               "One click opens a saved chat. Find, Rename and "
@@ -684,6 +688,7 @@ static void refresh_history(UI *u) {
         if (!strcmp(gs(u->history->v[i], "id"), gs(u->chat, "id")))
             u->history_sel = (int)i;
 }
+static void start_job(UI *, int, const char *);
 static void fresh(UI *u) {
     if (u->busy)
         return;
@@ -697,8 +702,9 @@ static void fresh(UI *u) {
     notice_ui(u, "");
     u->tab = 0;
     u->focus = 100;
+    if (strcmp(gs(u->mcp.config, "workspace"), gs(u->chat, "workspace")))
+        start_job(u, 4, "");
 }
-static void start_job(UI *, int, const char *);
 static void open_chat(UI *u, const char *id) {
     if (u->busy)
         return;
@@ -708,12 +714,7 @@ static void open_chat(UI *u, const char *id) {
         error_ui(u);
         return;
     }
-    if (strcmp(gs(chat, "workspace"), gs(u->config, "workspace"))) {
-        notice_ui(u, "Chat uses its original workspace. Settings follows the selected chat.");
-        jset(u->config, "workspace", js(gs(chat, "workspace")));
-        save_config(u->config);
-        reconnect = 1;
-    }
+    reconnect = strcmp(gs(chat, "workspace"), gs(u->mcp.config, "workspace")) != 0;
     jf(u->chat);
     u->chat = chat;
     u->tab = 0;
@@ -835,13 +836,17 @@ static void *worker(void *opaque) {
         break;
     case 4: {
         MCP nextm;
-        mcp_init(&nextm, u->config);
+        J *config = jc(u->config);
+        jset(config, "workspace", js(gs(u->chat, "workspace")));
+        mcp_init(&nextm, config);
         nextm.elicit = elicit_worker;
         nextm.opaque = u;
         nextm.mutex = &u->mutex;
         int failed = mcp_connect(&nextm);
         pthread_mutex_lock(&u->mutex);
         mcp_close(&u->mcp);
+        jf(u->mcp_config);
+        u->mcp_config = config;
         u->mcp = nextm;
         pthread_mutex_unlock(&u->mutex);
         char *text = failed ? fmt("%d MCP server(s) failed — see MCP tab", failed)
@@ -912,6 +917,7 @@ static void *worker(void *opaque) {
 static void start_job(UI *u, int job, const char *text) {
     if (u->busy)
         return;
+    jset(u->mcp.config, "timeout", jc(jg(u->config, "timeout")));
     cancelled = 0;
     free(u->prompt);
     u->prompt = strdup(text ? text : "");
@@ -1064,6 +1070,8 @@ static void submit(UI *u) {
             start_job(u, 3, "");
         else if (!strcmp(text, "/export"))
             dispatch(u, 109, 0);
+        else if (!strcmp(text, "/workspace"))
+            dispatch(u, 116, 0);
         else if (!strcmp(text, "/events"))
             dispatch(u, 115, 0);
         else if (!strcmp(text, "/fork"))
@@ -1212,7 +1220,6 @@ static void save_modal(UI *u, int yes) {
         if (r) {
             jf(u->config);
             u->config = copy;
-            u->mcp.config = u->config;
         } else
             jf(copy);
         break;
@@ -1234,13 +1241,29 @@ static void save_modal(UI *u, int yes) {
         if (r) {
             jf(u->config);
             u->config = copy;
-            u->mcp.config = u->config;
-        } else {
+        } else
             jf(copy);
-            if (action == A_WORKSPACE) {
-                jset(u->chat, "workspace", js(gs(u->config, "workspace")));
-                reconnect = 1;
-            }
+        break;
+    }
+    case A_CHAT_WORKSPACE: {
+        char path[PATH_MAX];
+        struct stat st;
+        const char *workspace = gs(v, "workspace");
+        if (*workspace != '/' || !realpath(workspace, path) || stat(path, &st) ||
+            !S_ISDIR(st.st_mode)) {
+            r = fail("Workspace must be an existing absolute directory");
+            break;
+        }
+        J *chat = jc(u->chat);
+        jset(chat, "workspace", js(path));
+        jdel(chat, "guidance");
+        r = save_chat(chat);
+        if (r)
+            jf(chat);
+        else {
+            jf(u->chat);
+            u->chat = chat;
+            reconnect = strcmp(path, gs(u->mcp.config, "workspace")) != 0;
         }
         break;
     }
@@ -1447,6 +1470,12 @@ static void dispatch(UI *u, int id, int index) {
             error_ui(u);
         break;
     }
+    case 116: {
+        Modal *m = modal(u, FORM, A_CHAT_WORKSPACE, "Chat workspace",
+                         "Applies only to this chat. New chats use the default in Settings.");
+        field_add(m, "workspace", "Existing absolute directory", gs(u->chat, "workspace"), 0, 0);
+        break;
+    }
     case 113:
     case 114: {
         J *copy = jc(u->chat);
@@ -1625,7 +1654,8 @@ static void dispatch(UI *u, int id, int index) {
         break;
     }
     case 505: {
-        Modal *m = modal(u, FORM, A_WORKSPACE, "Workspace", "");
+        Modal *m = modal(u, FORM, A_WORKSPACE, "Default workspace",
+                         "Used for new chats. Change the current chat with /workspace.");
         field_add(m, "workspace", "Existing absolute directory", gs(u->config, "workspace"), 0, 0);
         break;
     }
@@ -1684,8 +1714,9 @@ static void modal_draw(UI *u) {
     int bottom = y + height - 3, inner = width - 6;
     u->hitcount = 0;
     if (m->kind == FORM) {
+        int hint = m->action == A_CHAT_WORKSPACE || m->action == A_WORKSPACE;
         int focused = m->focus < m->count ? m->focus : m->count - 1;
-        int space = height - 6;
+        int space = height - 6 - (hint ? 2 : 0);
         int start = 0, total = 0;
         for (int i = 0; i <= focused; i++)
             total += m->fields[i].e.multiline ? 7 : 4;
@@ -1694,6 +1725,10 @@ static void modal_draw(UI *u) {
             start++;
         }
         int row = y + 2;
+        if (hint) {
+            draw_text(u, x + 3, row, inner, m->text, MUTED, 0, 0);
+            row += 2;
+        }
         for (int i = start; i < m->count; i++) {
             Field *f = &m->fields[i];
             int h = f->e.multiline ? 6 : 3;
@@ -1786,7 +1821,7 @@ static void draw_chat(UI *u) {
         hit(u, 2, 7 + i, side - 4, 1, 102, index);
     }
     int x = side, width = u->w - side;
-    int logheight = u->h - 13;
+    int logheight = u->h - 14;
     if (logheight < 5)
         logheight = 5;
     box(u, x, 3, width, logheight, gs(u->chat, "title"), u->focus == 108);
@@ -1800,7 +1835,13 @@ static void draw_chat(UI *u) {
     hit(u, x + 1, cy + 1, width - 2, 4, 100, 0);
     const char *labels[] = {"Send", "Stop", "Compact", "Export"};
     int ids[] = {105, 106, 107, 109};
-    actions(u, x, cy + 6, width, labels, ids, 4);
+    actions(u, x, cy + 6, width, labels, ids, 4, 4);
+    int color = u->focus == 116 ? HOVER : SURFACE;
+    fill(u, x + 2, cy + 8, width - 4, 1, color);
+    char *workspace = fmt("Workspace: %s", gs(u->chat, "workspace"));
+    draw_text(u, x + 3, cy + 8, width - 6, workspace, color, 0, 0);
+    free(workspace);
+    hit(u, x + 2, cy + 8, width - 4, 1, 116, 0);
 }
 static void draw_mcp(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;
@@ -1863,7 +1904,7 @@ static void draw_mcp(UI *u) {
     lines_free(&l);
     const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect"};
     int ids[] = {201, 202, 203, 204, 205, 206, 207};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7);
+    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 3);
 }
 static void draw_tasks(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;
@@ -1909,7 +1950,7 @@ static void draw_tasks(UI *u) {
     lines_free(&l);
     const char *labels[] = {"New", "Edit", "Pause", "Run", "Result", "Delete", "Timer"};
     int ids[] = {402, 403, 404, 405, 406, 407, 408};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7);
+    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 3);
 }
 static void draw_settings(UI *u) {
     int width = u->w / 2;
@@ -1930,7 +1971,7 @@ static void draw_settings(UI *u) {
     button(u, 3, 20, "Edit connection", 502);
     button(u, 3, 23, "Discover / Test", 503);
     button(u, 3, 26, "Manual model", 504);
-    text = fmt("Seth\n\nWorkspace: %s\nPermissions: %s\nContext window: %.0f\nOutput tokens: "
+    text = fmt("Seth\n\nDefault workspace: %s\nPermissions: %s\nContext window: %.0f\nOutput tokens: "
                "%.0f\nTool rounds: %.0f\nTimeout: %.0f seconds",
                gs(u->config, "workspace"), gs(u->config, "permissions"),
                gn(u->config, "contextWindow", 0), gn(u->config, "maxTokens", 0),
@@ -1939,7 +1980,7 @@ static void draw_settings(UI *u) {
     free(text);
     view_lines(u, &l, width + 3, 5, width - 6, 10, &scroll, 0, 0);
     lines_free(&l);
-    button(u, width + 3, 17, "Workspace", 505);
+    button(u, width + 3, 17, "Default workspace", 505);
     button(u, width + 3, 20, "Tool permissions", 506);
     button(u, width + 3, 23, "Context and limits", 507);
     button(u, width + 3, 26, "System instructions", 508);
@@ -2591,7 +2632,8 @@ int tui(J *config) {
     }
     pthread_mutex_init(&u.mutex, NULL);
     pthread_cond_init(&u.condition, NULL);
-    mcp_init(&u.mcp, config);
+    u.mcp_config = jc(config);
+    mcp_init(&u.mcp, u.mcp_config);
     u.mcp.elicit = elicit_worker;
     u.mcp.opaque = &u;
     u.mcp.mutex = &u.mutex;
@@ -2660,6 +2702,7 @@ int tui(J *config) {
     while (u.modal)
         close_modal(&u);
     mcp_close(&u.mcp);
+    jf(u.mcp_config);
     jf(u.chat);
     jf(u.history);
     jf(u.tasklist);

@@ -58,7 +58,11 @@ focuses the composer; Ctrl+Q exits. Dialogs save with Ctrl+S; Enter adds lines i
 multiline settings fields.
 
 Commands: `/new`, `/fork`, `/continue`, `/retry`, `/compact`, `/attach PATH`,
-`/export`, `/events`, and `/help`. Retry and branch preserve previous transcripts;
+`/workspace`, `/export`, `/events`, and `/help`. `/workspace` opens a directory field
+for the current chat; the clickable workspace path after Export in Actions opens
+the same dialog. The workspace is saved with the chat and restored when reopened.
+Settings' default workspace applies to new chats without changing existing chats.
+Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
 
 ## Provider settings

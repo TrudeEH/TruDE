@@ -565,6 +565,92 @@ class NativeTests(unittest.TestCase):
             self.assertEqual(json.loads(self.settings.read_text())["permissions"],"auto")
         finally:
             s.close()
+    def test_tui_workspace_is_per_chat_and_tools_follow_selection(self):
+        other=self.root/"other"
+        other.mkdir()
+        (other/"seed.txt").write_text("chat workspace content\n")
+        self.mock.mode="read"
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("/workspace\r")
+            s.wait("Chat workspace")
+            s.send("\x01\x0b"+str(other)+"\r")
+            s.wait("MCP tools connected")
+            self.assertEqual(self.chat()["workspace"],str(other))
+            self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(self.workspace))
+            s.send("read the file\r")
+            s.wait("Héllo 🙂 from Seth.")
+            chat=self.chat()
+            ident=chat["id"]
+            title=chat["title"]
+            self.assertIn("chat workspace content",chat["messages"][2]["content"])
+            requests=[body for path,body,_ in self.mock.requests if path=="/v1/chat/completions"]
+            self.assertIn("Workspace: "+str(other),requests[-1]["messages"][0]["content"])
+            s.send("\x0c/new\r")
+            s.wait("MCP tools connected")
+            self.assertIn("Workspace: "+str(self.workspace),s.screen.text)
+            s.send("read default\r")
+            s.wait("Héllo 🙂 from Seth.")
+            self.assertIn("first line",self.chat()["messages"][2]["content"])
+            s.click(title)
+            s.wait("MCP tools connected")
+            s.click("Workspace:")
+            s.wait("Chat workspace")
+            self.assertIn(str(other),s.screen.text)
+            s.send("\x1b")
+            self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(self.workspace))
+        finally:
+            s.close()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click(title)
+            s.wait("MCP tools connected")
+            s.send("\x0c/attach seed.txt\r")
+            s.wait("Attachment: seed.txt")
+            s.send("\r")
+            s.wait("Héllo 🙂 from Seth.")
+            saved=json.loads((self.root/f"data/dotfiles-agent/chats/{ident}.json").read_text())
+            self.assertIn("chat workspace content",saved["messages"][-2]["content"])
+        finally:
+            s.close()
+    def test_tui_workspace_validation_cancel_and_default_changes(self):
+        other=self.root/"other"
+        other.mkdir()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click("Workspace:")
+            s.wait("Chat workspace")
+            s.send("\x01\x0b"+str(other)+"\x1b")
+            self.assertIn("Workspace: "+str(self.workspace),s.screen.text)
+            for invalid in [str(self.workspace/"seed.txt"),str(self.root/"missing"),"relative"]:
+                s.send("\x0c/workspace\r")
+                s.send("\x01\x0b"+invalid+"\r")
+                s.wait("Workspace must be an existing absolute directory")
+                self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(self.workspace))
+                s.send("\x1b")
+                s.send("\x1b")
+            s.send("\x1bOS")
+            s.click("Default workspace")
+            s.send("\x01\x0b"+str(other)+"\r")
+            self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(other))
+            s.send("\x1bOP")
+            self.assertIn("Workspace: "+str(self.workspace),s.screen.text)
+            s.send("\x0c/new\r")
+            s.wait("MCP tools connected")
+            self.assertIn("Workspace: "+str(other),s.screen.text)
+            fcntl.ioctl(s.master,termios.TIOCSWINSZ,struct.pack("HHHH",30,80,0,0))
+            s.screen=Terminal(cols=80,rows=30)
+            os.kill(s.process.pid,signal.SIGWINCH)
+            s.read()
+            s.wait("Workspace:")
+            self.assertIn("Export",s.screen.text)
+            s.click("Workspace:")
+            s.wait("Chat workspace")
+        finally:
+            s.close()
     def test_tui_stop_clears_activity_and_all_views_have_borders(self):
         s=Session(self.env)
         try:
