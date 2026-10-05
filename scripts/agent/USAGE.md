@@ -23,8 +23,9 @@ Headless runs use the same settings and saved chats.
 
 ## Interface and chat features
 
-- Full-screen keyboard/mouse TUI with Chat, MCP servers, Automation, Settings,
-  and a fifth Help tab that opens the chat help pop-up. No permanent header or help panels.
+- Full-screen keyboard/mouse TUI with Chat, MCP servers, Automation,
+  Memory and Settings, and a sixth Help tab that opens the chat help pop-up.
+  No permanent header or help panels.
 - Repository dark/orange palette, scrollable conversation, Markdown headings/bold,
   code blocks, muted tool calls collapsed by default (click a row to expand or
   collapse its arguments and result), and a multiline editor supporting paste,
@@ -51,7 +52,8 @@ Headless runs use the same settings and saved chats.
 Enter sends a message; Shift+Enter adds a line; Ctrl+S also sends. Multiline paste
 does not send. Foot's enhanced keyboard reporting distinguishes Shift+Enter without
 terminal configuration changes. Ctrl+J is another way to insert a newline.
-Escape stops or dismisses a dialog. F1–F4 select tabs; F5 or the fifth tab opens chat
+Escape stops or dismisses a dialog. F1–F5 select Chat, MCP servers, Automation,
+Memory, and Settings; F6 or the sixth tab opens chat
 help. `?` toggles help outside text fields or in an empty composer; inside a message
 it remains a question mark. Tab/Shift+Tab move focus; Ctrl+N creates a chat; Ctrl+L
 focuses the composer; Ctrl+Q exits. Dialogs save with Ctrl+S; Enter adds lines in
@@ -115,6 +117,17 @@ Bundled defaults:
   across chats and workspaces in private `memories.json` under the agent's XDG data
   directory. Reads are permitted in read-only mode; saving and deleting follow the
   normal tool approval rules. Concurrent server processes use a lock and atomic saves.
+
+The Memory tab lists saved memories and shows the selected memory's full content.
+Click a row or use the arrow keys to select a memory; Read opens the complete text,
+Edit opens its title and multiline content, Delete asks for confirmation, and Refresh
+reloads the list. Manual changes are user actions and work in read-only agent mode.
+Edits and deletes detect changes made while the dialog was open. Enable the bundled
+memory server and the corresponding tools to use this tab.
+
+Function-key navigation accepts legacy SS3, CSI, Linux console, and modern keyboard
+reporting sequences. The enhanced keyboard encodings follow the
+[terminal keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
 
 Existing version 1 settings migrate once to version 2, adding memory and the separate
 shell server. A disabled filesystem server or shell tool keeps shell disabled. Explicit

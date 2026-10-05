@@ -59,6 +59,8 @@ enum {
     A_TASK_EDIT,
     A_TASK_DELETE,
     A_TASK_TOOLS,
+    A_MEMORY_EDIT,
+    A_MEMORY_DELETE,
     A_PROFILE,
     A_PROVIDER,
     A_MODEL,
@@ -79,15 +81,15 @@ typedef struct Modal {
     struct Modal *parent;
 } Modal;
 typedef struct {
-    J *config, *chat, *history, *tasklist, *expanded, *jobresult, *mcp_config;
+    J *config, *chat, *history, *tasklist, *expanded, *jobresult, *mcp_config, *memories;
     MCP mcp;
     pthread_mutex_t mutex;
     pthread_cond_t condition;
     pthread_t thread;
-    int busy, job, result, tab, focus, history_sel, server_sel, task_sel, chat_scroll,
-        detail_scroll, following, quit, w, h, paste;
+    int busy, job, result, tab, focus, history_sel, server_sel, task_sel, memory_sel, chat_scroll,
+        detail_scroll, following, quit, w, h, paste, memory_reload;
     atomic_int finished, dirty, approval;
-    char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer;
+    char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error;
     J *request_params, *response;
     int request_kind;
     Buf partial, input, pasted;
@@ -670,7 +672,7 @@ static void help(UI *u) {
         modal(u, MESSAGE, 999, "Chat help",
               "Enter sends · Shift+Enter adds a line · Ctrl+J adds a line\nCtrl+S sends · Tab / "
               "Shift+Tab move focus · Ctrl+L compose\nEscape stops or closes a dialog · Ctrl+Q "
-              "quits\nF1–F4 views · F5 help · ? help outside text or empty composer\nCtrl+N "
+              "quits\nF1–F5 views · F6 help · ? help outside text or empty composer\nCtrl+N "
               "creates a chat · click tool calls to open their details\nMouse wheel / PgUp / PgDn "
               "scroll the conversation\n\n/new        Start a new chat\n/fork       Branch this "
               "conversation\n/continue   Continue the current task\n/retry      Branch before the "
@@ -816,6 +818,58 @@ static J *elicit_worker(const char *server, J *params, void *opaque) {
     }
     return answer;
 }
+static J *memory_request(UI *u, const char *name, J *args) {
+    Tool *tool = NULL;
+    for (size_t i = 0; i < u->mcp.toolcount; i++) {
+        Tool *t = u->mcp.tools[i];
+        if (!strcmp(gs(t->conn->config, "builtin"), "memory") && !strcmp(t->name, name)) {
+            tool = t;
+            break;
+        }
+    }
+    if (!tool) {
+        fail("Enable the memory server and its %s tool in MCP servers", name);
+        return NULL;
+    }
+    J *params = jo();
+    jset(params, "name", js(name));
+    jset(params, "arguments", jc(args));
+    J *reply = mcp_request(&u->mcp, tool->conn, "tools/call", params,
+                          (int)gn(u->config, "timeout", 180));
+    jf(params);
+    if (!reply)
+        return NULL;
+    const char *text = gs(ji(jg(reply, "content"), 0), "text");
+    J *result = gb(reply, "isError", 0) ? NULL : jp(text, NULL);
+    if (!result)
+        fail("%s", *text ? text : "Invalid memory response");
+    jf(reply);
+    return result;
+}
+static J *memory_list(UI *u) {
+    J *rows = ja(), *args = jo();
+    jset(args, "limit", jnum(100));
+    for (int offset = 0; offset < 10000; offset += 100) {
+        jset(args, "offset", jnum(offset));
+        J *page = memory_request(u, "list_memories", args);
+        if (!page || page->type != JARR) {
+            if (page)
+                fail("Invalid memory list");
+            jf(page);
+            jf(args);
+            jf(rows);
+            return NULL;
+        }
+        size_t count = page->len;
+        for (size_t i = 0; i < count; i++)
+            jadd(rows, jc(page->v[i]));
+        jf(page);
+        if (count < 100)
+            break;
+    }
+    jf(args);
+    return rows;
+}
 static void *worker(void *opaque) {
     UI *u = opaque;
     err[0] = 0;
@@ -872,6 +926,18 @@ static void *worker(void *opaque) {
     case 9:
         result = mcp_refresh(&u->mcp);
         break;
+    case 10:
+        jobresult = memory_list(u);
+        result = jobresult ? 0 : -1;
+        break;
+    case 11: {
+        J *request = jp(u->prompt, NULL);
+        jobresult = request ? memory_request(u, gs(request, "name"), jg(request, "arguments"))
+                            : NULL;
+        jf(request);
+        result = jobresult ? 0 : -1;
+        break;
+    }
     case 8: {
         Tool *t = NULL;
         for (size_t i = 0; i < u->mcp.toolcount; i++)
@@ -930,6 +996,8 @@ static void start_job(UI *u, int job, const char *text) {
     u->finished = 0;
     free(u->progress);
     u->progress = strdup(job == 9   ? (u->notice && *u->notice ? u->notice : "Ready")
+                         : job == 10 ? "Loading memories…"
+                         : job == 11 ? "Updating memory…"
                          : job == 4 ? "Connecting MCP servers…"
                          : job == 5 ? "Discovering models…"
                          : job == 6 ? "Running scheduled task…"
@@ -1170,6 +1238,8 @@ static void save_modal(UI *u, int yes) {
         close_modal(u);
         return;
     }
+    if ((m->action == A_MEMORY_EDIT || m->action == A_MEMORY_DELETE) && u->busy)
+        return;
     int action = m->action;
     J *v = m->kind == FORM ? form_value(m) : NULL;
     if (m->kind == FORM && !v) {
@@ -1181,6 +1251,22 @@ static void save_modal(UI *u, int yes) {
                          ? strdup(jstr(m->choices->v[m->selected]))
                          : NULL;
     switch (action) {
+    case A_MEMORY_EDIT:
+    case A_MEMORY_DELETE: {
+        J *args = v ? jc(v) : jo(), *request = jo();
+        jset(args, "id", js(m->id));
+        jset(args, "expected_content", js(gs(m->value, "content")));
+        jset(args, "expected_title", js(gs(m->value, "title")));
+        jset(request, "name", js(action == A_MEMORY_EDIT ? "store_memory" : "delete_memory"));
+        jset(request, "arguments", args);
+        char *text = jd(request, 0);
+        start_job(u, 11, text);
+        free(text);
+        jf(request);
+        free(selected);
+        jf(v);
+        return;
+    }
     case A_FIND: {
         const char *query = gs(v, "query");
         J *choices = ja();
@@ -1389,14 +1475,20 @@ static void save_modal(UI *u, int yes) {
     u->dirty = 1;
 }
 static void dispatch(UI *u, int id, int index) {
-    if (id >= 10 && id < 15) {
-        if (id == 14)
+    if (id >= 10 && id < 16) {
+        if (id == 15)
             help(u);
         else if (!u->modal) {
             u->tab = id - 10;
             u->detail_scroll = 0;
-            u->focus = u->tab == 0 ? 100 : u->tab == 1 ? 200 : u->tab == 2 ? 400 : 500;
+            u->focus = u->tab == 0 ? 100 : u->tab == 1 ? 200 : u->tab == 2 ? 400
+                         : u->tab == 3 ? 600 : 500;
             u->dirty = 1;
+            if (u->tab == 3) {
+                u->memory_reload = u->busy;
+                if (!u->busy)
+                    start_job(u, 10, "");
+            }
         }
         return;
     }
@@ -1417,6 +1509,13 @@ static void dispatch(UI *u, int id, int index) {
     }
     if (id == 401) {
         u->task_sel = index;
+        u->detail_scroll = 0;
+        u->dirty = 1;
+        return;
+    }
+    if (id == 601) {
+        u->memory_sel = index;
+        u->focus = 600;
         u->detail_scroll = 0;
         u->dirty = 1;
         return;
@@ -1634,6 +1733,33 @@ static void dispatch(UI *u, int id, int index) {
     }
     case 408:
         start_job(u, 7, u->timer && !strcmp(u->timer, "enabled") ? "disable" : "enable");
+        break;
+    case 602:
+    case 603:
+    case 604: {
+        J *memory = ji(u->memories, u->memory_sel);
+        if (!memory)
+            break;
+        if (id == 602) {
+            char *text = fmt("%s\n\n%s", gs(memory, "title"), gs(memory, "content"));
+            message(u, "Read memory", text);
+            free(text);
+        } else {
+            Modal *m = modal(u, id == 603 ? FORM : CONFIRM,
+                             id == 603 ? A_MEMORY_EDIT : A_MEMORY_DELETE,
+                             id == 603 ? "Edit memory" : "Delete memory",
+                             "Permanently delete this saved memory?");
+            m->id = strdup(gs(memory, "id"));
+            m->value = jc(memory);
+            if (id == 603) {
+                field_add(m, "title", "Title", gs(memory, "title"), 0, 0);
+                field_add(m, "content", "Memory", gs(memory, "content"), 1, 0);
+            }
+        }
+        break;
+    }
+    case 605:
+        start_job(u, 10, "");
         break;
     case 501: {
         J *choices = ja(), *p = jg(u->config, "profiles");
@@ -1963,6 +2089,45 @@ static void draw_tasks(UI *u) {
     int ids[] = {402, 403, 404, 405, 406, 407, 408};
     actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
 }
+static void draw_memories(UI *u) {
+    int side = u->w * 32 / 100, height = u->h - 7;
+    if (side < 24)
+        side = 24;
+    box(u, 0, 3, side, height, "Memories", u->focus == 600);
+    box(u, side, 3, u->w - side, height, "Memory details", u->focus == 608);
+    hit(u, 1, 4, side - 2, height - 2, 600, 0);
+    hit(u, side + 1, 4, u->w - side - 2, height - 2, 608, 0);
+    int count = u->memories ? (int)u->memories->len : 0;
+    if (u->memory_sel >= count)
+        u->memory_sel = count ? count - 1 : 0;
+    int rows = height - 4, start = u->memory_sel >= rows ? u->memory_sel - rows + 1 : 0;
+    for (int i = 0; i < rows && i + start < count; i++) {
+        int index = i + start, color = index == u->memory_sel ? SELECTED : NORMAL;
+        J *memory = u->memories->v[index];
+        fill(u, 2, 5 + i, side - 4, 1, color);
+        draw_text(u, 3, 5 + i, side - 6,
+                  *gs(memory, "title") ? gs(memory, "title") : gs(memory, "content"), color, 0, 0);
+        hit(u, 2, 5 + i, side - 4, 1, 601, index);
+    }
+    Lines lines = {0};
+    J *memory = ji(u->memories, u->memory_sel);
+    if (u->memory_error && *u->memory_error)
+        text_lines(&lines, u->memory_error, MUTED, 0);
+    else if (memory) {
+        line(&lines, *gs(memory, "title") ? gs(memory, "title") : "Untitled memory", ACCENT, 1, NULL);
+        char *meta = fmt("Created: %s\nUpdated: %s\n", gs(memory, "created"), gs(memory, "updated"));
+        text_lines(&lines, meta, MUTED, 0);
+        free(meta);
+        text_lines(&lines, gs(memory, "content"), NORMAL, 0);
+    } else
+        line(&lines, u->busy && u->job == 10 ? "Loading memories…" : "No saved memories.",
+             MUTED, 0, NULL);
+    view_lines(u, &lines, side + 2, 5, u->w - side - 4, height - 4, &u->detail_scroll, 0, 0);
+    lines_free(&lines);
+    const char *labels[] = {"Read", "Edit", "Delete", "Refresh"};
+    int ids[] = {602, 603, 604, 605};
+    actions(u, 0, u->h - 4, u->w, labels, ids, 4, 2);
+}
 static void draw_settings(UI *u) {
     int width = u->w / 2;
     box(u, 0, 3, width, u->h - 4, "Connection", u->focus >= 501 && u->focus <= 504);
@@ -2017,17 +2182,20 @@ static void render(UI *u) {
         u->cells[i] = (Cell){L' ', NORMAL, 0};
     u->hitcount = 0;
     box(u, 0, 0, u->w, 3, "Views", 0);
-    const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Automation", "F4 Settings",
-                          "F5 Help (?)"};
+    const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Automation", "F4 Memory",
+                         "F5 Settings", "F6 Help (?)"};
+    const char *short_tabs[] = {"F1 Chat", "F2 MCP", "F3 Auto", "F4 Memory", "F5 Settings", "F6 Help"};
+    int padding = u->w < 110 ? 1 : 2;
     int x = 2;
-    for (int i = 0; i < 5; i++) {
-        int w = strlen(tabs[i]) + 4;
+    for (int i = 0; i < 6; i++) {
+        const char *label = u->w < 110 ? short_tabs[i] : tabs[i];
+        int w = strlen(label) + 2 * padding;
         int color =
-            ((u->modal && u->modal->action == 999) ? i == 4 : u->tab == i) ? SELECTED : SURFACE;
+            ((u->modal && u->modal->action == 999) ? i == 5 : u->tab == i) ? SELECTED : SURFACE;
         fill(u, x, 1, w, 1, color);
-        draw_text(u, x + 2, 1, w - 4, tabs[i], color, 0, 0);
+        draw_text(u, x + padding, 1, w - 2 * padding, label, color, 0, 0);
         hit(u, x, 1, w, 1, 10 + i, 0);
-        x += w + 2;
+        x += w + padding;
     }
     if (u->w < 80 || u->h < 30)
         draw_text(u, 2, 5, u->w - 4, "Resize the terminal to at least 80 columns × 30 rows.",
@@ -2038,9 +2206,11 @@ static void render(UI *u) {
         draw_mcp(u);
     else if (u->tab == 2)
         draw_tasks(u);
+    else if (u->tab == 3)
+        draw_memories(u);
     else
         draw_settings(u);
-    int working = u->busy && u->job != 9; /* Periodic MCP refresh is idle housekeeping. */
+    int working = u->busy && u->job != 9 && u->job != 10;
     char *status = fmt(
         "%s  %s / %s · %s · Context ≈ %zu / %.0f",
         working                   ? u->progress && *u->progress ? u->progress : "Working…"
@@ -2169,7 +2339,7 @@ static void cycle_focus(UI *u, int backwards) {
     int ids[256], n = 0;
     for (int i = 0; i < u->hitcount; i++) {
         int id = u->hits[i].id;
-        if (id >= 3000 || id == 301 || id == 401 || id < 100)
+        if (id >= 3000 || id == 301 || id == 401 || id == 601 || id < 100)
             continue;
         int seen = 0;
         for (int k = 0; k < n; k++)
@@ -2192,7 +2362,7 @@ static void key(UI *u, int code, const char *text) {
         cancelled = 1;
         return;
     }
-    if (code == 1015) {
+    if (code == 1021) {
         help(u);
         return;
     }
@@ -2276,7 +2446,7 @@ static void key(UI *u, int code, const char *text) {
             m->scroll += code == 1013 ? 10 : 1;
         return;
     }
-    if (code >= 1016 && code <= 1019) {
+    if (code >= 1016 && code <= 1020) {
         dispatch(u, 10 + code - 1016, 0);
         return;
     }
@@ -2342,12 +2512,44 @@ static void key(UI *u, int code, const char *text) {
             int i = u->task_sel + change;
             if (i >= 0 && i < (int)u->tasklist->len)
                 u->task_sel = i;
+        } else if (u->tab == 3 && u->focus == 600) {
+            int i = u->memory_sel + change;
+            if (i >= 0 && u->memories && i < (int)u->memories->len) {
+                u->memory_sel = i;
+                u->detail_scroll = 0;
+            }
         } else if (u->tab == 0) {
             u->following = 0;
             u->chat_scroll += change;
         } else
             u->detail_scroll += change;
     }
+}
+static int function_key(const char *seq) {
+    size_t n = strlen(seq);
+    if (!n)
+        return 0;
+    if (n == 2 && seq[0] == '[' && seq[1] >= 'A' && seq[1] <= 'E')
+        return 1016 + seq[1] - 'A'; /* Linux console F1–F5. */
+    const char *modifier = strchr(seq, ';');
+    int mods = modifier ? atoi(modifier + 1) : 1;
+    const char *event = modifier ? strchr(modifier + 1, ':') : NULL;
+    if ((event && atoi(event + 1) == 3) || mods < 1 || ((mods - 1) & ~(64 | 128)))
+        return 0;
+    char final = seq[n - 1];
+    int number = atoi(seq);
+    if ((final == 'P' || final == 'Q' || final == 'R' || final == 'S') &&
+        (n == 1 || number == 1))
+        return 1016 + final - 'P';
+    if (final == '~') {
+        const int keys[] = {11, 12, 13, 14, 15, 17};
+        for (int i = 0; i < 6; i++)
+            if (number == keys[i])
+                return 1016 + i;
+    }
+    if (final == 'u' && number >= 57364 && number <= 57369)
+        return 1016 + number - 57364;
+    return 0;
 }
 static void consume_input(UI *u, int flush) {
     while (u->input.n) {
@@ -2397,6 +2599,8 @@ static void consume_input(UI *u, int flush) {
                 used = 1;
             } else if (p[1] == '[') {
                 size_t end = 2;
+                if (u->input.n > 2 && p[2] == '[')
+                    end++;
                 while (end < u->input.n &&
                        !((unsigned char)p[end] >= 64 && (unsigned char)p[end] <= 126))
                     end++;
@@ -2431,26 +2635,30 @@ static void consume_input(UI *u, int flush) {
                     code = 1013;
                 else if (!strcmp(seq, "Z"))
                     code = 1011;
-                else if (!strcmp(seq, "11~"))
-                    code = 1016;
-                else if (!strcmp(seq, "12~"))
-                    code = 1017;
-                else if (!strcmp(seq, "13~"))
-                    code = 1018;
-                else if (!strcmp(seq, "14~"))
-                    code = 1019;
-                else if (!strcmp(seq, "15~"))
-                    code = 1015;
+                else if (function_key(seq))
+                    code = function_key(seq);
                 else if (seq[strlen(seq) - 1] == 'u') {
-                    int val = 0, mods = 1;
-                    if (sscanf(seq, "%d;%d", &val, &mods) >= 1) {
-                        if (val == 13)
-                            code = (mods & 2) ? 1010 : 13;
+                    int val = atoi(seq);
+                    if (val > 0) {
+                        const char *modifier = strchr(seq, ';');
+                        int mods = modifier ? atoi(modifier + 1) : 1;
+                        const char *event = modifier ? strchr(modifier + 1, ':') : NULL;
+                        if (event && atoi(event + 1) == 3)
+                            val = 0;
+                        int flags = mods - 1;
+                        if (val == 27)
+                            code = 27;
+                        else if (val == 127)
+                            code = 127;
+                        else if (val == 13)
+                            code = (flags & 1) ? 1010 : 13;
                         else if (val == 9)
-                            code = (mods & 2) ? 1011 : 9;
-                        else if (mods & 4)
-                            code = val < 128 ? tolower(val) - 'a' + 1 : 0;
-                        else if (val >= 32 && val <= 0x10ffff) {
+                            code = (flags & 1) ? 1011 : 9;
+                        else if (flags & 4) {
+                            int letter = val < 128 ? tolower(val) : 0;
+                            code = letter >= 'a' && letter <= 'z' ? letter - 'a' + 1 : 0;
+                        }
+                        else if (val >= 32 && val <= 0x10ffff && (val < 57344 || val > 63743)) {
                             char utf[MB_LEN_MAX];
                             mbstate_t st = {0};
                             size_t n = wcrtomb(utf, (wchar_t)val, &st);
@@ -2547,6 +2755,31 @@ static void finish_job(UI *u) {
     u->busy = 0;
     u->finished = 0;
     cancelled = 0;
+    if (u->job == 10) {
+        free(u->memory_error);
+        u->memory_error = strdup(u->result ? u->notice : "");
+        if (u->jobresult) {
+            char *id = strdup(gs(ji(u->memories, u->memory_sel), "id"));
+            jf(u->memories);
+            u->memories = u->jobresult;
+            u->jobresult = NULL;
+            for (size_t i = 0; i < u->memories->len; i++)
+                if (!strcmp(gs(u->memories->v[i], "id"), id))
+                    u->memory_sel = (int)i;
+            free(id);
+        }
+    } else if (u->job == 11) {
+        if (u->result) {
+            fail("%s", u->notice);
+            error_ui(u);
+        } else {
+            int deleted = jg(u->jobresult, "deleted") != NULL;
+            if (u->modal && (u->modal->action == A_MEMORY_EDIT || u->modal->action == A_MEMORY_DELETE))
+                close_modal(u);
+            notice_ui(u, deleted ? "Memory deleted" : "Memory saved");
+            u->memory_reload = 1;
+        }
+    }
     if (u->modal && (u->modal->action == A_APPROVE || u->modal->action == A_ELICIT))
         close_modal(u);
     if (u->job == 5 && u->jobresult && !u->jobresult->len) {
@@ -2577,6 +2810,10 @@ static void finish_job(UI *u) {
     if (!u->tasklist)
         u->tasklist = ja();
     u->dirty = 1;
+    if (u->memory_reload && u->tab == 3 && !u->modal) {
+        u->memory_reload = 0;
+        start_job(u, 10, "");
+    }
 }
 static void cleanup_terminal(void) {
     if (!active)
@@ -2594,6 +2831,7 @@ int tui(J *config) {
     u.config = config;
     u.chat = new_chat(config);
     u.expanded = jo();
+    u.memories = ja();
     u.notice = strdup("");
     u.progress = strdup("");
     u.focus = 100;
@@ -2718,6 +2956,7 @@ int tui(J *config) {
     jf(u.chat);
     jf(u.history);
     jf(u.tasklist);
+    jf(u.memories);
     jf(u.expanded);
     jf(u.jobresult);
     jf(u.request_params);
@@ -2729,6 +2968,7 @@ int tui(J *config) {
     free(u.request_title);
     free(u.request_text);
     free(u.timer);
+    free(u.memory_error);
     free(u.composer.s);
     free(u.cells);
     free(u.old);

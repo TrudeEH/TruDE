@@ -638,7 +638,7 @@ class NativeTests(unittest.TestCase):
             self.assertNotIn("filesystem / read_file",s.screen.text)
             x,y=s.screen.find("old chat")
             self.assertNotEqual(s.screen.grid[y][x][2],"#ffbe6f")
-            s.send("\x1b[15~")
+            s.send("\x1b[17~")
             s.wait("Chat help")
             s.send("\x1b")
             s.send("\x0c")
@@ -660,12 +660,136 @@ class NativeTests(unittest.TestCase):
         s=Session(self.env)
         try:
             s.wait("MCP tools connected")
-            s.send("\x1bOS")
+            s.send("\x1b[15~")
             s.click("Tool permissions")
             s.send("\x1b[B\x1b[B\r")
             s.wait("Enable Auto")
             s.click("Enable Auto")
             self.assertEqual(json.loads(self.settings.read_text())["permissions"],"auto")
+        finally:
+            s.close()
+    def test_tui_memory_read_edit_delete_and_conflicts(self):
+        first=self.memory("store_memory",{"title":"Editor choice","content":"Original content."})
+        second=self.memory("store_memory",{"title":"Another memory","content":"Keep this."})
+        self.config["permissions"]="read-only"
+        self.save()
+        file=self.root/"data/dotfiles-agent/memories.json"
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("\x1b[S")
+            s.wait("Another memory")
+            s.click("Editor choice")
+            s.wait("Original content.")
+            s.click("Read")
+            s.wait("Read memory")
+            self.assertIn("Original content.",s.screen.text)
+            s.send("\x1b")
+            s.click("Edit")
+            s.wait("Edit memory")
+            s.send("\x01\x0bEditor preference\t\x01\x0bUpdated content.\x0aSecond line.\x13")
+            s.wait("Memory saved")
+            s.wait("Second line.")
+            records=json.loads(file.read_text())
+            changed=next(r for r in records if r["id"]==first["id"])
+            self.assertEqual(changed["title"],"Editor preference")
+            self.assertEqual(changed["content"],"Updated content.\nSecond line.")
+            s.click("Edit")
+            self.memory("store_memory",{"id":first["id"],"content":"Changed in another chat."})
+            s.send("\x01\x0bMy unsaved title\x13")
+            s.wait("Memory changed.")
+            self.assertEqual(next(r for r in json.loads(file.read_text()) if r["id"]==first["id"])["content"],"Changed in another chat.")
+            s.send("\x1b")
+            self.assertIn("My unsaved title",s.screen.text)
+            s.send("\x1b")
+            s.click("Refresh")
+            s.wait("Changed in another chat.")
+            s.click("Delete")
+            s.wait("Delete memory")
+            s.click("Cancel")
+            self.assertEqual(len(json.loads(file.read_text())),2)
+            s.click("Delete")
+            s.click("Confirm")
+            s.wait("Memory deleted")
+            s.wait("Keep this.")
+            self.assertEqual([r["id"] for r in json.loads(file.read_text())],[second["id"]])
+            s.click("Delete")
+            s.click("Confirm")
+            s.wait("No saved memories.")
+            self.assertEqual(json.loads(file.read_text()),[])
+        finally:
+            s.close()
+    def test_tui_memory_pagination_and_disabled_server(self):
+        records=[{"id":f"00000000-0000-4000-8000-{i:012d}","title":f"Memory item {i:03d}","content":f"Contents of item {i}","created":"2026-01-01T00:00:00.000Z","updated":"2026-01-01T00:00:00.000Z"} for i in range(105)]
+        records[-1]["content"]="Contents of item 104\n"+"long line "*1600+"\nFull memory end."
+        file=self.root/"data/dotfiles-agent/memories.json"
+        file.parent.mkdir(parents=True)
+        file.write_text(json.dumps(records))
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click("F4 Memory")
+            s.wait("Contents of item 104")
+            s.click("Read")
+            s.wait("Read memory")
+            s.send("\x1b[6~"*30)
+            s.wait("Full memory end.")
+            s.send("\x1b")
+            s.click("Memory item 104")
+            s.send("\x1b[B"*104)
+            s.wait("Contents of item 0")
+            self.assertIn("Memory item 000",s.screen.text)
+            self.memory("store_memory",{"id":records[0]["id"],"content":"Refreshed oldest memory"})
+            s.click("Refresh")
+            s.wait("Refreshed oldest memory")
+            fcntl.ioctl(s.master,termios.TIOCSWINSZ,struct.pack("HHHH",30,80,0,0))
+            s.screen=Terminal(cols=80,rows=30)
+            os.kill(s.process.pid,signal.SIGWINCH)
+            s.read()
+            s.wait("F6 Help")
+            s.click("F5 Settings")
+            s.wait("Connection")
+        finally:
+            s.close()
+        self.config["mcpServers"]["memory"]={"builtin":"memory","enabled":False}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("\x1bOS")
+            s.wait("Enable the memory server")
+            self.assertEqual(len(json.loads(file.read_text())),105)
+        finally:
+            s.close()
+    def test_tui_function_keys_support_terminal_encodings(self):
+        families=[
+            ["\x1bOP","\x1bOQ","\x1bOR","\x1bOS","\x1b[15~","\x1b[17~"],
+            ["\x1b[P","\x1b[Q","\x1b[R","\x1b[S","\x1b[15;1~","\x1b[17;1~"],
+            ["\x1b[1;1P","\x1b[1;1Q","\x1b[1;1R","\x1b[1;1S","\x1b[15;1~","\x1b[17;1~"],
+            [f"\x1b[{n}~" for n in (11,12,13,14,15,17)],
+            [f"\x1b[[{c}" for c in "ABCDE"]+["\x1b[17~"],
+            [f"\x1b[{n};1u" for n in range(57364,57370)]
+        ]
+        titles=["Message","Server details","Task details","Memory details","Connection","Chat help"]
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("unfinished draft")
+            for family in families:
+                for seq,title in zip(family,titles):
+                    s.send(seq)
+                    s.wait(title)
+                s.send("\x1b")
+            s.send("\x1b[15~")
+            s.send("\x1b[57367;1:3u")
+            self.assertIn("Connection",s.screen.text)
+            s.send("\x1b[1;129Q")
+            s.wait("Server details")
+            s.send("\x1b[")
+            s.send("P")
+            s.wait("Message")
+            self.assertIn("unfinished draft",s.screen.text)
+            self.assertFalse(self.mock.requests)
         finally:
             s.close()
     def test_tui_workspace_is_per_chat_and_tools_follow_selection(self):
@@ -735,7 +859,7 @@ class NativeTests(unittest.TestCase):
                 self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(self.workspace))
                 s.send("\x1b")
                 s.send("\x1b")
-            s.send("\x1bOS")
+            s.send("\x1b[15~")
             s.click("Default workspace")
             s.send("\x01\x0b"+str(other)+"\r")
             self.assertEqual(json.loads(self.settings.read_text())["workspace"],str(other))
@@ -768,7 +892,7 @@ class NativeTests(unittest.TestCase):
                 s.read(.01)
                 self.assertEqual(s.screen.text.splitlines()[-1],idle_status)
                 self.assertTrue(all(fg=="#aaaaaa" for char,fg,_ in s.screen.grid[-1] if char.strip()))
-            for seq,title in [("\x1bOQ","Server details"),("\x1bOR","Task details"),("\x1bOS","Connection")]:
+            for seq,title in [("\x1bOQ","Server details"),("\x1bOR","Task details"),("\x1bOS","Memory details"),("\x1b[15~","Connection")]:
                 s.send(seq)
                 self.assertIn(title,s.screen.text)
                 self.assertIn("┌",s.screen.text)
