@@ -668,6 +668,127 @@ class NativeTests(unittest.TestCase):
             self.assertEqual(json.loads(self.settings.read_text())["permissions"],"auto")
         finally:
             s.close()
+    def timer_mock(self):
+        bindir=self.root/"bin"
+        bindir.mkdir(exist_ok=True)
+        state=self.root/"timer-state"
+        log=self.root/"timer-log"
+        failure=self.root/"timer-failure"
+        script=bindir/"systemctl"
+        script.write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$SETH_TIMER_LOG"
+if [ -f "$SETH_TIMER_FAILURE" ]; then
+    cat "$SETH_TIMER_FAILURE" >&2
+    exit 1
+fi
+case "$2" in
+    show) cat "$SETH_TIMER_STATE" ;;
+    enable|start) printf 'LoadState=loaded\\nActiveState=active\\nUnitFileState=enabled\\n' > "$SETH_TIMER_STATE" ;;
+    disable) printf 'LoadState=loaded\\nActiveState=inactive\\nUnitFileState=disabled\\n' > "$SETH_TIMER_STATE" ;;
+    daemon-reload) : ;;
+    *) exit 1 ;;
+esac
+''')
+        script.chmod(0o755)
+        self.env.update(PATH=str(bindir)+":"+self.env["PATH"],SETH_TIMER_STATE=str(state),SETH_TIMER_LOG=str(log),SETH_TIMER_FAILURE=str(failure))
+        return state,log,failure
+    def test_installer_enables_timer_with_and_without_user_manager(self):
+        state,log,failure=self.timer_mock()
+        repo=Path(__file__).resolve().parents[3]
+        source=(repo/"install.sh").read_text()
+        functions="\n".join(re.search(r"^"+name+r"\(\) \{\n.*?^\}",source,re.M|re.S).group() for name in ("link_config","configure_agent_timer"))
+        script='set -eu\nrepo_dir=$1\nconfig_dir=$2\nui_success() { :; }\n'+functions+'\nconfigure_agent_timer\n'
+        for offline in (False,True):
+            config=self.root/("offline-install" if offline else "online-install")
+            if offline:
+                failure.write_text("Failed to connect to user bus\n")
+            for _ in range(2):
+                result=subprocess.run(["sh","-s","--",str(repo),str(config)],input=script,env=self.env,text=True,capture_output=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+                for unit in ("dotfiles-agent.service","dotfiles-agent.timer","timers.target.wants/dotfiles-agent.timer"):
+                    link=config/"systemd/user"/unit
+                    self.assertTrue(link.is_symlink(),link)
+                    self.assertEqual(link.resolve(),repo/"configs/systemd/user"/Path(unit).name)
+                self.assertFalse(list(config.rglob("*.backup-*")))
+                if offline:
+                    self.assertIn("enabled for future user sessions",result.stderr)
+            if not offline:
+                self.assertIn("--user start dotfiles-agent.timer",log.read_text())
+                self.assertIn("ActiveState=active",state.read_text())
+        self.assertRegex(source,r"(?m)^    configure_agent_timer$")
+    def test_tui_timer_reports_states_and_controls_active_timer(self):
+        state,log,failure=self.timer_mock()
+        cases=[("loaded","inactive","linked","disabled"),
+               ("loaded","inactive","enabled","enabled (stopped)"),
+               ("not-found","inactive","","not installed"),
+               ("masked","inactive","masked","masked"),
+               ("loaded","failed","enabled","failed"),
+               ("error","inactive","","user service manager unavailable")]
+        for load,active,enabled,expected in cases:
+            state.write_text(f"LoadState={load}\nActiveState={active}\nUnitFileState={enabled}\n")
+            if load=="error":
+                failure.write_text("Failed to connect to user bus\n")
+            s=Session(self.env)
+            try:
+                s.wait("MCP tools connected")
+                s.click("F3 Automation")
+                s.wait("Background timer: "+expected)
+                if expected in ("disabled","enabled (stopped)"):
+                    s.click("Timer")
+                    s.wait("Background timer: enabled")
+                    s.read(.2)
+                    self.assertNotIn("enabled (stopped)",s.screen.text)
+                    self.assertIn("--user enable --now dotfiles-agent.timer",log.read_text())
+                    s.click("Timer")
+                    s.wait("Background timer: disabled")
+                    self.assertIn("--user disable --now dotfiles-agent.timer",log.read_text())
+                if expected=="disabled":
+                    state.write_text("LoadState=loaded\nActiveState=active\nUnitFileState=enabled\n")
+                    s.wait("Background timer: enabled",timeout=8)
+            finally:
+                s.close()
+    def test_tui_memory_creation_cancel_validation_and_persistence(self):
+        self.config["permissions"]="read-only"
+        self.save()
+        file=self.root/"data/dotfiles-agent/memories.json"
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click("F4 Memory")
+            s.wait("No saved memories.")
+            s.click("New")
+            s.wait("New memory")
+            s.send("Cancelled title\tCancelled content\x1b")
+            self.assertFalse(file.exists())
+            s.click("New")
+            s.send("Favorite editor\x13")
+            s.wait("Input.content has an invalid length")
+            self.assertFalse(file.exists())
+            s.send("\x1b")
+            self.assertIn("Favorite editor",s.screen.text)
+            s.send("\tUse micro.\x0aKeep line numbers enabled.\x13")
+            s.wait("Memory saved")
+            s.wait("Keep line numbers enabled.")
+            record=json.loads(file.read_text())[0]
+            self.assertEqual(record["title"],"Favorite editor")
+            self.assertEqual(record["content"],"Use micro.\nKeep line numbers enabled.")
+            self.assertTrue(record["id"] and record["created"] and record["updated"])
+            self.assertEqual(file.stat().st_mode&0o777,0o600)
+            s.click("New")
+            s.send("Another preference\tAlways use sh.\x13")
+            s.wait("Always use sh.")
+            self.assertEqual(len(json.loads(file.read_text())),2)
+        finally:
+            s.close()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click("F4 Memory")
+            s.wait("Always use sh.")
+            s.click("Favorite editor")
+            s.wait("Keep line numbers enabled.")
+        finally:
+            s.close()
     def test_tui_memory_read_edit_delete_and_conflicts(self):
         first=self.memory("store_memory",{"title":"Editor choice","content":"Original content."})
         second=self.memory("store_memory",{"title":"Another memory","content":"Keep this."})

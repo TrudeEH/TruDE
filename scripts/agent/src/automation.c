@@ -435,16 +435,41 @@ int run_due(void) {
     return result;
 }
 char *timer_status(void) {
-    char *args[] = {"systemctl", "--user", "is-enabled", "dotfiles-agent.timer", NULL};
-    int code;
+    char *args[] = {"systemctl", "--user", "show", "dotfiles-agent.timer", "--property=LoadState",
+                    "--property=ActiveState", "--property=UnitFileState", NULL};
+    int code = 0;
     char *s = command(args, NULL, 3, 2000, &code);
     if (!s || code) {
         free(s);
         err[0] = 0;
-        return strdup("disabled / unavailable");
+        return strdup("user service manager unavailable");
     }
-    s[strcspn(s, "\r\n")] = 0;
-    return s;
+    char *load = "", *active = "", *enabled = "", *save;
+    for (char *line = strtok_r(s, "\r\n", &save); line; line = strtok_r(NULL, "\r\n", &save)) {
+        if (!strncmp(line, "LoadState=", 10))
+            load = line + 10;
+        else if (!strncmp(line, "ActiveState=", 12))
+            active = line + 12;
+        else if (!strncmp(line, "UnitFileState=", 14))
+            enabled = line + 14;
+    }
+    const char *status = "disabled";
+    if (!strcmp(load, "not-found"))
+        status = "not installed";
+    else if (!strcmp(load, "masked") || !strcmp(enabled, "masked") ||
+             !strcmp(enabled, "masked-runtime"))
+        status = "masked";
+    else if (strcmp(load, "loaded"))
+        status = "unit could not be loaded";
+    else if (!strcmp(active, "failed"))
+        status = "failed";
+    else if (!strcmp(active, "active"))
+        status = "enabled";
+    else if (!strcmp(enabled, "enabled") || !strcmp(enabled, "enabled-runtime"))
+        status = "enabled (stopped)";
+    char *result = strdup(status);
+    free(s);
+    return result;
 }
 int timer_change(int enabled) {
     if (enabled) {

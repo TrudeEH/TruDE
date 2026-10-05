@@ -437,8 +437,6 @@ link_configs() {
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/systemd/user/waybar.service.d/override.conf" "$config_dir/systemd/user/waybar.service.d/override.conf"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.service" "$config_dir/systemd/user/dotfiles-agent.service"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/dotfiles-agent.timer"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
@@ -453,6 +451,17 @@ link_configs() {
     link_config "$repo_dir/configs/superfile/theme/dotfiles.toml" "$config_dir/superfile/theme/dotfiles.toml"
     link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 
+}
+
+configure_agent_timer() {
+    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.service" "$config_dir/systemd/user/dotfiles-agent.service"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/dotfiles-agent.timer"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/timers.target.wants/dotfiles-agent.timer"
+    if systemctl --user daemon-reload && systemctl --user start dotfiles-agent.timer; then
+        ui_success "Seth background timer is running."
+    else
+        printf '%s\n' 'Seth background timer is enabled for future user sessions; it could not start now.' >&2
+    fi
 }
 
 main() {
@@ -497,6 +506,8 @@ main() {
             xdg-mime default dotfiles-text-editor.desktop "$mime_type"
         done
     configure_theme
+
+    configure_agent_timer
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :

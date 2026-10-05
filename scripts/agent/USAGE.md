@@ -14,7 +14,8 @@ no compiler, Node.js, npm, Python, ncurses, or downloaded library tree. HTTP/TLS
 `curl` and the system certificate store, which the Debian installer already includes.
 Other Debian CPU architectures can rebuild from source with an existing C compiler;
 the installer never adds a compiler or another runtime package.
-The scheduler timer is installed but stays disabled until enabled in the TUI.
+The installer enables and starts the scheduler timer. When no user service manager
+is running during installation, the timer starts with the next user session.
 
 Options: `--workspace DIR`, `--help`, `--check` (connect MCP servers), `--run-due`,
 and `--run-task ID`. `--prompt TEXT` runs a request in the terminal without the TUI
@@ -119,6 +120,7 @@ Bundled defaults:
   normal tool approval rules. Concurrent server processes use a lock and atomic saves.
 
 The Memory tab lists saved memories and shows the selected memory's full content.
+New creates a memory with a title and multiline content.
 Click a row or use the arrow keys to select a memory; Read opens the complete text,
 Edit opens its title and multiline content, Delete asks for confirmation, and Refresh
 reloads the list. Manual changes are user actions and work in read-only agent mode.

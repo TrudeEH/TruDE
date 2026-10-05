@@ -89,7 +89,8 @@ typedef struct {
     int busy, job, result, tab, focus, history_sel, server_sel, task_sel, memory_sel, chat_scroll,
         detail_scroll, following, quit, w, h, paste, memory_reload;
     atomic_int finished, dirty, approval;
-    char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error;
+    char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
+         *memory_target;
     J *request_params, *response;
     int request_kind;
     Buf partial, input, pasted;
@@ -923,9 +924,13 @@ static void *worker(void *opaque) {
     case 7:
         result = timer_change(!strcmp(u->prompt, "enable"));
         break;
-    case 9:
+    case 9: {
+        char *status = timer_status();
+        jobresult = js(status);
+        free(status);
         result = mcp_refresh(&u->mcp);
         break;
+    }
     case 10:
         jobresult = memory_list(u);
         result = jobresult ? 0 : -1;
@@ -1254,9 +1259,11 @@ static void save_modal(UI *u, int yes) {
     case A_MEMORY_EDIT:
     case A_MEMORY_DELETE: {
         J *args = v ? jc(v) : jo(), *request = jo();
-        jset(args, "id", js(m->id));
-        jset(args, "expected_content", js(gs(m->value, "content")));
-        jset(args, "expected_title", js(gs(m->value, "title")));
+        if (m->id && *m->id) {
+            jset(args, "id", js(m->id));
+            jset(args, "expected_content", js(gs(m->value, "content")));
+            jset(args, "expected_title", js(gs(m->value, "title")));
+        }
         jset(request, "name", js(action == A_MEMORY_EDIT ? "store_memory" : "delete_memory"));
         jset(request, "arguments", args);
         char *text = jd(request, 0);
@@ -1761,6 +1768,12 @@ static void dispatch(UI *u, int id, int index) {
     case 605:
         start_job(u, 10, "");
         break;
+    case 606: {
+        Modal *m = modal(u, FORM, A_MEMORY_EDIT, "New memory", "");
+        field_add(m, "title", "Title", "", 0, 0);
+        field_add(m, "content", "Memory", "", 1, 0);
+        break;
+    }
     case 501: {
         J *choices = ja(), *p = jg(u->config, "profiles");
         int selected = 0;
@@ -2124,9 +2137,9 @@ static void draw_memories(UI *u) {
              MUTED, 0, NULL);
     view_lines(u, &lines, side + 2, 5, u->w - side - 4, height - 4, &u->detail_scroll, 0, 0);
     lines_free(&lines);
-    const char *labels[] = {"Read", "Edit", "Delete", "Refresh"};
-    int ids[] = {602, 603, 604, 605};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 4, 2);
+    const char *labels[] = {"New", "Read", "Edit", "Delete", "Refresh"};
+    int ids[] = {606, 602, 603, 604, 605};
+    actions(u, 0, u->h - 4, u->w, labels, ids, 5, 2);
 }
 static void draw_settings(UI *u) {
     int width = u->w / 2;
@@ -2755,11 +2768,15 @@ static void finish_job(UI *u) {
     u->busy = 0;
     u->finished = 0;
     cancelled = 0;
-    if (u->job == 10) {
+    if (u->job == 9 && u->jobresult) {
+        free(u->timer);
+        u->timer = strdup(jstr(u->jobresult));
+    } else if (u->job == 10) {
         free(u->memory_error);
         u->memory_error = strdup(u->result ? u->notice : "");
         if (u->jobresult) {
-            char *id = strdup(gs(ji(u->memories, u->memory_sel), "id"));
+            char *id = strdup(u->memory_target ? u->memory_target
+                                             : gs(ji(u->memories, u->memory_sel), "id"));
             jf(u->memories);
             u->memories = u->jobresult;
             u->jobresult = NULL;
@@ -2767,6 +2784,8 @@ static void finish_job(UI *u) {
                 if (!strcmp(gs(u->memories->v[i], "id"), id))
                     u->memory_sel = (int)i;
             free(id);
+            free(u->memory_target);
+            u->memory_target = NULL;
         }
     } else if (u->job == 11) {
         if (u->result) {
@@ -2774,6 +2793,10 @@ static void finish_job(UI *u) {
             error_ui(u);
         } else {
             int deleted = jg(u->jobresult, "deleted") != NULL;
+            if (!deleted) {
+                free(u->memory_target);
+                u->memory_target = strdup(gs(u->jobresult, "id"));
+            }
             if (u->modal && (u->modal->action == A_MEMORY_EDIT || u->modal->action == A_MEMORY_DELETE))
                 close_modal(u);
             notice_ui(u, deleted ? "Memory deleted" : "Memory saved");
@@ -2969,6 +2992,7 @@ int tui(J *config) {
     free(u.request_text);
     free(u.timer);
     free(u.memory_error);
+    free(u.memory_target);
     free(u.composer.s);
     free(u.cells);
     free(u.old);
