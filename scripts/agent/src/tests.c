@@ -32,6 +32,29 @@ int selftest(void) {
     check(!jp("{\"x\":1,\"x\":2}", NULL) && !jp("[01]", NULL) && !jp("\"\\ud800\"", NULL),
           "Malformed JSON rejected");
     check(!jp("\"\xc0\xaf\"", NULL), "Invalid UTF-8 rejected");
+    J *vision_config = jo(), *profiles = jo(), *provider = jo();
+    jset(vision_config, "profile", js("test"));
+    jset(vision_config, "profiles", profiles);
+    jset(profiles, "test", provider);
+    jset(provider, "model", js("test-model"));
+    check(!model_vision(vision_config), "Unknown model rejects image pastes");
+    J *flags = jo();
+    jset(flags, "test-model", jb(1));
+    jset(profile(vision_config), "visionModels", flags);
+    check(model_vision(vision_config), "Per-model vision capability enabled");
+    jset(flags, "test-model", jb(0));
+    check(!model_vision(vision_config), "Per-model vision capability disabled");
+    jf(vision_config);
+    J *images = ja(), *image = jo();
+    jset(image, "url", js("data:image/png;base64,aGVsbG8="));
+    jadd(images, image);
+    J *parts = image_content("Describe [Pasted image 1]", images);
+    check(parts->len == 2 && !strcmp(gs(parts->v[0], "text"), "Describe [Pasted image 1]") &&
+          !strcmp(gs(jg(parts->v[1], "image_url"), "url"), gs(image, "url")),
+          "Image attachment serialized as multimodal content");
+    check(estimate(parts) < 5000, "Image context estimate excludes base64 bytes");
+    jf(parts);
+    jf(images);
     char name[64];
     alias(name, "web", "search");
     check(!strcmp(name, "web__search_458186c80118"), "Stable MCP tool aliases");

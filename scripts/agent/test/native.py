@@ -400,6 +400,39 @@ class NativeTests(unittest.TestCase):
         result=self.bundled("memory","tools/call",{"name":name,"arguments":args},env)
         self.assertFalse(result.get("isError"),result)
         return json.loads(result["content"][0]["text"])
+    def test_tui_wayland_image_paste_and_vision_warning(self):
+        tools=self.root/"bin"
+        tools.mkdir()
+        clipboard=tools/"wl-paste"
+        clipboard.write_text("#!/bin/sh\ncase \"$1\" in\n--list-types) printf 'image/png\\n' ;;\n*) printf 'fake-image' ;;\nesac\n")
+        clipboard.chmod(0o700)
+        self.env.update({"PATH":str(tools)+":"+self.env.get("PATH","/usr/bin:/bin"),"WAYLAND_DISPLAY":"test-wayland"})
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("\x0c\x16")
+            s.wait("Warning:")
+            self.assertNotIn("[Pasted image 1]",s.screen.text)
+        finally:
+            s.close()
+        self.config["profiles"]["lmstudio"]["visionModels"]={"test-model":True}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("\x0cDescribe \x16")
+            s.wait("[Pasted image 1]")
+            x,y=s.screen.find("[Pasted image 1]")
+            self.assertEqual(s.screen.grid[y][x][1],"#ffbe6f")
+            s.send("\r")
+            s.wait("Héllo 🙂 from Seth.")
+            requests=[body for path,body,_ in self.mock.requests if path=="/v1/chat/completions"]
+            user=next(m for m in requests[-1]["messages"] if m["role"]=="user")
+            self.assertEqual(user["content"][1]["image_url"]["url"],"data:image/png;base64,ZmFrZS1pbWFnZQ==")
+            self.assertEqual(len(self.chat()["messages"][0]["images"]),1)
+        finally:
+            s.close()
+
     def test_bundled_servers_are_independent_and_settings_migrate(self):
         tools={kind:{t["name"] for t in self.bundled(kind,"tools/list")["tools"]} for kind in ("filesystem","web","shell","memory")}
         self.assertNotIn("shell",tools["filesystem"])

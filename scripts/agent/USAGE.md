@@ -217,3 +217,23 @@ or package manager is involved. `CC` selects a compiler. Native server processes
 use the same executable with `--mcp-filesystem`, `--mcp-web`, `--mcp-shell`, or
 `--mcp-memory`; all their actions
 remain MCP requests rather than being moved into the agent loop.
+
+## Pasting images (Wayland)
+
+Use Ctrl+V in the message field to paste a clipboard image. Empty terminal bracketed
+pastes also check the clipboard for an image. `wl-paste` (from `wl-clipboard`,
+already in the Debian install list) and `base64` are required. PNG, JPEG, WebP,
+and GIF are accepted, up to four images per message and 12 MiB per image.
+Images appear as accent-colored `[Pasted image N]` labels, never terminal graphics.
+Removing a label removes its attachment when the message is submitted.
+
+Model discovery reads vision capability metadata when the provider supplies it.
+Unknown and non-vision models reject image pastes with a warning. For providers
+that omit capability metadata, set **Vision for this model** to `true` in Provider
+settings only if that model supports images. This setting applies to the model
+ID in that provider profile, not all models. Switching to a non-vision model
+also blocks submitting a draft containing images.
+
+Images are sent as OpenAI-compatible `image_url` content with inline data URLs.
+Image data is stored in the local chat history so continued chats and retries
+retain their attachments; exported text includes only the placeholder labels.

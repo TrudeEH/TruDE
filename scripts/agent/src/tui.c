@@ -91,7 +91,8 @@ typedef struct {
     atomic_int finished, dirty, approval;
     char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
          *memory_target;
-    J *request_params, *response;
+    J *request_params, *response, *images, *jobimages;
+    unsigned image_number;
     int request_kind;
     Buf partial, input, pasted;
     Editor composer;
@@ -589,8 +590,32 @@ static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, i
         p += n;
     }
     int first = cursorrow >= height ? cursorrow - height + 1 : 0;
-    for (int i = 0; i < height && i + first < w.len; i++)
-        draw_text(u, x, y + i, width, w.v[i + first].s, NORMAL, 0, 0);
+    int marker = 0;
+    for (int row = 0; row < w.len && row < first + height; row++) {
+        const char *text = w.v[row].s;
+        if (row >= first)
+            draw_text(u, x, y + row - first, width, text, NORMAL, 0, 0);
+        int col = 0;
+        mbstate_t state = {0};
+        for (size_t p = 0; text[p];) {
+            if (e == &u->composer && !strncmp(text + p, "[Pasted image ", 14))
+                marker = 1;
+            wchar_t c;
+            size_t n = mbrtowc(&c, text + p, strlen(text + p), &state);
+            if (n == (size_t)-1 || n == (size_t)-2) {
+                n = 1;
+                c = L'�';
+                memset(&state, 0, sizeof state);
+            }
+            if (marker && row >= first && col < width)
+                u->cells[(y + row - first) * u->w + x + col].color = ACCENT;
+            int cw = wcwidth(c);
+            col += cw > 0 ? cw : 1;
+            if (c == L']')
+                marker = 0;
+            p += n;
+        }
+    }
     if (focused) {
         if (cursorcol >= width) {
             cursorcol = 0;
@@ -673,7 +698,7 @@ static void help(UI *u) {
         modal(u, MESSAGE, 999, "Chat help",
               "Enter sends · Shift+Enter adds a line · Ctrl+J adds a line\nCtrl+S sends · Tab / "
               "Shift+Tab move focus · Ctrl+L compose\nEscape stops or closes a dialog · Ctrl+Q "
-              "quits\nF1–F5 views · F6 help · ? help outside text or empty composer\nCtrl+N "
+              "quits\nF1–F5 views · F6 help · ? help outside text or empty composer\nCtrl+V pastes clipboard images · Ctrl+N "
               "creates a chat · click tool calls to open their details\nMouse wheel / PgUp / PgDn "
               "scroll the conversation\n\n/new        Start a new chat\n/fork       Branch this "
               "conversation\n/continue   Continue the current task\n/retry      Branch before the "
@@ -705,6 +730,8 @@ static void fresh(UI *u) {
     u->chat_scroll = 0;
     u->following = 1;
     es(&u->composer, "");
+    jf(u->images);
+    u->images = NULL;
     bfree(&u->partial);
     notice_ui(u, "");
     u->tab = 0;
@@ -882,7 +909,7 @@ static void *worker(void *opaque) {
                .mutex = &u->mutex,
                .approve = approve_worker,
                .update = update_worker,
-               .opaque = u};
+               .opaque = u, .images = u->jobimages};
     switch (u->job) {
     case 1:
         result = agent_run(&a, u->prompt, 0);
@@ -996,6 +1023,8 @@ static void start_job(UI *u, int job, const char *text) {
     cancelled = 0;
     free(u->prompt);
     u->prompt = strdup(text ? text : "");
+    jf(u->jobimages);
+    u->jobimages = job == 1 ? jc(u->images) : NULL;
     u->job = job;
     u->busy = 1;
     u->finished = 0;
@@ -1032,6 +1061,7 @@ static void provider_form(UI *u) {
     field_add(m, "apiKey", "API key", gs(p, "apiKey"), 0, 0);
     m->fields[2].e.secret = 1;
     field_add(m, "apiKeyEnv", "API key environment variable", gs(p, "apiKeyEnv"), 0, 0);
+    field_add(m, "vision", "Vision for this model (true/false)", model_vision(u->config) ? "true" : "false", 0, 1);
 }
 static void mcp_form(UI *u, int edit) {
     J *cfg = jg(u->config, "mcpServers"), *s = edit ? ji(cfg, (size_t)u->server_sel) : NULL;
@@ -1124,9 +1154,54 @@ static void response(UI *u, J *answer) {
         close_modal(u);
 }
 static void dispatch(UI *, int, int);
+static void prune_images(UI *u) {
+    for (size_t i = 0; u->images && i < u->images->len;) {
+        if (!strstr(u->composer.s, gs(u->images->v[i], "label")))
+            jremove(u->images, i);
+        else
+            i++;
+    }
+}
+/* Return true when an image paste was handled, including rejected pastes. */
+static int paste_image(UI *u) {
+    if (u->busy)
+        return 0;
+    char *url = clipboard_image();
+    if (!url)
+        return 0;
+    if (!*url)
+        notice_ui(u, err);
+    else if (!model_vision(u->config))
+        notice_ui(u, "Warning: this model has no confirmed vision support; image not pasted. Enable vision for this model in Provider settings if supported.");
+    else {
+        prune_images(u);
+        if (!u->images)
+            u->images = ja();
+        if (u->images->len >= 4) {
+            notice_ui(u, "Maximum four images per message");
+            free(url);
+            return 1;
+        }
+        char *label = fmt("[Pasted image %u]", ++u->image_number);
+        J *image = jo();
+        jset(image, "label", js(label));
+        jset(image, "url", js(url));
+        jadd(u->images, image);
+        insert(&u->composer, label, strlen(label));
+        free(label);
+    }
+    free(url);
+    u->dirty = 1;
+    return 1;
+}
 static void submit(UI *u) {
     if (u->busy)
         return;
+    prune_images(u);
+    if (u->images && u->images->len && !model_vision(u->config)) {
+        notice_ui(u, "Warning: selected model has no confirmed vision support; remove images or choose a vision model.");
+        return;
+    }
     char *text = strdup(u->composer.s);
     if (!*text) {
         free(text);
@@ -1167,6 +1242,8 @@ static void submit(UI *u) {
         start_job(u, 1, text);
         es(&u->composer, "");
     }
+    jf(u->images);
+    u->images = NULL;
     free(text);
 }
 static J *form_value(Modal *m) {
@@ -1312,7 +1389,11 @@ static void save_modal(UI *u, int yes) {
     case A_PROVIDER: {
         J *p = profile(u->config), *copy = jc(u->config);
         for (size_t i = 0; i < v->len; i++)
-            jset(p, v->v[i]->key, jc(v->v[i]));
+            if (strcmp(v->v[i]->key, "vision"))
+                jset(p, v->v[i]->key, jc(v->v[i]));
+        if (!jg(p, "visionModels"))
+            jset(p, "visionModels", jo());
+        jset(jg(p, "visionModels"), gs(p, "model"), jc(jg(v, "vision")));
         r = save_config(u->config);
         if (r) {
             jf(u->config);
@@ -1604,6 +1685,8 @@ static void dispatch(UI *u, int id, int index) {
                 break;
             }
             prompt = strdup(gs(m->v[n - 1], "content"));
+            jf(u->images);
+            u->images = jc(jg(m->v[n - 1], "images"));
             while (m->len >= n)
                 jremove(m, m->len - 1);
             if (gn(copy, "compacted", 0) >= (double)n) {
@@ -1621,6 +1704,8 @@ static void dispatch(UI *u, int id, int index) {
         notice_ui(u, "Created a branch; prior tool side effects remain.");
         if (prompt) {
             start_job(u, 1, prompt);
+            jf(u->images);
+            u->images = NULL;
             free(prompt);
         }
         break;
@@ -2498,7 +2583,9 @@ static void key(UI *u, int code, const char *text) {
         return;
     }
     if (u->tab == 0 && u->focus == 100) {
-        if (code == 13)
+        if (code == 22)
+            paste_image(u);
+        else if (code == 13)
             submit(u);
         else
             editor_key(&u->composer, code, text);
@@ -2584,7 +2671,7 @@ static void consume_input(UI *u, int flush) {
                                 ? &u->modal->fields[u->modal->focus].e
                             : u->tab == 0 && u->focus == 100 ? &u->composer
                                                              : NULL;
-                if (e) {
+                if (e && !(e == &u->composer && !u->pasted.n && paste_image(u))) {
                     Buf clean = {0};
                     for (size_t i = 0; i < u->pasted.n; i++) {
                         unsigned char c = u->pasted.s[i];
@@ -2994,6 +3081,8 @@ int tui(J *config) {
     free(u.memory_error);
     free(u.memory_target);
     free(u.composer.s);
+    jf(u.images);
+    jf(u.jobimages);
     free(u.cells);
     free(u.old);
     bfree(&u.partial);

@@ -96,9 +96,12 @@ J *load_config(void), *new_chat(J *), *chats(void), *load_chat(const char *), *t
 int save_tasks(J *), delete_chat(const char *);
 void event(J *, const char *);
 J *profile(J *), *models(J *);
+int model_vision(J *);
+char *clipboard_image(void);
+J *image_content(const char *, J *);
 J *completion(J *, J *, J *, int, int, Chunk, void *, J **, char **);
 typedef struct Agent {
-    J *config, *chat, *background;
+    J *config, *chat, *background, *images;
     MCP *mcp;
     pthread_mutex_t *mutex;
     int (*approve)(Tool *, J *, void *);

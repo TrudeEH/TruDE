@@ -43,9 +43,19 @@ J *models(J *config) {
             fail("Provider returned no model list");
         else {
             a = ja();
+            J *vision = jo();
             for (size_t i = 0; i < data->len; i++)
-                if (*gs(data->v[i], "id"))
-                    jadd(a, js(gs(data->v[i], "id")));
+                if (*gs(data->v[i], "id")) {
+                    J *v = data->v[i];
+                    const char *id = gs(v, "id");
+                    jadd(a, js(id));
+                    J *inputs = jg(v, "input_modalities");
+                    if (!inputs)
+                        inputs = jg(jg(v, "architecture"), "input_modalities");
+                    jset(vision, id, jb(contains(inputs, "image") ||
+                                      gb(jg(v, "capabilities"), "vision", 0)));
+                }
+            jset(profile(config), "discoveredVision", vision);
         }
         jf(j);
     }
@@ -158,6 +168,14 @@ J *completion(J *config, J *messages, J *tools, int stream, int max, Chunk delta
         fail("Choose a model in Settings first");
         return NULL;
     }
+    for (size_t i = 0; messages && i < messages->len; i++) {
+        J *parts = jg(messages->v[i], "content");
+        for (size_t k = 0; parts && parts->type == JARR && k < parts->len; k++)
+            if (!strcmp(gs(parts->v[k], "type"), "image_url") && !model_vision(config)) {
+                fail("Selected model has no confirmed vision support for images in this chat");
+                return NULL;
+            }
+    }
     J *h = headers(config);
     if (!h)
         return NULL;
@@ -246,4 +264,28 @@ J *completion(J *config, J *messages, J *tools, int stream, int max, Chunk delta
     else
         free(s.finish);
     return s.message;
+}
+
+int model_vision(J *config) {
+    J *p = profile(config);
+    const char *model = gs(p, "model");
+    J *override = jg(jg(p, "visionModels"), model);
+    if (override && override->type == JBOOL)
+        return override->n != 0;
+    return gb(jg(p, "discoveredVision"), model, 0);
+}
+J *image_content(const char *text, J *images) {
+    J *parts = ja(), *part = jo();
+    jset(part, "type", js("text"));
+    jset(part, "text", js(text));
+    jadd(parts, part);
+    for (size_t i = 0; images && i < images->len; i++) {
+        part = jo();
+        J *url = jo();
+        jset(url, "url", js(gs(images->v[i], "url")));
+        jset(part, "type", js("image_url"));
+        jset(part, "image_url", url);
+        jadd(parts, part);
+    }
+    return parts;
 }
