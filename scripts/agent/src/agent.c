@@ -192,6 +192,14 @@ int agent_compact(Agent *a, int force) {
     lock(a);
     jset(a->chat, "summary", js(s));
     jset(a->chat, "compacted", jnum(boundary));
+    J *entries = jg(a->chat, "compactions");
+    if (!entries) { entries = ja(); jset(a->chat, "compactions", entries); }
+    J *entry = jo();
+    jset(entry, "position", jnum(jg(a->chat, "messages")->len));
+    jset(entry, "boundary", jnum(boundary));
+    jset(entry, "content", js(s));
+    char *at = now(); jset(entry, "at", js(at)); free(at);
+    jadd(entries, entry);
     unlock(a);
     free(s);
     char *text =

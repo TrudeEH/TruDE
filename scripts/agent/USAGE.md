@@ -206,6 +206,14 @@ Support currently covers public clients on Streamable HTTP, not client secrets,
 device authorization, client-ID metadata documents, or legacy SSE authentication.
 Existing explicit bearer headers and stdio configurations remain supported.
 
+GitHub's remote endpoint is `https://api.githubcopilot.com/mcp/`. It does not
+advertise dynamic client registration: configure a registered public client with
+`oauth.clientId` and its registered callback port, or an explicit
+`Authorization: Bearer …` header using your GitHub personal access token. Do not
+commit tokens. Add `X-MCP-Readonly: true` to the headers for read-only testing.
+A URL alone is insufficient to authenticate with GitHub.
+
+
 ### MCP startup troubleshooting
 
 A server marked `error (MCP v2 / legacy)` has not necessarily negotiated a legacy
@@ -367,8 +375,12 @@ The queued text is visible in chat until consumed. Errors or cancellation leave
 unconsumed steering queued; `/continue` resumes it.
 
 The footer and unresolved tool calls show an animated activity indicator while
-working. Footer errors use red text. Context summaries appear at their
-compaction boundary, before the messages that follow them.
+working. Footer errors use red text. Each compaction posts a persistent
+“Context compacted · new context” entry at the current end of chat. The full
+summary scrolls with the transcript; subsequent messages appear beneath it.
+Repeated compactions retain their own entries, including in Markdown exports.
+Older chats without compaction entries still display their saved summary at its
+original context boundary.
 
 The vision switch in Provider settings is an On/Off toggle; click it or use
 Space, Enter, or the left/right arrow keys. Save with Ctrl+S.

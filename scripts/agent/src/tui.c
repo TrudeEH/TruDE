@@ -299,10 +299,20 @@ static void transcript(UI *u) {
     }
     int speaker = 0;
     for (size_t i = 0; m && i <= m->len; i++) {
-        if (i == (size_t)gn(u->chat, "compacted", 0) && *gs(u->chat, "summary")) {
+        J *entries = jg(u->chat, "compactions");
+        for (size_t n = 0; entries && n < entries->len; n++) {
+            J *entry = entries->v[n];
+            if (i != (size_t)gn(entry, "position", 0)) continue;
+            line(&u->transcript, "", NORMAL, 0, NULL);
+            line(&u->transcript, "Context compacted · new context", ACCENT, 0, NULL);
+            text_lines(&u->transcript, gs(entry, "content"), NORMAL, 0);
+            speaker = 0;
+        }
+        /* Older chats retain their single saved summary at the original boundary. */
+        if ((!entries || !entries->len) && i == (size_t)gn(u->chat, "compacted", 0) && *gs(u->chat, "summary")) {
             line(&u->transcript, "", NORMAL, 0, NULL);
             line(&u->transcript, "Context summary", ACCENT, 0, NULL);
-            text_lines(&u->transcript, gs(u->chat, "summary"), MUTED, 0);
+            text_lines(&u->transcript, gs(u->chat, "summary"), NORMAL, 0);
             speaker = 0;
         }
         if (i == m->len)
@@ -1906,6 +1916,10 @@ static void dispatch(UI *u, int id, int index) {
             u->images = jc(jg(m->v[n - 1], "images"));
             while (m->len >= n)
                 jremove(m, m->len - 1);
+            J *entries = jg(copy, "compactions");
+            for (size_t i = entries ? entries->len : 0; i > 0; i--)
+                if (gn(entries->v[i - 1], "position", 0) > (double)m->len)
+                    jremove(entries, i - 1);
             if (gn(copy, "compacted", 0) >= (double)n) {
                 jset(copy, "compacted", jnum(0));
                 jset(copy, "summary", js(""));

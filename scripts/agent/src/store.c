@@ -424,7 +424,14 @@ char *export_chat(J *j) {
     Buf b = {0};
     bf(&b, "# %s\n\n", gs(j, "title"));
     J *m = jg(j, "messages");
-    for (size_t i = 0; m && i < m->len; i++) {
+    for (size_t i = 0; m && i <= m->len; i++) {
+        J *entries = jg(j, "compactions");
+        for (size_t n = 0; entries && n < entries->len; n++)
+            if (i == (size_t)gn(entries->v[n], "position", 0))
+                bf(&b, "## Context compacted · new context\n\n%s\n\n", gs(entries->v[n], "content"));
+        if ((!entries || !entries->len) && i == (size_t)gn(j, "compacted", 0) && *gs(j, "summary"))
+            bf(&b, "## Context summary\n\n%s\n\n", gs(j, "summary"));
+        if (i == m->len) break;
         J *v = m->v[i];
         bf(&b, "## %s\n\n%s\n\n", gs(v, "role"), gs(v, "content"));
         if (jg(v, "tool_calls")) {
