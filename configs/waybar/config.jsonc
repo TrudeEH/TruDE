@@ -89,11 +89,12 @@
     },
     "custom/launcher": {
         "exec": "dotfiles-waybar-launcher-status center",
+        "signal": 9,
         "return-type": "json",
         "interval": 1,
         "align": 0.5,
         "justify": "center",
-        "tooltip": false,
+        "tooltip": true,
         "on-click": "dotfiles-app-launcher-toggle"
     },
     "group/center-left": {
@@ -206,6 +207,7 @@
 
     "custom/left#accent": {
         "exec": "dotfiles-waybar-launcher-status left",
+        "signal": 9,
         "return-type": "json",
         "interval": 1,
         "tooltip": false
@@ -228,6 +230,7 @@
     },
     "custom/right#accent": {
         "exec": "dotfiles-waybar-launcher-status right",
+        "signal": 9,
         "return-type": "json",
         "interval": 1,
         "tooltip": false

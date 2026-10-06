@@ -1,0 +1,102 @@
+#!/bin/sh
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/common.sh"
+umask 077
+exec 8>"$runtime/worker.lock"
+flock -n 8 || exit 0
+work=$(mktemp -d "$runtime/audio.XXXXXX")
+recorder=
+success=false
+cleanup() {
+    if [ -n "$recorder" ]; then
+        kill -TERM "$recorder" 2>/dev/null || :
+        wait "$recorder" 2>/dev/null || :
+    fi
+    if [ "$success" = true ]; then
+        rm -f "$runtime/state" "$runtime/error"
+    else
+        [ -s "$runtime/error" ] || printf '%s\n' 'Dictation failed. Check engine, microphone, and model in Settings.' > "$runtime/error"
+        state dictation-error
+    fi
+    rm -rf "$work"
+    rm -f "$runtime/stop"
+    refresh_launcher
+}
+trap cleanup EXIT
+trap 'success=true; exit 0' HUP INT TERM
+# Hold a shared installation lock until the selected backend exits.
+exec 9>"$runtime/setup.lock"
+flock -s -n 9 || exit 1
+model_ready "$model"
+rm -f "$runtime/error"
+[ "${1:-}" != test ] || rm -f "$runtime/stop"
+state recording
+# PipeWire chooses the default source; no device override is persisted.
+pw-record --rate 16000 --channels 1 --format s16 "$work/audio.wav" > "$work/capture.log" 2>&1 &
+recorder=$!
+seconds=0
+limit=600
+[ "${1:-}" != test ] || limit=5
+while [ ! -f "$runtime/stop" ] && [ "$seconds" -lt "$limit" ]; do
+    if ! kill -0 "$recorder" 2>/dev/null; then
+        printf '%s\n' 'Microphone capture failed. Check the default input in your volume mixer.' > "$runtime/error"
+        exit 1
+    fi
+    sleep 1
+    seconds=$((seconds + 1))
+done
+kill -INT "$recorder" 2>/dev/null || :
+wait "$recorder" 2>/dev/null || :
+recorder=
+state transcribing
+if ! "$(dirname -- "$(readlink -f -- "$0")")/transcribe" "$model" "$work/audio.wav" "$work/transcript.txt" > "$work/recognition.log" 2>&1; then
+    printf '%s\n' 'Recognition failed. Try a smaller model or reinstall the selected model in Settings.' > "$runtime/error"
+    exit 1
+fi
+# Collapse segment boundaries, without evaluating recognized text as commands.
+awk '{gsub(/^[ \t]+|[ \t]+$/, ""); if (length) {printf "%s%s", separator, $0; separator=" "}} END {if (length(separator)) printf "\n"}' "$work/transcript.txt" > "$work/text"
+if [ "${1:-}" = test ]; then
+    cat "$work/text"
+    cat "$work/recognition.log" >&2
+elif [ -s "$work/text" ]; then
+    # A separate user unit owns the clipboard. A wl-copy daemon inside this
+    # worker would be killed by systemd's control-group cleanup on completion.
+    systemd-run --user --collect --quiet --property=Type=exec \
+        --setenv=WAYLAND_DISPLAY="${WAYLAND_DISPLAY:?}" -- \
+        wl-copy --foreground --type text/plain -- "$(cat "$work/text")"
+    # Wait for the new selection rather than racing Wayland clipboard publication.
+    attempt=0
+    until wl-paste --no-newline > "$work/selection" 2>/dev/null &&
+        [ "$(cat "$work/selection")" = "$(cat "$work/text")" ]; do
+        attempt=$((attempt + 1))
+        if [ "$attempt" -ge 40 ]; then
+            printf '%s\n' 'Clipboard publication failed; transcript was not pasted.' > "$runtime/error"
+            exit 1
+        fi
+        sleep 0.05
+    done
+    # Never press Enter. Foot and common terminal classes require Shift+Ctrl+V.
+    window=$(hyprctl activewindow -j)
+    class=$(printf '%s\n' "$window" | jq -r '.class // ""')
+    address=$(printf '%s\n' "$window" | jq -r '.address // ""')
+    # Only hexadecimal addresses can enter the generated Lua expression.
+    case $address in
+        0x*) hex=${address#0x} ;;
+        *) hex= ;;
+    esac
+    case $hex in ''|*[!0-9a-fA-F]*) address= ;; esac
+    [ -n "$address" ] && [ "$address" != 0x0 ] || {
+        printf '%s\n' 'No focused window to paste into.' > "$runtime/error"
+        exit 1
+    }
+    case $class in foot|footclient|Alacritty|kitty|org.wezfurlong.wezterm|org.gnome.Terminal) modifiers=CTRL_SHIFT ;; *) modifiers=CTRL ;; esac
+    # This repository uses Hyprland's Lua configuration API (0.55+).
+    # Legacy dispatch strings are parsed as Lua and never deliver a key event.
+    if ! hyprctl dispatch "hl.dsp.send_shortcut({mods=\"$modifiers\",key=\"v\",window=\"address:$address\"})" > "$work/paste.log" 2>&1 ||
+        grep -Eq '^(error|warning):' "$work/paste.log"; then
+        cat "$work/paste.log" >&2
+        printf '%s\n' 'Hyprland rejected the paste shortcut. Transcript remains on the clipboard.' > "$runtime/error"
+        exit 1
+    fi
+fi
+success=true

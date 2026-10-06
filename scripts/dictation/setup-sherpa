@@ -1,0 +1,66 @@
+#!/bin/sh
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/common.sh"
+model=$1
+model_valid "$model" || exit 2
+exec 9>"$runtime/setup.lock"
+flock -n 9 || { printf 'Dictation or installation is active. Stop it first.\n' >&2; exit 1; }
+model_ready "$model" && exit 0
+archive=$(jq -er --arg id "$model" '.[] | select(.id == $id) | .archive' "$catalog")
+checksum=$(jq -er --arg id "$model" '.[] | select(.id == $id) | .sha256' "$catalog")
+umask 077
+mkdir -p "$model_dir" "$dictation_root/backends"
+temporary=$(mktemp -d "$dictation_root/setup.XXXXXX")
+created_backend=false
+success=false
+cleanup() {
+    rm -rf "$temporary"
+    if [ "$success" != true ] && [ "$created_backend" = true ]; then
+        rm -rf "$dictation_root/backends/sherpa"
+    fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+if [ ! -x "$sherpa_python" ]; then
+    ensure_packages python3-venv
+    created_backend=true
+    # Use the final path: virtual-environment launchers embed absolute paths.
+    python3 -m venv "$dictation_root/backends/sherpa"
+    "$sherpa_python" -m pip install --no-cache-dir --only-binary=:all: 'sherpa-onnx==1.13.8' 'soundfile==0.13.1' 'numpy==2.2.6'
+fi
+curl --fail --location --retry 3 -o "$temporary/model.tar.bz2" "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$archive.tar.bz2"
+printf '%s  %s\n' "$checksum" "$temporary/model.tar.bz2" | sha256sum --check
+# Extract only regular model/tokenizer files, not examples or archive links.
+"$sherpa_python" - "$temporary/model.tar.bz2" "$temporary/model" "$archive" <<'PY'
+import sys, tarfile
+from pathlib import Path, PurePosixPath
+archive, destination, root = sys.argv[1:]
+with tarfile.open(archive) as source:
+    for member in source:
+        path = PurePosixPath(member.name)
+        if not member.isfile() or path.parts[0] != root or '..' in path.parts:
+            continue
+        relative = Path(*path.parts[1:])
+        if not relative.parts or relative.parts[0] == 'test_wavs':
+            continue
+        if relative.suffix not in ('.onnx', '.txt', '.json') and relative.name != 'LICENSE':
+            continue
+        target = Path(destination) / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with source.extractfile(member) as src, target.open('wb') as dst:
+            import shutil
+            shutil.copyfileobj(src, dst)
+PY
+# Loading smoke test: only this model is instantiated, then the process exits.
+"$sherpa_python" - "$(dirname -- "$(readlink -f -- "$0")")" "$model" "$temporary/model" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from recognize import create
+create(sys.argv[2], sys.argv[3])
+PY
+cp "$catalog" "$temporary/model/catalog.json"
+: > "$temporary/model/.ready"
+[ ! -e "$model_dir/$model" ] || { printf 'Incomplete model exists; remove it in Settings first.\n' >&2; exit 1; }
+mv "$temporary/model" "$model_dir/$model"
+success=true
+printf '\n%s is ready.\n' "$model"

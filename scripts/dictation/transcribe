@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/common.sh"
+model=$1
+model_valid "$model" || exit 2
+if [ "$(backend_for "$model")" = sherpa ]; then
+    exec "$sherpa_python" "$(dirname -- "$(readlink -f -- "$0")")/recognize.py" "$model" "$model_dir/$model" "$2" "$3"
+fi
+language=auto
+case $model in *.en) language=en ;; esac
+exec "$engine" -m "$model_dir/ggml-$model.bin" -f "$2" -l "$language" -t 4 -otxt -of "${3%.txt}"

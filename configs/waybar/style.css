@@ -278,3 +278,16 @@ menu separator {
     /* Compensate for the right divider's one-pixel glyph bearing. */
     margin-left: -1px;
 }
+
+/* Dictation takes priority over screen-sharing on the launcher. */
+#custom-launcher.recording,
+#custom-launcher.transcribing {
+    background-color: #99c1f1;
+    color: #222226;
+}
+#custom-left.accent.recording,
+#custom-right.accent.recording,
+#custom-left.accent.transcribing,
+#custom-right.accent.transcribing {
+    color: #99c1f1;
+}

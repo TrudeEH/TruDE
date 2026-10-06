@@ -1,0 +1,81 @@
+#!/bin/sh
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
+. "$(dirname -- "$(readlink -f -- "$0")")/../dictation/common.sh"
+dialog() { whiptail --title 'Voice Dictation' "$@"; }
+message() { dialog --msgbox "$1" 14 78; }
+save() {
+    mkdir -p "$(dirname "$preferences_file")"
+    temporary=$(mktemp "$(dirname "$preferences_file")/settings.json.XXXXXX")
+    if [ -f "$preferences_file" ]; then
+        jq --arg model "$model" --argjson enabled "$enabled" '.dictation = ((.dictation // {}) + {model: $model, enabled: $enabled})' "$preferences_file" > "$temporary" || { rm -f "$temporary"; return 1; }
+    else
+        jq -n --arg model "$model" --argjson enabled "$enabled" '{dictation: {model: $model, enabled: $enabled}}' > "$temporary"
+    fi
+    mv "$temporary" "$preferences_file"
+}
+while :; do
+    enabled=$(jq -r '.dictation.enabled // false' "$preferences_file" 2>/dev/null || printf false)
+    if [ "$enabled" = true ]; then toggle_label='Enabled — turn off'; else toggle_label='Disabled — turn on'; fi
+    selected_status=$(model_status "$model")
+    action=$(dialog --menu "Model: $model ($selected_status)\nSuper+D: record, then stop and paste. Default system microphone.\nLocal recognition; up to 10 minutes. Paste replaces clipboard." 21 96 7 \
+        "󰔡 toggle" "$toggle_label" \
+        "󰏗 model" 'Models — download status and selection' \
+        "󰍬 test" 'Test selected model (5 seconds; no paste)' \
+        "󰋼 error" 'View last error' \
+        "󰆴 remove" 'Remove a downloaded model and unused runtime' \
+        "󰅖 back" 'Back to settings' 3>&1 1>&2 2>&3) || exit 0
+    case $action in
+        *" toggle")
+            if [ "$enabled" = true ]; then
+                enabled=false; save; dotfiles-dictation cancel
+            elif model_ready "$model"; then
+                enabled=true; save
+            else
+                message 'Choose and download a model before enabling dictation.'
+            fi ;;
+        *" model")
+            set --
+            while IFS="$(printf '\t')" read -r id label; do
+                status=$(model_status "$id")
+                [ "$id" != "$model" ] || status="$status; selected"
+                set -- "$@" "$id" "[$status] $label"
+            done <<CATALOG
+$(jq -r '.[] | [.id, .label] | @tsv' "$catalog")
+CATALOG
+            selected=$(dialog --menu 'CPU backends; one model loaded only during transcription.
+Moonshine: English. Parakeet: European languages. Qwen: broader coverage.
+Actual memory/speed depend on your machine; use Test.' 23 100 9 "$@" \
+                3>&1 1>&2 2>&3) || continue
+            if model_ready "$selected"; then
+                model=$selected; save
+                continue
+            fi
+            if dialog --yesno "Download $selected if missing and install its shared CPU runtime if needed?\nMissing runtime-specific Debian packages require a separate sudo confirmation. Internet and disk space are required. No audio is uploaded." 12 78; then
+                clear
+                if dotfiles-dictation-setup "$selected"; then model=$selected; save; else message 'Model setup failed. See terminal output.'; fi
+                printf 'Press Enter to continue.'; read -r ignored
+            fi ;;
+        *" test")
+            if ! model_ready "$model"; then message 'Download the selected model before testing.'; continue; fi
+            if systemctl --user is-active --quiet dotfiles-dictation.service; then message 'Stop dictation before testing.'; continue; fi
+            clear
+            printf 'Speak now. Recording lasts 5 seconds.\n'
+            if transcript=$(dotfiles-dictation-worker test); then message "Transcript:\n$transcript"; else message 'Test failed. Check the last error.'; fi ;;
+        *" error") message "$(cat "$runtime/error" 2>/dev/null || printf 'No error recorded.')" ;;
+        *" remove")
+            set --
+            for id in moonshine-tiny moonshine-base parakeet-v3 qwen3-0.6b tiny tiny.en base base.en small small.en medium medium.en large-v3-turbo; do
+                if [ -d "$model_dir/$id" ] || [ -f "$model_dir/ggml-$id.bin" ]; then
+                    set -- "$@" "$id" "$(model_status "$id")$([ "$id" != "$model" ] || printf '; selected')"
+                fi
+            done
+            if [ "$#" -eq 0 ]; then message 'No models installed.'; continue; fi
+            removal=$(dialog --menu 'Choose an installed model to remove' 20 82 9 "$@" 3>&1 1>&2 2>&3) || continue
+            if dialog --yesno "Permanently delete $removal and its runtime if no other models need it?" 10 78; then
+                if [ "$removal" = "$model" ]; then enabled=false; save; dotfiles-dictation cancel; fi
+                if ! dotfiles-dictation-remove "$removal"; then message 'Removal failed. Stop tests or installation and retry.'; fi
+            fi ;;
+        *" back") exit 0 ;;
+    esac
+done

@@ -900,7 +900,8 @@ while :; do
         "󰍹 displays" "Monitor layout, modes, scale, rotation, and position" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
-        "󰍜 waybar" "Visibility, position, and displays"
+        "󰍜 waybar" "Visibility, position, and displays" \
+        "󰍬 dictation" "Voice dictation, models, and testing"
     if find /proc/acpi/button/lid -mindepth 1 -maxdepth 1 -type d \
         -print -quit 2>/dev/null | grep -q .; then
         set -- "$@" "󰌢 laptop" "Lid-close behavior"
@@ -913,6 +914,7 @@ while :; do
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
         *" waybar") waybar_settings ;;
+        *" dictation") dotfiles-dictation-tui; load_preferences ;;
         *" laptop") laptop_settings ;;
         *" close") exit 0 ;;
     esac

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Destructive action is confirmed by the Settings caller.
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/common.sh"
+model=${1:?Model ID required}
+model_valid "$model" || exit 2
+exec 9>"$runtime/setup.lock"
+flock -n 9 || { printf 'Dictation or installation is active. Stop it first.\n' >&2; exit 1; }
+if [ "$(backend_for "$model")" = sherpa ]; then
+    rm -rf "$model_dir/$model"
+    remaining=false
+    for id in moonshine-tiny moonshine-base parakeet-v3 qwen3-0.6b; do
+        [ ! -d "$model_dir/$id" ] || remaining=true
+    done
+    [ "$remaining" = true ] || rm -rf "$dictation_root/backends/sherpa"
+else
+    rm -f "$model_dir/ggml-$model.bin"
+    if ! find "$model_dir" -maxdepth 1 -name 'ggml-*.bin' -print -quit | grep -q .; then
+        rm -f "$engine"
+    fi
+fi

@@ -5,73 +5,53 @@ part=${1:-center}
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 preferences_file=$config_home/dotfiles/settings.json
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
-cache_file=$runtime_dir/dotfiles-waybar-launcher-status
-lock_dir=$runtime_dir/dotfiles-waybar-launcher-status.lock
-
 launcher_icon=
 if [ -f "$preferences_file" ] && command -v jq >/dev/null 2>&1; then
     launcher_icon=$(jq -r '.waybar.launcher_icon // ""' "$preferences_file" 2>/dev/null || :)
 fi
 
-cache_is_fresh() {
-    [ -r "$cache_file" ] || return 1
-    now=$(date +%s)
-    modified=$(stat -c %Y "$cache_file" 2>/dev/null || printf '0')
-    [ $((now - modified)) -le 1 ]
-}
-
-refresh_status() {
-    if ! mkdir "$lock_dir" 2>/dev/null; then
-        lock_pid=
-        IFS= read -r lock_pid < "$lock_dir/pid" 2>/dev/null || :
-        case $lock_pid in
-            ''|*[!0-9]*) ;;
-            *) kill -0 "$lock_pid" 2>/dev/null && return ;;
-        esac
-        rm -f "$lock_dir/pid"
-        rmdir "$lock_dir" 2>/dev/null || return
-        mkdir "$lock_dir" 2>/dev/null || return
-    fi
-
-    printf '%s\n' "$$" > "$lock_dir/pid"
-    trap 'rm -f "$lock_dir/pid"; rmdir "$lock_dir" 2>/dev/null || :' EXIT HUP INT TERM
-    status=launcher
-    if command -v pw-cli >/dev/null 2>&1; then
-        if pw-cli ls Node 2>/dev/null | awk '
-            /^[[:space:]]*id [0-9]+, type PipeWire:Interface:Node\// {
-                if (screen && video) found = 1
-                screen = 0
-                video = 0
-            }
-            /media.class = "(Stream\/(Input|Output)\/Video|Video\/Source)"/ {
-                video = 1
-            }
-            /media.role = "Screen"/ { screen = 1 }
-            END {
-                if (screen && video) found = 1
-                exit !found
-            }
-        '; then
-            status=screensharing
-        fi
-    fi
-
-    temporary=$(mktemp "$runtime_dir/dotfiles-waybar-launcher-status.XXXXXX") || exit 1
-    printf '%s\n' "$status" > "$temporary"
-    mv "$temporary" "$cache_file"
-}
-
-if [ "$part" = center ]; then
-    cache_is_fresh || refresh_status
-fi
 status=launcher
-IFS= read -r status < "$cache_file" 2>/dev/null || status=launcher
+if command -v pw-cli >/dev/null 2>&1; then
+    if pw-cli ls Node 2>/dev/null | awk '
+        /^[[:space:]]*id [0-9]+, type PipeWire:Interface:Node\// {
+            if (screen && video) found = 1
+            screen = 0
+            video = 0
+        }
+        /media.class = "(Stream\/(Input|Output)\/Video|Video\/Source)"/ {
+            video = 1
+        }
+        /media.role = "Screen"/ { screen = 1 }
+        END {
+            if (screen && video) found = 1
+            exit !found
+        }
+    '; then
+        status=screensharing
+    fi
+fi
+
+dictation_state=$(cat "$runtime_dir/dotfiles-dictation/state" 2>/dev/null || :)
+case $dictation_state in
+    recording|transcribing)
+        # A live worker holds this lock, including during the Settings test.
+        # Ignore stale state left by a crash or an interrupted session.
+        worker_lock=$runtime_dir/dotfiles-dictation/worker.lock
+        if [ -f "$worker_lock" ] && ! flock -n "$worker_lock" true; then
+            status=$dictation_state
+        fi
+        ;;
+esac
 
 case $part in
     left) text='' ;;
     right) text='' ;;
     *)
-        if [ "$status" = screensharing ]; then
+        if [ "$status" = recording ]; then
+            text='󰍬'
+        elif [ "$status" = transcribing ]; then
+            text='󰔟'
+        elif [ "$status" = screensharing ]; then
             text='󰍹'
         elif [ -n "$launcher_icon" ]; then
             text=$launcher_icon
@@ -85,4 +65,9 @@ if [ "$part" = center ]; then
     text="<span font_family='JetBrainsMono Nerd Font Propo' stretch='condensed'>$text</span>"
 fi
 
-printf '{"text":"%s","class":"%s"}\n' "$text" "$status"
+tooltip=
+case $status in
+    recording) tooltip='Dictation recording — Super+D to stop and paste' ;;
+    transcribing) tooltip='Transcribing locally — text will paste into the focused field' ;;
+esac
+jq -cn --arg text "$text" --arg class "$status" --arg tooltip "$tooltip" '{text:$text,class:$class,tooltip:$tooltip}'

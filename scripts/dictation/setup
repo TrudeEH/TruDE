@@ -1,0 +1,49 @@
+#!/bin/sh
+# Explicitly invoked by the model picker, never at desktop startup.
+set -eu
+. "$(dirname -- "$(readlink -f -- "$0")")/common.sh"
+model=${1:-base}
+model_valid "$model" || exit 2
+exec 9>"$runtime/setup.lock"
+flock -n 9 || { printf 'Dictation or another model installation is running.\n' >&2; exit 1; }
+if [ "$(backend_for "$model")" = sherpa ]; then
+    exec "$(dirname -- "$(readlink -f -- "$0")")/setup-sherpa" "$model" 9>&-
+fi
+if [ ! -x "$engine" ]; then ensure_packages cmake build-essential; fi
+for command in curl jq tar; do
+    command -v "$command" >/dev/null || { printf 'Missing %s. Run install.sh first.\n' "$command" >&2; exit 1; }
+done
+umask 077
+mkdir -p "$model_dir" "$(dirname "$engine")"
+temporary=$(mktemp -d "$data_home/dotfiles/dictation/setup.XXXXXX")
+created_engine=false
+success=false
+cleanup() {
+    rm -rf "$temporary"
+    if [ "$success" != true ] && [ "$created_engine" = true ]; then rm -f "$engine"; fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+if [ ! -x "$engine" ]; then
+    version=v1.7.6
+    curl --fail --location --retry 3 -o "$temporary/source.tar.gz" "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/$version.tar.gz"
+    printf '%s  %s\n' '166140e9a6d8a36f787a2bd77f8f44dd64874f12dd8359ff7c1f4f9acb86202e' "$temporary/source.tar.gz" | sha256sum --check
+    tar -xzf "$temporary/source.tar.gz" -C "$temporary"
+    source=$temporary/whisper.cpp-${version#v}
+    cmake -S "$source" -B "$temporary/build" -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DWHISPER_CURL=OFF -DBUILD_SHARED_LIBS=OFF
+    # Keep compilation usable on smaller machines.
+    cmake --build "$temporary/build" --target whisper-cli -j 2
+    created_engine=true
+    install -m 0755 "$temporary/build/bin/whisper-cli" "$engine"
+fi
+if [ ! -s "$model_dir/ggml-$model.bin" ]; then
+    # Resolve a revision and verify the model against its published LFS SHA-256.
+    curl --fail --location --retry 3 -o "$temporary/model.json" 'https://huggingface.co/api/models/ggerganov/whisper.cpp?blobs=true'
+    revision=$(jq -er '.sha | select(test("^[0-9a-f]{40}$"))' "$temporary/model.json")
+    checksum=$(jq -er --arg name "ggml-$model.bin" '.siblings[] | select(.rfilename == $name) | .lfs.sha256 | select(test("^[0-9a-f]{64}$"))' "$temporary/model.json")
+    curl --fail --location --retry 3 -o "$temporary/model.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/$revision/ggml-$model.bin"
+    printf '%s  %s\n' "$checksum" "$temporary/model.bin" | sha256sum --check
+    mv "$temporary/model.bin" "$model_dir/ggml-$model.bin"
+fi
+success=true
+printf '\nModel %s is ready.\n' "$model"

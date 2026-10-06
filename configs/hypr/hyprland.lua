@@ -246,6 +246,7 @@ hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window"
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"), { description = "Open power menu" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("dotfiles-dictation"), { description = "Toggle voice dictation" })
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle floating" })
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu), { description = "Open application launcher" })
 -- Launch on release so Super can still be used as a modifier for other binds.

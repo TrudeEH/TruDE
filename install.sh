@@ -127,7 +127,7 @@ install_packages() {
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
-        file fontconfig procps xdg-user-dirs xdg-utils \
+        file fontconfig procps util-linux pipewire-bin xdg-user-dirs xdg-utils \
         </dev/tty
 }
 
@@ -400,6 +400,12 @@ link_configs() {
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
     link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
     link_config "$repo_dir/scripts/hypr/set-wallpaper" "$HOME/.local/bin/dotfiles-set-wallpaper"
+    link_config "$repo_dir/scripts/dictation/control" "$HOME/.local/bin/dotfiles-dictation"
+    link_config "$repo_dir/scripts/dictation/worker" "$HOME/.local/bin/dotfiles-dictation-worker"
+    link_config "$repo_dir/scripts/dictation/remove" "$HOME/.local/bin/dotfiles-dictation-remove"
+    link_config "$repo_dir/scripts/dictation/setup" "$HOME/.local/bin/dotfiles-dictation-setup"
+    link_config "$repo_dir/scripts/tui/dictation-tui" "$HOME/.local/bin/dotfiles-dictation-tui"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-dictation.service" "$config_dir/systemd/user/dotfiles-dictation.service"
     link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
     link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/dotfiles-mako"
     link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
