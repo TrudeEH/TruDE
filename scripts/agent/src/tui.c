@@ -92,7 +92,7 @@ typedef struct {
     atomic_int finished, dirty, approval;
     char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
          *memory_target;
-    J *request_params, *response, *images, *jobimages, *steering;
+    J *request_params, *response, *images, *jobimages, *steering, *jobchat, *jobconfig;
     unsigned image_number;
     int request_kind;
     Buf partial, input, pasted;
@@ -358,7 +358,7 @@ static void transcript(UI *u) {
                 J *call = calls->v[k], *f = jg(call, "function");
                 char *key = fmt("%s:%zu:%zu", gs(u->chat, "id"), i, k);
                 J *r = jg(results, key);
-                const char *result = jstr(r), *status = !r ? u->busy ? spinner() : "interrupted"
+                const char *result = jstr(r), *status = !r ? u->busy && u->chat == u->jobchat ? spinner() : "interrupted"
                                                         : !strncmp(result, "Tool denied", 11)
                                                             ? "denied"
                                                         : !strncmp(result, "Tool error:", 11) ||
@@ -393,12 +393,12 @@ static void transcript(UI *u) {
             }
         }
     }
-    for (size_t i = 0; u->steering && i < u->steering->len; i++) {
+    for (size_t i = 0; u->chat == u->jobchat && u->steering && i < u->steering->len; i++) {
         line(&u->transcript, "", NORMAL, 0, NULL);
         line(&u->transcript, "Queued steering message", ACCENT, 0, NULL);
         text_lines(&u->transcript, gs(u->steering->v[i], "content"), NORMAL, 0);
     }
-    if (u->partial.n) {
+    if (u->chat == u->jobchat && u->partial.n) {
         if (speaker != 2) {
             line(&u->transcript, "", NORMAL, 0, NULL);
             line(&u->transcript, "Seth", ACCENT, 0, NULL);
@@ -829,11 +829,9 @@ static void refresh_history(UI *u) {
 }
 static void start_job(UI *, int, const char *);
 static void fresh(UI *u) {
-    if (u->busy)
-        return;
-    while (u->steering->len)
-        jremove(u->steering, 0);
-    jf(u->chat);
+    if (!u->busy)
+        while (u->steering->len) jremove(u->steering, 0);
+    if (u->chat != u->jobchat) jf(u->chat);
     u->chat = new_chat(u->config);
     u->history_sel = -1;
     u->chat_scroll = 0;
@@ -841,31 +839,33 @@ static void fresh(UI *u) {
     es(&u->composer, "");
     jf(u->images);
     u->images = NULL;
-    bfree(&u->partial);
-    notice_ui(u, "");
+    if (!u->busy) bfree(&u->partial);
+    if (!u->busy) notice_ui(u, "");
     u->tab = 0;
     u->focus = 100;
-    if (strcmp(gs(u->mcp.config, "workspace"), gs(u->chat, "workspace")))
-        start_job(u, 4, "");
+    pthread_mutex_lock(&u->mutex);
+    int reconnect = strcmp(gs(u->mcp.config, "workspace"), gs(u->chat, "workspace")) != 0;
+    pthread_mutex_unlock(&u->mutex);
+    if (reconnect) start_job(u, 4, "");
 }
 static void open_chat(UI *u, const char *id) {
-    if (u->busy)
-        return;
     int reconnect = 0;
-    J *chat = load_chat(id);
+    J *chat = u->jobchat && !strcmp(id, gs(u->jobchat, "id")) ? u->jobchat : load_chat(id);
     if (!chat) {
         error_ui(u);
         return;
     }
-    while (u->steering->len)
-        jremove(u->steering, 0);
+    if (!u->busy)
+        while (u->steering->len) jremove(u->steering, 0);
+    pthread_mutex_lock(&u->mutex);
     reconnect = strcmp(gs(chat, "workspace"), gs(u->mcp.config, "workspace")) != 0;
-    jf(u->chat);
+    pthread_mutex_unlock(&u->mutex);
+    if (u->chat != u->jobchat) jf(u->chat);
     u->chat = chat;
     u->tab = 0;
     u->chat_scroll = 0;
     u->following = 1;
-    bfree(&u->partial);
+    if (!u->busy) bfree(&u->partial);
     refresh_history(u);
     u->dirty = 1;
     if (reconnect)
@@ -1014,8 +1014,8 @@ static void *worker(void *opaque) {
     err[0] = 0;
     int result = 0;
     J *jobresult = NULL;
-    Agent a = {.config = u->config,
-               .chat = u->chat,
+    Agent a = {.config = u->jobconfig,
+               .chat = u->jobchat,
                .mcp = &u->mcp,
                .mutex = &u->mutex,
                .approve = approve_worker,
@@ -1033,19 +1033,23 @@ static void *worker(void *opaque) {
         break;
     case 4: {
         MCP nextm;
-        J *config = jc(u->config);
-        jset(config, "workspace", js(gs(u->chat, "workspace")));
+        J *config = jc(u->jobconfig);
+        jset(config, "workspace", js(gs(u->jobchat, "workspace")));
         mcp_init(&nextm, config);
         nextm.elicit = elicit_worker;
         nextm.opaque = u;
         nextm.mutex = &u->mutex;
         int failed = mcp_connect(&nextm);
         pthread_mutex_lock(&u->mutex);
-        mcp_close(&u->mcp);
-        jf(u->mcp_config);
+        MCP previous = u->mcp;
+        J *previous_config = u->mcp_config;
         u->mcp_config = config;
         u->mcp = nextm;
         pthread_mutex_unlock(&u->mutex);
+        /* Session teardown can perform network I/O; never hold the UI lock. */
+        previous.mutex = NULL;
+        mcp_close(&previous);
+        jf(previous_config);
         char *text = failed ? fmt("%d MCP server(s) failed — see MCP tab", failed)
                             : fmt("%zu MCP tools connected", nextm.toolcount);
         update_worker("notice", text, u);
@@ -1137,6 +1141,9 @@ static void start_job(UI *u, int job, const char *text) {
     jf(u->jobimages);
     u->jobimages = job == 1 ? jc(u->images) : NULL;
     u->job = job;
+    u->jobchat = u->chat;
+    jf(u->jobconfig);
+    u->jobconfig = jc(u->config);
     u->busy = 1;
     u->finished = 0;
     free(u->progress);
@@ -1155,6 +1162,7 @@ static void start_job(UI *u, int job, const char *text) {
     int r = pthread_create(&u->thread, NULL, worker, u);
     if (r) {
         u->busy = 0;
+        u->jobchat = NULL;
         notice_ui(u, "Could not start worker");
     }
 }
@@ -1345,6 +1353,11 @@ static void submit(UI *u) {
         return;
     }
     if (u->busy) {
+        if (u->chat != u->jobchat) {
+            notice_ui(u, "A task is running in another chat. Return to that chat to steer it, or wait for completion.");
+            free(text);
+            return;
+        }
         J *msg = jo();
         jset(msg, "role", js("user"));
         jset(msg, "content", js(text));
@@ -1843,7 +1856,8 @@ static void dispatch(UI *u, int id, int index) {
         cancelled = 1;
         return;
     }
-    if (u->busy)
+    /* Navigation and read-only actions remain available during background work. */
+    if (u->busy && id != 101 && id != 102 && id != 103 && id != 105 && id != 109 && id != 115)
         return;
     if (id == 102) {
         J *chat = ji(u->history, index);
@@ -1879,7 +1893,11 @@ static void dispatch(UI *u, int id, int index) {
         start_job(u, 3, "");
         break;
     case 109: {
-        char *p = export_chat(u->chat);
+        pthread_mutex_lock(&u->mutex);
+        J *snapshot = jc(u->chat);
+        pthread_mutex_unlock(&u->mutex);
+        char *p = export_chat(snapshot);
+        jf(snapshot);
         if (p) {
             Modal *m = modal(u, MESSAGE, A_EXPORT, "Export saved · click path to copy", p);
             m->id = strdup(p);
@@ -1943,9 +1961,11 @@ static void dispatch(UI *u, int id, int index) {
     }
     case 115: {
         Buf b = {0};
+        pthread_mutex_lock(&u->mutex);
         J *e = jg(u->chat, "events");
         for (size_t i = 0; e && i < e->len; i++)
             bf(&b, "%s  %s\n", gs(e->v[i], "at"), gs(e->v[i], "text"));
+        pthread_mutex_unlock(&u->mutex);
         message(u, "Activity", b.s ? b.s : "No events.");
         bfree(&b);
         break;
@@ -3412,8 +3432,18 @@ static void finish_job(UI *u) {
     if (!u->tasklist)
         u->tasklist = ja();
     u->dirty = 1;
+    J *completed_chat = u->jobchat;
+    u->jobchat = NULL;
     if (u->steering->len && !u->result && (u->job == 1 || u->job == 2 || u->job == 3)) {
+        J *viewed = u->chat;
+        u->chat = completed_chat;
         start_job(u, 2, "");
+        u->chat = viewed;
+        return;
+    }
+    if (completed_chat != u->chat) jf(completed_chat);
+    if (strcmp(gs(u->chat, "workspace"), gs(u->mcp.config, "workspace"))) {
+        start_job(u, 4, "");
         return;
     }
     if (u->memory_reload && u->tab == 3 && !u->modal) {
@@ -3565,6 +3595,8 @@ int tui(J *config) {
     mcp_close(&u.mcp);
     jf(u.mcp_config);
     jf(u.config);
+    if (u.jobchat != u.chat) jf(u.jobchat);
+    jf(u.jobconfig);
     jf(u.chat);
     jf(u.history);
     jf(u.tasklist);

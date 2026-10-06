@@ -1389,6 +1389,63 @@ esac
             self.assertNotIn("ACTIVITY",s.screen.text)
         finally:
             s.close()
+    def saved_browse_chat(self):
+        ident="00000000-0000-4000-8000-000000000099"
+        path=self.root/f"data/dotfiles-agent/chats/{ident}.json"
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text(json.dumps({"id":ident,"title":"Browse fixture","created":"2026-01-01T00:00:00.000Z","updated":"2026-01-01T00:00:00.000Z","workspace":str(self.workspace),"messages":[{"role":"user","content":"saved browsing content"}],"events":[],"summary":"","compacted":0,"usage":{}}))
+        return path
+
+    def test_tui_browse_chats_while_connecting(self):
+        path=self.saved_browse_chat()
+        self.mock.mcp_connect_delay=2
+        self.config["mcpServers"]["remote"]={"url":f"http://127.0.0.1:{self.mock.server_port}/mcp","oauth":False}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("Connecting MCP servers")
+            s.click("Browse fixture")
+            s.wait("saved browsing content",timeout=1)
+            self.assertIn("Connecting MCP servers",s.screen.text)
+            s.send("\x1bOQ")
+            s.wait("Server details",timeout=1)
+            s.send("\x1bOP")
+            s.wait("saved browsing content",timeout=1)
+            s.wait("MCP tools connected")
+            self.assertIn("saved browsing content",s.screen.text)
+            self.assertEqual(json.loads(path.read_text())["messages"],[{"role":"user","content":"saved browsing content"}])
+        finally: s.close()
+
+    def test_tui_browse_chats_while_thinking_keeps_results_in_origin(self):
+        path=self.saved_browse_chat()
+        self.mock.mode="slow"
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("background origin request\r")
+            s.wait("Thinking")
+            s.click("Browse fixture")
+            s.wait("saved browsing content",timeout=1)
+            self.assertIn("Thinking",s.screen.text)
+            transcript="\n".join(line[33:] for line in s.screen.text.splitlines()[4:25])
+            self.assertNotIn("background origin request",transcript)
+            s.send("\x0cdo not send to other chat\r")
+            self.assertIn("do not send to other chat",s.screen.text)
+            until=time.monotonic()+8
+            while time.monotonic()<until:
+                s.read(.1)
+                if any("Héllo" in p.read_text() for p in path.parent.glob("*.json") if p!=path): break
+            self.assertIn("saved browsing content",s.screen.text)
+            self.assertNotIn("Héllo",s.screen.text)
+            self.assertIn("do not send to other chat",s.screen.text)
+            self.assertEqual(json.loads(path.read_text())["messages"],[{"role":"user","content":"saved browsing content"}])
+            origins=[json.loads(p.read_text()) for p in path.parent.glob("*.json") if p!=path]
+            origin=next(c for c in origins if any(m.get("content")=="background origin request" for m in c["messages"]))
+            self.assertTrue(any("Héllo" in m.get("content","") for m in origin["messages"]))
+            s.click(origin["title"])
+            s.wait("Héllo")
+        finally: s.close()
+
     def test_tui_steering_and_animated_footer(self):
         self.mock.mode="slow"
         s=Session(self.env)

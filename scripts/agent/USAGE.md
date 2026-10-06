@@ -150,6 +150,14 @@ individual tools in the MCP tab. Tool-list changes refresh automatically when ad
 MCP resources and prompts are exposed to the agent through bridges to the standard MCP
 methods. Form elicitation can ask the user for input; URL requests display a sign-in link.
 
+While a task runs or MCP servers connect, you can browse other chats, search
+history, open a new chat, scroll/select/export transcripts, switch tabs, and edit
+settings drafts. Replies and streamed text remain attached to the originating
+chat. Sending from another chat leaves the draft unsent; return to the running
+chat to queue steering, or wait before starting another task. Saving settings and
+other conflicting mutations remain disabled until the task finishes. A different
+chat workspace reconnects MCP servers after the active task completes.
+
 Startup and reconnect run independent server connections in parallel, in batches
 of up to eight. Authentication/input prompts remain serialized, and tool ordering
 follows the configured server order. Existing timeouts and protocol fallback are
