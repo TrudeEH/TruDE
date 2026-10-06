@@ -12,7 +12,7 @@
 
 /* The terminal renderer and editor need only libc. All coordinates are cells;
  * text positions are UTF-8 byte offsets. No escape from remote text is emitted. */
-enum { NORMAL, MUTED, ACCENT, SURFACE, SELECTED, BORDER, FOCUS, CODE, HOVER, ERROR };
+enum { NORMAL, MUTED, ACCENT, SURFACE, SELECTED, BORDER, FOCUS, CODE, HOVER, ERROR, TOOL_HEADER, TOOL_LABEL };
 typedef struct {
     wchar_t c;
     unsigned char color, bold;
@@ -272,6 +272,59 @@ static void text_lines(Lines *l, const char *s, int color, int markdown) {
     }
     free(copy);
 }
+static Lines wrap(Lines *, int);
+/* Wrap the content before adding the gutter, so continuations stay inside the
+ * card and command/output bytes are never interpreted as terminal markup. */
+static void tool_text(UI *u, const char *text, int color) {
+    int side = u->w * 26 / 100;
+    if (side < 22) side = 22;
+    int width = u->w - side - 9;
+    Lines raw = {0};
+    text_lines(&raw, text, color, 0);
+    Lines wrapped = wrap(&raw, width > 0 ? width : 1);
+    for (int i = 0; i < wrapped.len; i++) {
+        char *row = fmt("  │ %s", wrapped.v[i].s);
+        line(&u->transcript, row, color, 0, NULL);
+        free(row);
+    }
+    lines_free(&raw);
+    lines_free(&wrapped);
+}
+static void tool_details(UI *u, J *f, J *result, const char *status) {
+    line(&u->transcript, "  ├─ Arguments", TOOL_LABEL, 1, NULL);
+    J *args = jp(gs(f, "arguments"), NULL);
+    if (args && args->type == JOBJ) {
+        if (!args->len) tool_text(u, "No arguments", TOOL_LABEL);
+        for (size_t i = 0; i < args->len; i++) {
+            J *value = args->v[i];
+            char *label = fmt("  │ %s", value->key);
+            line(&u->transcript, label, TOOL_LABEL, 1, NULL);
+            free(label);
+            char *text = value->type == JSTR ? strdup(jstr(value)) : jd(value, 1);
+            tool_text(u, text, SURFACE);
+            free(text);
+        }
+    } else {
+        char *text = args ? jd(args, 1) : strdup(gs(f, "arguments"));
+        tool_text(u, *text ? text : "No arguments", SURFACE);
+        free(text);
+    }
+    jf(args);
+    line(&u->transcript, "  │", TOOL_LABEL, 0, NULL);
+    line(&u->transcript, "  ├─ Result", TOOL_LABEL, 1, NULL);
+    if (result) {
+        const char *text = jstr(result);
+        J *json = jp(text, NULL);
+        char *pretty = json && (json->type == JOBJ || json->type == JARR) ? jd(json, 1) : NULL;
+        tool_text(u, pretty ? pretty : *text ? text : "Empty result", SURFACE);
+        free(pretty);
+        jf(json);
+    } else tool_text(u, "Awaiting result…", TOOL_LABEL);
+    char *footer = fmt("  └─ %s", status);
+    line(&u->transcript, footer, TOOL_LABEL, 0, NULL);
+    free(footer);
+    line(&u->transcript, "", NORMAL, 0, NULL);
+}
 static const char *spinner(void) {
     static const char *frames[] = {"/", "-", "\\", "|"};
     return frames[(int)(mono() * 8) % 4];
@@ -370,18 +423,10 @@ static void transcript(UI *u) {
                 char *label =
                     t ? fmt("%s %s / %s · %s", expanded ? "▼" : "▶", t->server, t->name, status)
                       : fmt("%s %s · %s", expanded ? "▼" : "▶", gs(f, "name"), status);
-                line(&u->transcript, label, MUTED, 0, key);
+                line(&u->transcript, label, expanded ? TOOL_HEADER : MUTED, expanded, key);
                 free(label);
-                if (expanded) {
-                    line(&u->transcript, "  Arguments", MUTED, 0, NULL);
-                    J *args = jp(gs(f, "arguments"), NULL);
-                    char *raw = args ? jd(args, 1) : strdup(gs(f, "arguments"));
-                    jf(args);
-                    text_lines(&u->transcript, raw, MUTED, 0);
-                    free(raw);
-                    line(&u->transcript, "  Result", MUTED, 0, NULL);
-                    text_lines(&u->transcript, r ? result : "Awaiting result…", MUTED, 0);
-                }
+                if (expanded)
+                    tool_details(u, f, r, status);
                 free(key);
             }
         } else if (!strcmp(role, "tool")) {
@@ -594,6 +639,8 @@ static int view_lines(UI *u, Lines *l, int x, int y, int width, int height, int 
         *scroll = 0;
     for (int r = 0; r < height && r + *scroll < w.len; r++) {
         Line *v = &w.v[r + *scroll];
+        if (v->color == SURFACE || v->color == TOOL_HEADER || v->color == TOOL_LABEL)
+            fill(u, x, y + r, width - 1, 1, v->color);
         draw_text(u, x, y + r, width - 1, v->s, v->color, v->bold, v->color == NORMAL);
         if (tools && v->key) { /* key is represented by index in the unwrapped transcript. */
             for (int i = 0; i < l->len; i++)
@@ -2538,7 +2585,9 @@ static const char *styles[] = {
     "\033[38;2;34;34;38m\033[48;2;255;190;111m", "\033[38;2;170;170;170m\033[48;2;34;34;38m",
     "\033[38;2;255;190;111m\033[48;2;34;34;38m", "\033[38;2;255;255;255m\033[48;2;56;56;60m",
     "\033[38;2;34;34;38m\033[48;2;255;163;72m",
-    "\033[38;2;246;97;81m\033[48;2;34;34;38m"};
+    "\033[38;2;246;97;81m\033[48;2;34;34;38m",
+    "\033[38;2;255;190;111m\033[48;2;56;56;60m",
+    "\033[38;2;170;170;170m\033[48;2;56;56;60m"};
 static size_t active_estimate(J *chat) {
     J *a = ja(), *m = jg(chat, "messages");
     for (size_t i = (size_t)gn(chat, "compacted", 0); m && i < m->len; i++)

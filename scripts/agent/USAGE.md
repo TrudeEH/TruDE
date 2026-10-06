@@ -147,6 +147,12 @@ bearer-token environment variable. Advanced editing and import accept the famili
 headers may contain `${ENV_VAR}` references. Programs launch directly, without shell
 interpolation. Enable/disable, remove, reconnect, inspect tools/errors, and disable
 individual tools in the MCP tab. Tool-list changes refresh automatically when advertised.
+Expanded chat tool calls use a raised card with an accent header, labeled argument
+values, and a separate result section. String arguments show decoded text rather
+than JSON escapes; structured values/results retain pretty-printed JSON. Long
+lines wrap with a consistent gutter and reflow on terminal resize. Click the
+header again to collapse the card.
+
 MCP resources and prompts are exposed to the agent through bridges to the standard MCP
 methods. Form elicitation can ask the user for input; URL requests display a sign-in link.
 

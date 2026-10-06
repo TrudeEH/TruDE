@@ -923,6 +923,44 @@ class NativeTests(unittest.TestCase):
         p=subprocess.run([BINARY,"--run-task",task["id"]],env=self.env,text=True,capture_output=True,timeout=10)
         self.assertEqual(p.returncode,0,p.stderr)
         self.assertEqual(json.loads(file.read_text())[0]["lastStatus"],"completed")
+    def test_tui_expanded_tool_card_decodes_arguments_and_wraps_gutter(self):
+        ident="00000000-0000-4000-8000-000000000088"
+        command='printf "readable command"\nprintf "'+"word "*24+'"'
+        messages=[{"role":"user","content":"Inspect card"},{"role":"assistant","content":"","tool_calls":[{"id":"card-call","type":"function","function":{"name":alias("shell","shell"),"arguments":json.dumps({"command":command,"timeout":10})}}]},{"role":"tool","tool_call_id":"card-call","content":"Exit 0\n"+"output "*24+"\nlast output line"}]
+        path=self.root/f"data/dotfiles-agent/chats/{ident}.json"
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text(json.dumps({"id":ident,"title":"Tool card fixture","created":"2026-01-01T00:00:00.000Z","updated":"2026-01-01T00:00:00.000Z","workspace":str(self.workspace),"messages":messages,"events":[],"summary":"","compacted":0,"usage":{}}))
+        self.config["mcpServers"]["shell"]={"builtin":"shell"}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.click("Tool card fixture")
+            s.wait("shell / shell")
+            s.click("shell / shell")
+            s.wait("Arguments")
+            self.assertIn('printf "readable command"',s.screen.text)
+            self.assertNotIn('\\"readable command',s.screen.text)
+            self.assertIn("├─ Result",s.screen.text)
+            self.assertIn("└─ done",s.screen.text)
+            self.assertIn("last output line",s.screen.text)
+            x,y=s.screen.find("shell / shell")
+            self.assertEqual(s.screen.grid[y][x][1:],("#ffbe6f","#38383c"))
+            for row in s.screen.grid:
+                text="".join(c[0] for c in row)
+                if "word" in text or "output output" in text:
+                    self.assertIn("│",text[33:38])
+                    self.assertEqual(row[40][2],"#38383c")
+            # Resizing reflows the card without losing its gutter or toggle.
+            fcntl.ioctl(s.master,termios.TIOCSWINSZ,struct.pack("HHHH",38,90,0,0))
+            s.screen=Terminal(90,38)
+            os.kill(s.process.pid,signal.SIGWINCH)
+            s.wait("Arguments")
+            self.assertIn('printf "readable command"',s.screen.text)
+            s.click("shell / shell")
+            self.assertNotIn("Arguments",s.screen.text)
+        finally: s.close()
+
     def test_tui_input_help_history_tools_and_ready(self):
         self.mock.mode="read"
         self.run_agent("old chat")
