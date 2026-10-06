@@ -51,6 +51,8 @@ typedef struct {
 } Http;
 int http(const char *, const char *, J *, J *, int, size_t, Chunk, void *, Http *);
 void http_free(Http *);
+int http_oauth(const char *, const char *, J *, Http *);
+int http_form(const char *, const char *, Http *);
 int http_notify(const char *, J *, J *);
 int http_close_session(const char *, J *);
 int http_stream(Proc *, const char *, J *, int);
@@ -60,7 +62,7 @@ typedef struct Server {
     _Atomic(const char *) state;
     J *config, *caps, *headers, *listed;
     Proc proc;
-    int kind, modern, seq, listen;
+    int kind, modern, seq, listen, oauth_failed;
     atomic_int changed;
     Buf sse;
 } Server;
@@ -73,6 +75,7 @@ typedef struct {
 } Tool;
 typedef struct {
     J *config;
+    int interactive;
     Server **servers;
     size_t count;
     Tool **tools;
@@ -81,6 +84,7 @@ typedef struct {
     void *opaque;
     pthread_mutex_t *mutex;
 } MCP;
+int oauth_authorize(MCP *, Server *, const char *, int);
 void mcp_init(MCP *, J *), mcp_close(MCP *);
 int mcp_connect(MCP *), mcp_refresh(MCP *), mcp_poll(MCP *);
 J *mcp_definitions(MCP *), *mcp_request(MCP *, Server *, const char *, J *, int);

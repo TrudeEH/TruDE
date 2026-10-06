@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """Development-only integration tests; Seth itself never invokes Python."""
+import base64
+import urllib.parse
+import urllib.request
 import codecs
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -92,6 +95,59 @@ class Mock(http.server.ThreadingHTTPServer):
         self.started = threading.Event()
         self.model_hook = None
         threading.Thread(target=self.serve_forever, daemon=True).start()
+
+class OAuthHandler(http.server.BaseHTTPRequestHandler):
+    protocol_version="HTTP/1.1"
+    def log_message(self,*_): pass
+    def reply(self,obj,status=200,headers=None):
+        data=json.dumps(obj).encode()
+        self.send_response(status)
+        self.send_header("Content-Length",str(len(data)))
+        self.send_header("Content-Type","application/json")
+        for k,v in (headers or {}).items(): self.send_header(k,v)
+        self.end_headers(); self.wfile.write(data)
+    def do_GET(self):
+        base=self.server.base
+        if self.path=="/.well-known/oauth-protected-resource/mcp":
+            self.reply({"resource":base+"/mcp","authorization_servers":[base],"scopes_supported":["tasks:read"]})
+        elif self.path=="/.well-known/oauth-authorization-server":
+            self.reply({"issuer":base,"authorization_endpoint":base+"/authorize","token_endpoint":base+"/token",
+                        "registration_endpoint":base+"/register","code_challenge_methods_supported":["S256"]})
+        else: self.reply({},404)
+    def do_POST(self):
+        raw=self.rfile.read(int(self.headers.get("Content-Length",0)))
+        if self.path=="/register":
+            body=json.loads(raw)
+            assert body["token_endpoint_auth_method"]=="none"
+            assert body["redirect_uris"][0].startswith("http://127.0.0.1:")
+            self.server.registrations+=1
+            self.server.registered_redirect=body["redirect_uris"][0]
+            self.reply({"client_id":"native-client","token_endpoint_auth_method":"none"})
+        elif self.path=="/token":
+            body=urllib.parse.parse_qs(raw.decode())
+            assert body["client_id"]==["native-client"]
+            assert body["resource"]==[self.server.base+"/mcp"]
+            if body["grant_type"]==["authorization_code"]:
+                verifier=body["code_verifier"][0]
+                digest=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+                assert digest==self.server.challenge
+                assert body["code"]==["valid-code"]
+                assert body["redirect_uri"]==[self.server.redirect]
+            else:
+                assert body["grant_type"]==["refresh_token"]
+                assert body["refresh_token"]==["refresh-secret"]
+                self.server.refreshes+=1
+            self.reply({"access_token":"access-secret","refresh_token":"refresh-secret","token_type":"Bearer","expires_in":3600})
+        elif self.path=="/mcp":
+            if self.headers.get("Authorization")!="Bearer access-secret":
+                self.reply({},401,{"WWW-Authenticate":'Bearer resource_metadata="'+self.server.base+'/.well-known/oauth-protected-resource/mcp"'})
+                return
+            body=json.loads(raw); method=body["method"]
+            if method=="server/discover": self.reply({"jsonrpc":"2.0","id":body["id"],"error":{"code":-32601,"message":"Use initialize"}})
+            elif method=="initialize": self.reply({"jsonrpc":"2.0","id":body["id"],"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{}}}})
+            elif method=="tools/list": self.reply({"jsonrpc":"2.0","id":body["id"],"result":{"tools":[]}})
+            else: self.reply({},202)
+        else: self.reply({},404)
 
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -545,6 +601,92 @@ class NativeTests(unittest.TestCase):
             self.assertEqual(len(self.chat()["messages"][0]["images"]),1)
         finally:
             s.close()
+
+    def test_native_oauth_pkce_callback_cache_and_refresh(self):
+        server=http.server.ThreadingHTTPServer(("127.0.0.1",0),OAuthHandler)
+        server.daemon_threads=True
+        server.base=f"http://127.0.0.1:{server.server_port}"
+        server.registrations=server.refreshes=0
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        self.config["mcpServers"]={"oauth-test":{"url":server.base+"/mcp","transport":"http"}}
+        self.save()
+        p=subprocess.Popen([BINARY,"--check"],env=self.env,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        try:
+            deadline=time.monotonic()+15
+            line=""; received=""
+            while time.monotonic()<deadline:
+                self.assertIsNone(p.poll())
+                if select.select([p.stderr],[],[],.1)[0]:
+                    received+=os.read(p.stderr.fileno(),8192).decode()
+                    for candidate in received.splitlines():
+                        if candidate.startswith(server.base+"/authorize?"): line=candidate
+                    if line: break
+            self.assertTrue(line.startswith(server.base+"/authorize?"),line)
+            query=urllib.parse.parse_qs(urllib.parse.urlsplit(line).query)
+            self.assertEqual(query["code_challenge_method"],["S256"])
+            self.assertEqual(query["scope"],["tasks:read"])
+            self.assertEqual(query["resource"],[server.base+"/mcp"])
+            server.challenge=query["code_challenge"][0]
+            server.redirect=query["redirect_uri"][0]
+            # An incorrect state must not exchange a code or consume the callback.
+            with self.assertRaises(urllib.error.HTTPError):
+                urllib.request.urlopen(server.redirect+"?code=bad&state=wrong",timeout=3)
+            callback=server.redirect+"?"+urllib.parse.urlencode({"code":"valid-code","state":query["state"][0]})
+            with urllib.request.urlopen(callback,timeout=3) as response: self.assertEqual(response.status,200)
+            out,error=p.communicate(timeout=15)
+            self.assertEqual(p.returncode,0,error)
+            self.assertIn("oauth-test: connected",out)
+            files=list(self.settings.parent.glob("oauth-*.json"))
+            self.assertEqual(len(files),1)
+            self.assertEqual(files[0].stat().st_mode&0o777,0o600)
+            record=json.loads(files[0].read_text())
+            self.assertEqual(record["access_token"],"access-secret")
+            result=subprocess.run([BINARY,"--check"],env=self.env,text=True,capture_output=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertNotIn("/authorize?",result.stderr)
+            record["expires_at"]=0; files[0].write_text(json.dumps(record))
+            result=subprocess.run([BINARY,"--check"],env=self.env,text=True,capture_output=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(server.registrations,1)
+            self.assertEqual(server.refreshes,1)
+            self.assertNotIn("access-secret",out+error+result.stdout+result.stderr)
+        finally:
+            if p.poll() is None: p.terminate(); p.communicate(timeout=5)
+            server.shutdown(); server.server_close()
+
+    def test_native_oauth_decline_disable_and_validation(self):
+        server=http.server.ThreadingHTTPServer(("127.0.0.1",0),OAuthHandler)
+        server.daemon_threads=True
+        server.base=f"http://127.0.0.1:{server.server_port}"
+        server.registrations=server.refreshes=0
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        self.config["mcpServers"]={"oauth-test":{"url":server.base+"/mcp","transport":"http","oauth":False}}
+        self.save()
+        try:
+            result=subprocess.run([BINARY,"--check"],env=self.env,text=True,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,1)
+            self.assertNotIn("/authorize?",result.stderr)
+            self.assertEqual(server.registrations,0)
+            self.config["mcpServers"]["oauth-test"]["oauth"]={"clientId":"native-client"}
+            self.save()
+            s=Session(self.env)
+            try:
+                s.wait("Sign-in URL:")
+                self.assertIn("127.0.0.1",s.screen.text)
+                s.click("Cancel")
+                s.wait("failed — see MCP tab")
+                s.click("F2 MCP servers")
+                s.wait("OAuth sign-in declined")
+                self.assertEqual(server.registrations,0)
+                self.assertEqual(list(self.settings.parent.glob("oauth-*.json")),[])
+            finally: s.close()
+            self.config["mcpServers"]["oauth-test"]["oauth"]={"clientId":123}
+            self.save()
+            result=subprocess.run([BINARY,"--check"],env=self.env,text=True,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,1)
+            self.assertIn("oauth.clientId must be text",result.stderr)
+        finally:
+            server.shutdown(); server.server_close()
 
     def test_stock_prompt_allows_user_workspace_exceptions(self):
         previous=("You are Seth, a local Debian AI agent. Help the user complete their request. Use tools when "

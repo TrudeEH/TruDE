@@ -296,6 +296,14 @@ static J *request_once(MCP *m, Server *s, const char *method, J *params, int tim
         Http response = {0};
         int code = http(s->post ? s->post : s->url, "POST", h, req, timeout, 8 * LIMIT, NULL, NULL,
                         &response);
+        if (response.status == 401 && s->kind == 1 &&
+            !jg(jg(s->config, "headers"), "Authorization") && gb(s->config, "oauth", 1)) {
+            if (!oauth_authorize(m, s, response.headers, 1)) {
+                http_free(&response);
+                jset(h, "Authorization", js(gs(s->headers, "Authorization")));
+                code = http(s->url, "POST", h, req, timeout, 8 * LIMIT, NULL, NULL, &response);
+            } else s->oauth_failed = 1;
+        }
         if (!code) {
             char *session = header_value(response.headers, "Mcp-Session-Id");
             if (session) {
@@ -695,7 +703,7 @@ static int connect_server(MCP *m, Server *s) {
     s->modern = s->kind != 2;
     J *r = s->modern ? mcp_request(m, s, "server/discover", NULL, 3) : NULL;
     if (!r) {
-        if (cancelled)
+        if (cancelled || s->oauth_failed)
             return -1;
         if (s->kind != 2) {
             server_stop(s);
@@ -788,6 +796,8 @@ int mcp_connect(MCP *m) {
             jset(s->headers, headers->v[k]->key, js(v));
             free(v);
         }
+        if (valid && s->kind == 1 && !jg(s->headers, "Authorization") && gb(s->config, "oauth", 1))
+            valid = !oauth_authorize(m, s, NULL, 0);
         if (valid && !connect_server(m, s)) {
             s->state = "connected";
             err[0] = 0;

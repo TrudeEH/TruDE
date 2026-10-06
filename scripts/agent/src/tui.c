@@ -1196,6 +1196,9 @@ static void mcp_form(UI *u, int edit) {
     field_add(m, "headers", "Headers JSON — e.g. Authorization: Bearer ${TOKEN}", headers, 1, 2);
     free(env);
     free(headers);
+    char *oauth = jg(s, "oauth") ? jd(jg(s, "oauth"), 0) : strdup("true");
+    field_add(m, "oauth", "OAuth JSON: true, false, or {clientId, scope}", oauth, 0, 2);
+    free(oauth);
 }
 static void task_form(UI *u, int edit) {
     J *t = edit ? ji(u->tasklist, (size_t)u->task_sel) : NULL;
@@ -2248,6 +2251,8 @@ static void modal_draw(UI *u) {
             draw_text(u, b + 1, bottom + 1, 10, m->action == A_APPROVE ? "Deny" : "Cancel",
                       m->selected == 0 ? SELECTED : SURFACE, 0, 0);
             hit(u, b, bottom + 1, 12, 1, 802, 0);
+            if (m->action == A_ELICIT && m->id)
+                button(u, b + 15, bottom + 1, "Copy URL", 805);
         } else
             button(u, x + 3, bottom + 1, "Close", 802);
     }
@@ -2768,7 +2773,8 @@ static void mouse_click(UI *u, int buttoncode, int x, int y) {
                     es(&f->e, !strcmp(f->e.s, "true") ? "false" : "true");
             }
             else if (h->id == 805)
-                copied(u, clipboard_copy(m->id, strlen(m->id), "text/plain;charset=utf-8"), "Export path copied to clipboard.");
+                copied(u, clipboard_copy(m->id, strlen(m->id), "text/plain;charset=utf-8"),
+                       m->action == A_EXPORT ? "Export path copied to clipboard." : "Sign-in URL copied to clipboard.");
             else if (h->id == 801)
                 save_modal(u, 1);
             else if (h->id == 802)
@@ -3292,9 +3298,10 @@ static void show_request(UI *u) {
     }
     J *p = u->request_params;
     if (!strcmp(gs(p, "mode"), "url")) {
-        char *text = fmt("%s\n\nSign-in URL:\n%s\n\nOpen this URL in your browser, then continue.",
+        char *text = fmt("%s\n\nSign-in URL:\n%s",
                          u->request_text, gs(p, "url"));
-        modal(u, CONFIRM, A_ELICIT, u->request_title, text);
+        Modal *m = modal(u, CONFIRM, A_ELICIT, u->request_title, text);
+        m->id = strdup(gs(p, "url"));
         free(text);
         return;
     }

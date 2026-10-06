@@ -81,6 +81,20 @@ int validate_server(const char *name, J *s) {
         return fail("Transport must be stdio, http or sse");
     if (jg(s, "enabled") && jg(s, "enabled")->type != JBOOL)
         return fail("enabled must be boolean");
+    J *oauth = jg(s, "oauth");
+    if (oauth && oauth->type != JBOOL && oauth->type != JOBJ)
+        return fail("oauth must be boolean or an object");
+    if (oauth && oauth->type == JOBJ) {
+        J *port = jg(oauth, "callbackPort");
+        if (port && (port->type != JNUM || port->n < 0 || port->n > 65535 || port->n != (int)port->n))
+            return fail("oauth.callbackPort must be an integer from 0 to 65535");
+        const char *fields[] = {"clientId", "scope", NULL};
+        for (int i = 0; fields[i]; i++) {
+            J *value = jg(oauth, fields[i]);
+            if (value && (value->type != JSTR || strchr(jstr(value), '\n') || strchr(jstr(value), '\r')))
+                return fail("oauth.%s must be text without newlines", fields[i]);
+        }
+    }
     a = jg(s, "disabledTools");
     if (a && a->type != JARR)
         return fail("disabledTools must be an array");

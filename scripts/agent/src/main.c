@@ -96,6 +96,7 @@ int main(int argc, char **argv) {
     if (check || prompt) {
         MCP m;
         mcp_init(&m, config);
+        m.interactive = 1;
         int failed = mcp_connect(&m);
         if (check) {
             for (size_t i = 0; i < m.count; i++) {

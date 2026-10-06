@@ -150,6 +150,62 @@ individual tools in the MCP tab. Tool-list changes refresh automatically when ad
 MCP resources and prompts are exposed to the agent through bridges to the standard MCP
 methods. Form elicitation can ask the user for input; URL requests display a sign-in link.
 
+### Native OAuth for remote MCP servers
+
+Remote Streamable HTTP servers can authenticate directly, without Node, `npx`, or
+`mcp-remote`. OAuth is enabled by default when no Authorization header is configured.
+For Todoist, replace the bridge entry with:
+
+```json
+{
+  "todoist": {
+    "url": "https://ai.todoist.net/mcp",
+    "transport": "http",
+    "enabled": true
+  }
+}
+```
+
+Use MCP **Edit** or JSON import, then reconnect. On a sign-in request, use **Copy URL**,
+select **Confirm**, then open the URL in a browser on the same machine and authorize
+access. Seth waits up to three minutes for a callback bound only to `127.0.0.1`.
+`--check` prints the full sign-in URL instead. The browser is not launched automatically.
+
+Seth discovers protected-resource and authorization-server metadata, registers a
+public client when supported, and uses authorization-code OAuth with S256 PKCE,
+a random state, and the exact MCP URL as the resource/audience. It validates the
+resource and issuer metadata, requires HTTPS except on loopback, and refuses
+redirects during discovery and credential exchanges. Authenticated MCP requests
+also refuse redirects rather than risk forwarding credentials elsewhere.
+
+Tokens are stored atomically with mode `0600` in
+`$XDG_CONFIG_HOME/dotfiles-agent/oauth-<URL hash>.json` (default
+`~/.config/dotfiles-agent/`). Storage is plaintext, protected by filesystem
+permissions, not encryption. Each exact MCP URL has separate tokens and a lock.
+Cached tokens are reused and refresh tokens are exchanged when needed. Scheduled
+runs may reuse or refresh tokens but never start interactive authentication.
+
+Set `"oauth": false` to disable OAuth. Providers requiring pre-registration accept:
+
+```json
+"oauth": {
+  "clientId": "your-registered-public-client-id",
+  "callbackPort": 8765,
+  "scope": "tasks:read"
+}
+```
+
+Register `http://127.0.0.1:8765/callback` with that provider. Without a configured
+port Seth chooses a free ephemeral port. Without an explicit scope it requests the
+protected resource's advertised scopes, not every authorization-server scope.
+The MCP editor includes an OAuth JSON field for these options.
+
+Runtime requirements remain curl and Debian coreutils (`sha256sum` for PKCE and
+URL-scoped storage keys). No OAuth SDK, Node, Python, or OpenSSL command is needed.
+Support currently covers public clients on Streamable HTTP, not client secrets,
+device authorization, client-ID metadata documents, or legacy SSE authentication.
+Existing explicit bearer headers and stdio configurations remain supported.
+
 ### MCP startup troubleshooting
 
 A server marked `error (MCP v2 / legacy)` has not necessarily negotiated a legacy

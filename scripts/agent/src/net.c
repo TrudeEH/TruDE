@@ -47,7 +47,7 @@ void http_free(Http *h) {
     memset(h, 0, sizeof *h);
 }
 static int http_impl(const char *url, const char *method, J *headers, J *body, int timeout,
-                     size_t cap, Chunk chunk, void *arg, Http *h, int ignore_cancel) {
+                     size_t cap, Chunk chunk, void *arg, Http *h, int ignore_cancel, const char *form, int redirects) {
     memset(h, 0, sizeof *h);
     if (valid_url(url, 0))
         return -1;
@@ -62,14 +62,14 @@ static int http_impl(const char *url, const char *method, J *headers, J *body, i
     option(&cfg, "write-out", "%{stderr}\nSETH_EFFECTIVE:%{url_effective}\n");
     if (method)
         option(&cfg, "request", method);
-    if (body) {
+    if (body || form) {
         f = temp(bp);
         if (f < 0) {
             unlink(hp);
             bfree(&cfg);
             return -1;
         }
-        char *s = jd(body, 0);
+        char *s = form ? strdup(form) : jd(body, 0);
         int r = writeall(f, s, strlen(s));
         free(s);
         close(f);
@@ -85,6 +85,7 @@ static int http_impl(const char *url, const char *method, J *headers, J *body, i
     }
     char *args[] = {"curl",         "--silent", "--show-error", "--no-buffer", "--location",
                     "--max-redirs", "5",        "--config",     "-",           NULL};
+    if (!redirects || *gs(headers, "Authorization")) args[4] = "--no-location";
     Proc p;
     if (spawn(&p, args, NULL, NULL)) {
         unlink(hp);
@@ -169,17 +170,30 @@ static int http_impl(const char *url, const char *method, J *headers, J *body, i
 }
 int http(const char *url, const char *method, J *headers, J *body, int timeout, size_t cap,
          Chunk chunk, void *arg, Http *h) {
-    return http_impl(url, method, headers, body, timeout, cap, chunk, arg, h, 0);
+    return http_impl(url, method, headers, body, timeout, cap, chunk, arg, h, 0, NULL, 1);
+}
+int http_oauth(const char *url, const char *method, J *body, Http *h) {
+    J *headers = jo();
+    jset(headers, "Content-Type", js("application/json"));
+    int r = http_impl(url, method, headers, body, 20, LIMIT, NULL, NULL, h, 0, NULL, 0);
+    jf(headers); return r;
+}
+int http_form(const char *url, const char *form, Http *h) {
+    J *headers = jo();
+    jset(headers, "Content-Type", js("application/x-www-form-urlencoded"));
+    int r = http_impl(url, "POST", headers, NULL, 20, LIMIT, NULL, NULL, h, 0, form, 0);
+    jf(headers);
+    return r;
 }
 int http_notify(const char *url, J *headers, J *body) {
     Http response = {0};
-    int r = http_impl(url, "POST", headers, body, 2, 65536, NULL, NULL, &response, 1);
+    int r = http_impl(url, "POST", headers, body, 2, 65536, NULL, NULL, &response, 1, NULL, 1);
     http_free(&response);
     return r;
 }
 int http_close_session(const char *url, J *headers) {
     Http response = {0};
-    int r = http_impl(url, "DELETE", headers, NULL, 2, 65536, NULL, NULL, &response, 1);
+    int r = http_impl(url, "DELETE", headers, NULL, 2, 65536, NULL, NULL, &response, 1, NULL, 1);
     http_free(&response);
     return r;
 }
