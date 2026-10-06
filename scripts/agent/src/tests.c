@@ -48,8 +48,8 @@ int selftest(void) {
     J *images = ja(), *image = jo();
     jset(image, "url", js("data:image/png;base64,aGVsbG8="));
     jadd(images, image);
-    J *parts = image_content("Describe [Pasted image 1]", images);
-    check(parts->len == 2 && !strcmp(gs(parts->v[0], "text"), "Describe [Pasted image 1]") &&
+    J *parts = image_content("Describe [Image 1]", images);
+    check(parts->len == 2 && !strcmp(gs(parts->v[0], "text"), "Describe [Image 1]") &&
           !strcmp(gs(jg(parts->v[1], "image_url"), "url"), gs(image, "url")),
           "Image attachment serialized as multimodal content");
     check(estimate(parts) < 5000, "Image context estimate excludes base64 bytes");

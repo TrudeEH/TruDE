@@ -252,7 +252,10 @@ Use Ctrl+V in the message field to paste a clipboard image. Empty terminal brack
 pastes also check the clipboard for an image. `wl-paste` (from `wl-clipboard`,
 already in the Debian install list) and `base64` are required. PNG, JPEG, WebP,
 and GIF are accepted, up to four images per message and 12 MiB per image.
-Images appear as accent-colored `[Pasted image N]` labels, never terminal graphics.
+Images appear as accent-colored `[Image N]` labels in the composer and chat, never
+terminal graphics. Backspace or Delete at an attachment label removes the whole
+label and detaches the image, even when the cursor is inside it. Enter sends the
+message. Loading uses an ASCII `/ | \ -` spinner.
 Removing a label removes its attachment when the message is submitted.
 
 Model discovery reads vision capability metadata when the provider supplies it.

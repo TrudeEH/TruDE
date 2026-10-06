@@ -269,8 +269,8 @@ static void text_lines(Lines *l, const char *s, int color, int markdown) {
     free(copy);
 }
 static const char *spinner(void) {
-    static const char *frames[] = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
-    return frames[(int)(mono() * 10) % 10];
+    static const char *frames[] = {"/", "|", "\\", "-"};
+    return frames[(int)(mono() * 8) % 4];
 }
 static void transcript(UI *u) {
     lines_free(&u->transcript);
@@ -413,11 +413,26 @@ static void cell(UI *u, int x, int y, wchar_t c, int color, int bold) {
     if (width == 2 && x + 1 < u->w)
         u->cells[y * u->w + x + 1] = (Cell){0, (unsigned char)color, (unsigned char)bold};
 }
+static size_t image_tag_length(const char *s) {
+    size_t prefix = !strncmp(s, "[Image ", 7) ? 7 :
+                    !strncmp(s, "[Pasted image ", 14) ? 14 :
+                    !strncmp(s, "[Pasted Image ", 14) ? 14 : 0;
+    if (!prefix || !isdigit((unsigned char)s[prefix]))
+        return 0;
+    size_t end = prefix;
+    while (isdigit((unsigned char)s[end]))
+        end++;
+    return s[end] == ']' ? end + 1 : 0;
+}
 static int draw_text(UI *u, int x, int y, int width, const char *s, int color, int bold,
                      int markdown) {
     mbstate_t st = {0};
     int used = 0;
+    const char *image_end = NULL;
     while (*s && used < width) {
+        size_t tag = image_tag_length(s);
+        if (tag && (color == NORMAL || color == MUTED))
+            image_end = s + tag;
         if (markdown && s[0] == '*' && s[1] == '*') {
             bold = !bold;
             s += 2;
@@ -445,7 +460,7 @@ static int draw_text(UI *u, int x, int y, int width, const char *s, int color, i
         }
         if (used + w > width)
             break;
-        cell(u, x + used, y, c, color, bold);
+        cell(u, x + used, y, c, image_end && s < image_end ? ACCENT : color, bold);
         used += w;
         s += n;
     }
@@ -624,7 +639,7 @@ static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, i
         int col = 0;
         mbstate_t state = {0};
         for (size_t p = 0; text[p];) {
-            if (e == &u->composer && !strncmp(text + p, "[Pasted image ", 14))
+            if (e == &u->composer && image_tag_length(text + p))
                 marker = 1;
             wchar_t c;
             size_t n = mbrtowc(&c, text + p, strlen(text + p), &state);
@@ -1236,6 +1251,30 @@ static void prune_images(UI *u) {
             i++;
     }
 }
+/* Delete attachment labels as units, including when the cursor is inside one. */
+static int delete_image(UI *u, int code) {
+    if (code != 127 && code != 8 && code != 1003)
+        return 0;
+    Editor *e = &u->composer;
+    for (size_t i = 0; u->images && i < u->images->len; i++) {
+        const char *label = gs(u->images->v[i], "label");
+        if (!*label)
+            continue;
+        const char *found = e->s;
+        while ((found = strstr(found, label))) {
+            size_t from = found - e->s, to = from + strlen(label);
+            int inside = code == 1003 ? e->pos >= from && e->pos < to
+                                     : e->pos > from && e->pos <= to;
+            if (inside) {
+                remove_text(e, from, to);
+                jremove(u->images, i);
+                return 1;
+            }
+            found += strlen(label);
+        }
+    }
+    return 0;
+}
 /* Return true when an image paste was handled, including rejected pastes. */
 static int paste_image(UI *u) {
     if (u->busy)
@@ -1256,7 +1295,7 @@ static int paste_image(UI *u) {
             free(url);
             return 1;
         }
-        char *label = fmt("[Pasted image %u]", ++u->image_number);
+        char *label = fmt("[Image %u]", ++u->image_number);
         J *image = jo();
         jset(image, "label", js(label));
         jset(image, "url", js(url));
@@ -2825,7 +2864,7 @@ static void key(UI *u, int code, const char *text) {
             paste_image(u);
         else if (code == 13)
             submit(u);
-        else
+        else if (!delete_image(u, code))
             editor_key(&u->composer, code, text);
         return;
     }

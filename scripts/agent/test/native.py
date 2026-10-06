@@ -412,7 +412,7 @@ class NativeTests(unittest.TestCase):
             s.wait("MCP tools connected")
             s.send("\x0c\x16")
             s.wait("Warning:")
-            self.assertNotIn("[Pasted image 1]",s.screen.text)
+            self.assertNotIn("[Image 1]",s.screen.text)
         finally:
             s.close()
         self.config["profiles"]["lmstudio"]["visionModels"]={"test-model":True}
@@ -421,11 +421,29 @@ class NativeTests(unittest.TestCase):
         try:
             s.wait("MCP tools connected")
             s.send("\x0cDescribe \x16")
-            s.wait("[Pasted image 1]")
-            x,y=s.screen.find("[Pasted image 1]")
+            s.wait("[Image 1]")
+            x,y=s.screen.find("[Image 1]")
             self.assertEqual(s.screen.grid[y][x][1],"#ffbe6f")
+            # Backspace removes the entire tag and detaches its image.
+            s.send("\x7f")
+            self.assertNotIn("[Image 1]",s.screen.text)
+            s.send("\x16")
+            s.wait("[Image 2]")
+            # Delete at the tag start also removes the whole attachment.
+            s.send("\x1b[D"*len("[Image 2]")+"\x1b[3~")
+            self.assertNotIn("[Image 2]",s.screen.text)
+            s.send("\x16")
+            s.wait("[Image 3]")
+            # Backspace inside a tag must not leave a broken label.
+            s.send("\x1b[D"*3+"\x7f")
+            self.assertNotIn("[Image 3]",s.screen.text)
+            s.send("\x16")
+            s.wait("[Image 4]")
             s.send("\r")
             s.wait("Héllo 🙂 from Seth.")
+            x,y=s.screen.find("[Image 4]")
+            for offset in range(len("[Image 4]")):
+                self.assertEqual(s.screen.grid[y][x+offset][1],"#ffbe6f")
             requests=[body for path,body,_ in self.mock.requests if path=="/v1/chat/completions"]
             user=next(m for m in requests[-1]["messages"] if m["role"]=="user")
             self.assertEqual(user["content"][1]["image_url"]["url"],"data:image/png;base64,ZmFrZS1pbWFnZQ==")
@@ -1125,7 +1143,9 @@ esac
             s.send("first request\r")
             s.wait("Thinking")
             first=s.screen.text.splitlines()[-1]
-            s.read(.16)
+            deadline=time.monotonic()+1
+            while first==s.screen.text.splitlines()[-1] and time.monotonic()<deadline:
+                s.read(.03)
             self.assertNotEqual(first,s.screen.text.splitlines()[-1])
             s.send("focus on the tests\r")
             s.wait("Queued steering message")
