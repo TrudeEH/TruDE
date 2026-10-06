@@ -73,12 +73,15 @@ custom system instructions are preserved.
 Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
 
-## Copying from chat
+## Copying text and images
 
-Drag with the left mouse button to highlight chat text. Releasing the button copies
+Drag with the left mouse button to highlight visible text in any view or dialog,
+including editable fields. Releasing the button copies
 it automatically to the system clipboard. Selected text stays highlighted until the
 next click, scroll, or keypress. Selection uses the visible rendered text, including
-line breaks, and freezes the visible conversation while you select.
+line breaks, and freezes the selected region while you select. Clicking inside an editable field
+places the cursor at that position, including wrapped lines and Unicode text.
+Masked fields copy only their visible placeholder, never the secret value.
 
 Click an `[Image N]` tag to copy its attached image, including tags in the composer.
 After exporting, click the displayed path or **Copy path** to copy the full filename.

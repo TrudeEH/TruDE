@@ -101,7 +101,9 @@ typedef struct {
     int settings_section;
     Cell *cells, *old, *selection_cells;
     int selecting, selected, select_start, select_end, select_left, select_right,
-        select_top, select_bottom, select_id, select_index;
+        select_top, select_bottom;
+    struct { Editor *e; int x, y, w, h, first; } editors[64];
+    int editorcount;
     Hit hits[256];
     int hitcount;
     Lines transcript;
@@ -271,7 +273,7 @@ static void text_lines(Lines *l, const char *s, int color, int markdown) {
     free(copy);
 }
 static const char *spinner(void) {
-    static const char *frames[] = {"/", "|", "\\", "-"};
+    static const char *frames[] = {"/", "-", "\\", "|"};
     return frames[(int)(mono() * 8) % 4];
 }
 static void transcript(UI *u) {
@@ -633,6 +635,13 @@ static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, i
         p += n;
     }
     int first = cursorrow >= height ? cursorrow - height + 1 : 0;
+    if (u->editorcount < 64) {
+        int i = u->editorcount++;
+        u->editors[i].e = e;
+        u->editors[i].x = x; u->editors[i].y = y;
+        u->editors[i].w = width; u->editors[i].h = height;
+        u->editors[i].first = first;
+    }
     int marker = 0;
     for (int row = 0; row < w.len && row < first + height; row++) {
         const char *text = w.v[row].s;
@@ -2146,6 +2155,7 @@ static void modal_draw(UI *u) {
     box(u, x, y, width, height, m->title, 1);
     int bottom = y + height - 3, inner = width - 6;
     u->hitcount = 0;
+    u->editorcount = 0;
     if (m->kind == FORM) {
         int hint = m->action == A_CHAT_WORKSPACE || m->action == A_WORKSPACE;
         int focused = m->focus < m->count ? m->focus : m->count - 1;
@@ -2504,6 +2514,7 @@ static void render(UI *u) {
     for (int i = 0; i < u->w * u->h; i++)
         u->cells[i] = (Cell){L' ', NORMAL, 0};
     u->hitcount = 0;
+    u->editorcount = 0;
     box(u, 0, 0, u->w, 3, "Views", 0);
     const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Automation", "F4 Memory",
                          "F5 Settings", "F6 Help (?)"};
@@ -2547,7 +2558,7 @@ static void render(UI *u) {
     free(status);
     if (u->modal)
         modal_draw(u);
-    if (!u->modal && u->tab == 0 && u->selection_cells && (u->selecting || u->selected)) {
+    if (u->selection_cells && (u->selecting || u->selected)) {
         int first = u->select_start < u->select_end ? u->select_start : u->select_end;
         int last = u->select_start > u->select_end ? u->select_start : u->select_end;
         for (int y = u->select_top; y <= u->select_bottom; y++)
@@ -2678,28 +2689,46 @@ static int copy_clicked_image(UI *u, int x, int y) {
     }
     return 0;
 }
-static void mouse(UI *u, int buttoncode, int x, int y, int release) {
-    if (u->selecting && (release || (buttoncode & 32))) {
-        if (x < u->select_left) x = u->select_left;
-        if (x > u->select_right) x = u->select_right;
-        if (y < u->select_top) y = u->select_top;
-        if (y > u->select_bottom) y = u->select_bottom;
-        u->select_end = y * u->w + x;
-        u->selected = u->select_end != u->select_start;
-        if (release) {
-            u->selecting = 0;
-            if (u->selected) {
-                Buf text = selected_text(u);
-                copied(u, clipboard_copy(text.s ? text.s : "", text.n, "text/plain;charset=utf-8"),
-                       "Selection copied to clipboard.");
-                bfree(&text);
-            } else if (!copy_clicked_image(u, x, y))
-                dispatch(u, u->select_id, u->select_index);
+/* The rendered editor geometry includes the cursor-follow scroll offset. */
+static void editor_click(UI *u, int x, int y) {
+    for (int i = u->editorcount - 1; i >= 0; i--) {
+        Editor *e = u->editors[i].e;
+        int ex = u->editors[i].x, ey = u->editors[i].y;
+        int width = u->editors[i].w;
+        if (x < ex || x >= ex + width || y < ey || y >= ey + u->editors[i].h)
+            continue;
+        if (e->secret) { e->pos = strlen(e->s); return; }
+        Lines l = {0};
+        text_lines(&l, e->s, NORMAL, 0);
+        Lines w = wrap(&l, width);
+        int row = y - ey + u->editors[i].first;
+        size_t offset = 0;
+        for (int r = 0; r < row && r < w.len; r++) {
+            offset += strlen(w.v[r].s);
+            if (e->s[offset] == '\n') offset++;
         }
-        u->dirty = 1;
+        if (row < w.len) {
+            const char *text = w.v[row].s;
+            int col = 0;
+            mbstate_t st = {0};
+            for (size_t p = 0; text[p];) {
+                wchar_t c;
+                size_t n = mbrtowc(&c, text + p, strlen(text + p), &st);
+                if (n == (size_t)-1 || n == (size_t)-2) {
+                    n = 1; c = L'�'; memset(&st, 0, sizeof st);
+                }
+                int cw = wcwidth(c);
+                if (cw < 1) cw = 1;
+                if (col + cw > x - ex) break;
+                col += cw; p += n; offset += n;
+            }
+        } else offset = strlen(e->s);
+        e->pos = offset;
+        lines_free(&l); lines_free(&w);
         return;
     }
-    if (release || (buttoncode & 32)) return;
+}
+static void mouse_click(UI *u, int buttoncode, int x, int y) {
     if (buttoncode & 64) {
         u->selected = 0;
         int down = buttoncode & 1;
@@ -2724,30 +2753,8 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
     if ((buttoncode & 3) != 0)
         return;
     u->selected = 0;
-    if (!u->modal && u->tab == 0) {
-        int side = u->w * 26 / 100;
-        if (side < 22) side = 22;
-        int bottom = u->h - 13;
-        if (x >= side + 2 && x <= u->w - 4 && y >= 5 && y <= bottom) {
-            free(u->selection_cells);
-            u->selection_cells = malloc((size_t)u->w * u->h * sizeof *u->cells);
-            memcpy(u->selection_cells, u->cells, (size_t)u->w * u->h * sizeof *u->cells);
-            u->selecting = 1;
-            u->select_left = side + 2; u->select_right = u->w - 4;
-            u->select_top = 5; u->select_bottom = bottom;
-            u->select_start = u->select_end = y * u->w + x;
-            u->select_id = 108; u->select_index = 0;
-            for (int i = u->hitcount - 1; i >= 0; i--) {
-                Hit *h = &u->hits[i];
-                if (x >= h->x && x < h->x + h->w && y >= h->y && y < h->y + h->h) {
-                    u->select_id = h->id; u->select_index = h->index; break;
-                }
-            }
-            u->focus = 108;
-            return;
-        }
-        if (copy_clicked_image(u, x, y)) return;
-    }
+    editor_click(u, x, y);
+    if (!u->modal && u->tab == 0 && copy_clicked_image(u, x, y)) return;
     for (int i = u->hitcount - 1; i >= 0; i--) {
         Hit *h = &u->hits[i];
         if (x < h->x || x >= h->x + h->w || y < h->y || y >= h->y + h->h)
@@ -2781,6 +2788,72 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
         u->dirty = 1;
         return;
     }
+}
+static void mouse(UI *u, int buttoncode, int x, int y, int release) {
+    if (u->selecting && (release || (buttoncode & 32))) {
+        if (x < u->select_left) x = u->select_left;
+        if (x > u->select_right) x = u->select_right;
+        if (y < u->select_top) y = u->select_top;
+        if (y > u->select_bottom) y = u->select_bottom;
+        u->select_end = y * u->w + x;
+        u->selected = u->select_end != u->select_start;
+        if (release) {
+            u->selecting = 0;
+            if (u->selected) {
+                Buf text = selected_text(u);
+                copied(u, clipboard_copy(text.s ? text.s : "", text.n, "text/plain;charset=utf-8"),
+                       "Selection copied to clipboard.");
+                bfree(&text);
+            } else mouse_click(u, 0, x, y);
+        }
+        u->dirty = 1;
+        return;
+    }
+    if (release || (buttoncode & 32)) return;
+    u->selected = 0;
+    if (buttoncode & 64) {
+        u->selecting = 0;
+        mouse_click(u, buttoncode, x, y);
+        return;
+    }
+    if ((buttoncode & 3) != 0 || x < 0 || y < 0 || x >= u->w || y >= u->h) return;
+    u->select_left = 0; u->select_right = u->w - 1;
+    u->select_top = 0; u->select_bottom = u->h - 1;
+    /* Keep multiline selection within the clicked text region when available. */
+    for (int i = u->hitcount - 1; i >= 0; i--) {
+        Hit *h = &u->hits[i];
+        if (x >= h->x && x < h->x + h->w && y >= h->y && y < h->y + h->h) {
+            u->select_left = h->x; u->select_right = h->x + h->w - 1;
+            u->select_top = h->y; u->select_bottom = h->y + h->h - 1;
+            break;
+        }
+    }
+    if (!u->modal && u->tab == 0) {
+        int side = u->w * 26 / 100;
+        if (side < 22) side = 22;
+        if (x >= side + 2 && x <= u->w - 4 && y >= 5 && y <= u->h - 13) {
+            u->select_left = side + 2; u->select_right = u->w - 4;
+            u->select_top = 5; u->select_bottom = u->h - 13;
+        }
+    }
+    for (int i = u->editorcount - 1; i >= 0; i--) {
+        int ex = u->editors[i].x, ey = u->editors[i].y;
+        if (x >= ex && x < ex + u->editors[i].w && y >= ey && y < ey + u->editors[i].h) {
+            u->select_left = ex; u->select_right = ex + u->editors[i].w - 1;
+            u->select_top = ey; u->select_bottom = ey + u->editors[i].h - 1;
+            break;
+        }
+    }
+    if (u->select_left < 0) u->select_left = 0;
+    if (u->select_right >= u->w) u->select_right = u->w - 1;
+    if (u->select_top < 0) u->select_top = 0;
+    if (u->select_bottom >= u->h) u->select_bottom = u->h - 1;
+    free(u->selection_cells);
+    u->selection_cells = malloc((size_t)u->w * u->h * sizeof *u->cells);
+    memcpy(u->selection_cells, u->cells, (size_t)u->w * u->h * sizeof *u->cells);
+    u->selecting = 1;
+    u->select_start = u->select_end = y * u->w + x;
+    u->dirty = 1;
 }
 static void cycle_focus(UI *u, int backwards) {
     int ids[256], n = 0;

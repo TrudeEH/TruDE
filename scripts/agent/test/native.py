@@ -443,6 +443,58 @@ class NativeTests(unittest.TestCase):
         finally:
             s.close()
 
+    def test_tui_all_views_selection_and_input_click(self):
+        tools=self.root/"bin"
+        tools.mkdir()
+        copied=self.root/"clipboard"
+        (tools/"wl-copy").write_text('#!/bin/sh\ncat > "$COPY_DATA"\n')
+        (tools/"wl-copy").chmod(0o700)
+        self.env.update(PATH=str(tools)+":"+self.env.get("PATH","/usr/bin:/bin"),WAYLAND_DISPLAY="test",COPY_DATA=str(copied))
+        s=Session(self.env)
+        def drag(text):
+            x,y=s.screen.find(text)
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x+len(text)};{y+1}M\x1b[<0;{x+len(text)};{y+1}m")
+            self.assertEqual(copied.read_text(),text)
+        try:
+            s.wait("MCP tools connected")
+            s.send("alpha café 世界 omega")
+            s.click("café")
+            s.send("X")
+            s.wait("alpha Xcafé 世界 omega")
+            drag("alpha Xcafé")
+            s.click("世界")
+            s.send("Y")
+            s.wait("alpha Xcafé Y世界 omega")
+            s.send("\x01\x0b"+"a"*100+"TARGET tail")
+            s.wait("TARGET tail")
+            s.click("TARGET")
+            s.send("Z")
+            s.wait("ZTARGET tail")
+            s.send("\x01\x0b/workspace\r")
+            s.wait("Chat workspace")
+            x,y=s.screen.find(str(self.workspace))
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<0;{x+1};{y+1}m")
+            s.send("X")
+            s.wait("X"+str(self.workspace)[:15])
+            s.send("\x1b")
+            s.click("F5 Settings")
+            s.click("Instructions")
+            s.wait("You are Seth")
+            drag("You are Seth")
+            s.click("Seth")
+            s.send("Local ")
+            s.wait("You are Local Seth")
+            s.click("F6 Help")
+            s.wait("Chat help")
+            drag("Chat help")
+            s.send("\x1b")
+            s.click("F1 Chat")
+            s.click("Export")
+            s.wait("Export saved")
+            drag("Export saved")
+        finally:
+            s.close()
+
     def test_tui_wayland_image_paste_and_vision_warning(self):
         tools=self.root/"bin"
         tools.mkdir()
