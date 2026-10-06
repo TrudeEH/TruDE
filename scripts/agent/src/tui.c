@@ -104,6 +104,8 @@ typedef struct {
         select_top, select_bottom;
     struct { Editor *e; int x, y, w, h, first; } editors[64];
     int editorcount;
+    struct { int x, y, w, h; } text_regions[64];
+    int text_regioncount;
     Hit hits[256];
     int hitcount;
     Lines transcript;
@@ -627,6 +629,11 @@ static Lines wrap(Lines *source, int width) {
 }
 static int view_lines(UI *u, Lines *l, int x, int y, int width, int height, int *scroll,
                        int follow, int tools) {
+    if (u->text_regioncount < 64) {
+        int i = u->text_regioncount++;
+        u->text_regions[i].x = x; u->text_regions[i].y = y;
+        u->text_regions[i].w = width - 1; u->text_regions[i].h = height;
+    }
     Lines w = wrap(l, width - 1);
     int max = w.len - height;
     if (max < 0)
@@ -890,23 +897,17 @@ static void fresh(UI *u) {
     if (!u->busy) notice_ui(u, "");
     u->tab = 0;
     u->focus = 100;
-    pthread_mutex_lock(&u->mutex);
-    int reconnect = strcmp(gs(u->mcp.config, "workspace"), gs(u->chat, "workspace")) != 0;
-    pthread_mutex_unlock(&u->mutex);
-    if (reconnect) start_job(u, 4, "");
 }
 static void open_chat(UI *u, const char *id) {
-    int reconnect = 0;
     J *chat = u->jobchat && !strcmp(id, gs(u->jobchat, "id")) ? u->jobchat : load_chat(id);
     if (!chat) {
         error_ui(u);
         return;
     }
+    if (!*gs(chat, "workspace"))
+        jset(chat, "workspace", js(gs(u->config, "workspace")));
     if (!u->busy)
         while (u->steering->len) jremove(u->steering, 0);
-    pthread_mutex_lock(&u->mutex);
-    reconnect = strcmp(gs(chat, "workspace"), gs(u->mcp.config, "workspace")) != 0;
-    pthread_mutex_unlock(&u->mutex);
     if (u->chat != u->jobchat) jf(u->chat);
     u->chat = chat;
     u->tab = 0;
@@ -915,8 +916,6 @@ static void open_chat(UI *u, const char *id) {
     if (!u->busy) bfree(&u->partial);
     refresh_history(u);
     u->dirty = 1;
-    if (reconnect)
-        start_job(u, 4, "");
 }
 static void update_worker(const char *kind, const char *text, void *opaque) {
     UI *u = opaque;
@@ -1056,6 +1055,30 @@ static J *memory_list(UI *u) {
     jf(args);
     return rows;
 }
+static void connect_worker(UI *u) {
+    MCP nextm;
+    J *config = jc(u->jobconfig);
+    jset(config, "workspace", js(gs(u->jobchat, "workspace")));
+    mcp_init(&nextm, config);
+    nextm.elicit = elicit_worker;
+    nextm.opaque = u;
+    nextm.mutex = &u->mutex;
+    int failed = mcp_connect(&nextm);
+    pthread_mutex_lock(&u->mutex);
+    MCP previous = u->mcp;
+    J *previous_config = u->mcp_config;
+    u->mcp_config = config;
+    u->mcp = nextm;
+    pthread_mutex_unlock(&u->mutex);
+    /* Session teardown can perform network I/O; never hold the UI lock. */
+    previous.mutex = NULL;
+    mcp_close(&previous);
+    jf(previous_config);
+    char *text = failed ? fmt("%d MCP server(s) failed — see MCP tab", failed)
+                        : fmt("%zu MCP tools connected", nextm.toolcount);
+    update_worker("notice", text, u);
+    free(text);
+}
 static void *worker(void *opaque) {
     UI *u = opaque;
     err[0] = 0;
@@ -1068,6 +1091,9 @@ static void *worker(void *opaque) {
                .approve = approve_worker,
                .update = update_worker,
                .opaque = u, .images = u->jobimages, .steering = u->steering};
+    if (((u->job >= 1 && u->job <= 3) || u->job == 8) &&
+        strcmp(gs(u->jobchat, "workspace"), gs(u->mcp.config, "workspace")))
+        connect_worker(u);
     switch (u->job) {
     case 1:
         result = agent_run(&a, u->prompt, 0);
@@ -1079,28 +1105,7 @@ static void *worker(void *opaque) {
         result = agent_compact(&a, 1);
         break;
     case 4: {
-        MCP nextm;
-        J *config = jc(u->jobconfig);
-        jset(config, "workspace", js(gs(u->jobchat, "workspace")));
-        mcp_init(&nextm, config);
-        nextm.elicit = elicit_worker;
-        nextm.opaque = u;
-        nextm.mutex = &u->mutex;
-        int failed = mcp_connect(&nextm);
-        pthread_mutex_lock(&u->mutex);
-        MCP previous = u->mcp;
-        J *previous_config = u->mcp_config;
-        u->mcp_config = config;
-        u->mcp = nextm;
-        pthread_mutex_unlock(&u->mutex);
-        /* Session teardown can perform network I/O; never hold the UI lock. */
-        previous.mutex = NULL;
-        mcp_close(&previous);
-        jf(previous_config);
-        char *text = failed ? fmt("%d MCP server(s) failed — see MCP tab", failed)
-                            : fmt("%zu MCP tools connected", nextm.toolcount);
-        update_worker("notice", text, u);
-        free(text);
+        connect_worker(u);
         break;
     }
     case 5:
@@ -2240,6 +2245,7 @@ static void modal_draw(UI *u) {
     int bottom = y + height - 3, inner = width - 6;
     u->hitcount = 0;
     u->editorcount = 0;
+    u->text_regioncount = 0;
     if (m->kind == FORM) {
         int hint = m->action == A_CHAT_WORKSPACE || m->action == A_WORKSPACE;
         int focused = m->focus < m->count ? m->focus : m->count - 1;
@@ -2603,6 +2609,7 @@ static void render(UI *u) {
         u->cells[i] = (Cell){L' ', NORMAL, 0};
     u->hitcount = 0;
     u->editorcount = 0;
+    u->text_regioncount = 0;
     box(u, 0, 0, u->w, 3, "Views", 0);
     const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Automation", "F4 Memory",
                          "F5 Settings", "F6 Help (?)"};
@@ -2906,32 +2913,30 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
         return;
     }
     if ((buttoncode & 3) != 0 || x < 0 || y < 0 || x >= u->w || y >= u->h) return;
-    u->select_left = 0; u->select_right = u->w - 1;
-    u->select_top = 0; u->select_bottom = u->h - 1;
-    /* Keep multiline selection within the clicked text region when available. */
-    for (int i = u->hitcount - 1; i >= 0; i--) {
-        Hit *h = &u->hits[i];
-        if (x >= h->x && x < h->x + h->w && y >= h->y && y < h->y + h->h) {
-            u->select_left = h->x; u->select_right = h->x + h->w - 1;
-            u->select_top = h->y; u->select_bottom = h->y + h->h - 1;
+    int selectable = 0;
+    for (int i = u->text_regioncount - 1; i >= 0; i--) {
+        int rx = u->text_regions[i].x, ry = u->text_regions[i].y;
+        if (x >= rx && x < rx + u->text_regions[i].w &&
+            y >= ry && y < ry + u->text_regions[i].h) {
+            u->select_left = rx; u->select_right = rx + u->text_regions[i].w - 1;
+            u->select_top = ry; u->select_bottom = ry + u->text_regions[i].h - 1;
+            selectable = 1;
             break;
-        }
-    }
-    if (!u->modal && u->tab == 0) {
-        int side = u->w * 26 / 100;
-        if (side < 22) side = 22;
-        if (x >= side + 2 && x <= u->w - 4 && y >= 5 && y <= u->h - 13) {
-            u->select_left = side + 2; u->select_right = u->w - 4;
-            u->select_top = 5; u->select_bottom = u->h - 13;
         }
     }
     for (int i = u->editorcount - 1; i >= 0; i--) {
         int ex = u->editors[i].x, ey = u->editors[i].y;
         if (x >= ex && x < ex + u->editors[i].w && y >= ey && y < ey + u->editors[i].h) {
+            if (u->editors[i].e->secret) break;
+            selectable = 1;
             u->select_left = ex; u->select_right = ex + u->editors[i].w - 1;
             u->select_top = ey; u->select_bottom = ey + u->editors[i].h - 1;
             break;
         }
+    }
+    if (!selectable) {
+        mouse_click(u, buttoncode, x, y);
+        return;
     }
     if (u->select_left < 0) u->select_left = 0;
     if (u->select_right >= u->w) u->select_right = u->w - 1;
@@ -3491,10 +3496,6 @@ static void finish_job(UI *u) {
         return;
     }
     if (completed_chat != u->chat) jf(completed_chat);
-    if (strcmp(gs(u->chat, "workspace"), gs(u->mcp.config, "workspace"))) {
-        start_job(u, 4, "");
-        return;
-    }
     if (u->memory_reload && u->tab == 3 && !u->modal) {
         u->memory_reload = 0;
         start_job(u, 10, "");

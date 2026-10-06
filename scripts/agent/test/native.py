@@ -534,7 +534,13 @@ class NativeTests(unittest.TestCase):
             s.send("X")
             s.wait("X"+str(self.workspace)[:15])
             s.send("\x1b")
-            s.click("F5 Settings")
+            previous=copied.read_text()
+            x,y=s.screen.find("Views")
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x+5};{y+1}M\x1b[<0;{x+5};{y+1}m")
+            self.assertEqual(copied.read_text(),previous)
+            x,y=s.screen.find("F5 Settings")
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x+5};{y+1}M\x1b[<0;{x+5};{y+1}m")
+            self.assertEqual(copied.read_text(),previous)
             s.click("Instructions")
             s.wait("You are Seth")
             drag("You are Seth")
@@ -543,12 +549,12 @@ class NativeTests(unittest.TestCase):
             s.wait("You are Local Seth")
             s.click("F6 Help")
             s.wait("Chat help")
-            drag("Chat help")
+            drag("Enter sends")
             s.send("\x1b")
             s.click("F1 Chat")
             s.click("Export")
             s.wait("Export saved")
-            drag("Export saved")
+            drag(str(self.root)[:15])
         finally:
             s.close()
 
@@ -1310,6 +1316,34 @@ esac
             self.assertFalse(self.mock.requests)
         finally:
             s.close()
+    def test_tui_browsing_workspaces_does_not_reconnect_mcp(self):
+        other=self.root/"other"
+        other.mkdir()
+        ident="33333333-3333-4333-8333-333333333333"
+        chat={"id":ident,"title":"Different workspace","created":"2026-01-01T00:00:00.000Z","updated":"2026-01-01T00:00:00.000Z","workspace":str(other),"messages":[],"events":[],"summary":"","compacted":0,"usage":{}}
+        directory=self.root/"data/dotfiles-agent/chats"
+        directory.mkdir(parents=True,exist_ok=True)
+        (directory/(ident+".json")).write_text(json.dumps(chat))
+        self.config["mcpServers"]["remote"]={"url":f"http://127.0.0.1:{self.mock.server_port}/mcp","oauth":False}
+        self.save()
+        s=Session(self.env)
+        def connections():
+            return sum(path=="/mcp" and body.get("method")=="server/discover" for path,body,_ in self.mock.requests)
+        try:
+            s.wait("MCP tools connected")
+            initial=connections()
+            self.assertGreater(initial,0)
+            for _ in range(3):
+                s.click("Different workspace")
+                s.send("\x0c/new\r")
+            s.click("Different workspace")
+            self.assertEqual(connections(),initial)
+            s.send("\x0chello from another workspace\r")
+            s.wait("Héllo 🙂 from Seth.")
+            self.assertEqual(connections(),initial+1)
+        finally:
+            s.close()
+
     def test_tui_workspace_is_per_chat_and_tools_follow_selection(self):
         other=self.root/"other"
         other.mkdir()
@@ -1333,13 +1367,11 @@ esac
             requests=[body for path,body,_ in self.mock.requests if path=="/v1/chat/completions"]
             self.assertIn("Workspace: "+str(other),requests[-1]["messages"][0]["content"])
             s.send("\x0c/new\r")
-            s.wait("MCP tools connected")
             self.assert_workspace(s,self.workspace)
             s.send("read default\r")
             s.wait("Héllo 🙂 from Seth.")
             self.assertIn("first line",self.chat()["messages"][2]["content"])
             s.click(title)
-            s.wait("MCP tools connected")
             s.click("Workspace:")
             s.wait("Chat workspace")
             self.assertIn(str(other),s.screen.text)
@@ -1351,7 +1383,6 @@ esac
         try:
             s.wait("MCP tools connected")
             s.click(title)
-            s.wait("MCP tools connected")
             s.send("\x0c/attach seed.txt\r")
             s.wait("Attachment: seed.txt")
             s.send("\r")
@@ -1385,7 +1416,6 @@ esac
             s.send("\x1bOP")
             self.assert_workspace(s,self.workspace)
             s.send("\x0c/new\r")
-            s.wait("MCP tools connected")
             self.assert_workspace(s,other)
             fcntl.ioctl(s.master,termios.TIOCSWINSZ,struct.pack("HHHH",30,80,0,0))
             s.screen=Terminal(cols=80,rows=30)

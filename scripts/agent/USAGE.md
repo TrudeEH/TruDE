@@ -64,6 +64,8 @@ Commands: `/new`, `/fork`, `/continue`, `/retry`, `/compact`, `/attach PATH`,
 `/workspace`, `/export`, `/events`, and `/help`. `/workspace` opens a directory field
 for the current chat; the clickable workspace path to the right of Export in Actions opens
 the same dialog. The workspace is saved with the chat and restored when reopened.
+Browsing chat history does not reconnect MCP servers. When a task starts in a
+different workspace, its MCP connections are refreshed before tools run.
 Settings' default workspace applies to new chats without changing existing chats. The
 stock agent prompt treats the workspace as the default scope, not an absolute rule:
 explicit user requests may authorize work elsewhere. Filesystem tools remain scoped
@@ -75,13 +77,14 @@ retry does not undo any prior tool side effects.
 
 ## Copying text and images
 
-Drag with the left mouse button to highlight visible text in any view or dialog,
-including editable fields. Releasing the button copies
+Drag with the left mouse button to highlight text in transcripts, detail panes,
+dialog bodies, and editable fields. Buttons, navigation lists, titles, and other
+UI controls are not selectable. Releasing the button copies
 it automatically to the system clipboard. Selected text stays highlighted until the
 next click, scroll, or keypress. Selection uses the visible rendered text, including
 line breaks, and freezes the selected region while you select. Clicking inside an editable field
 places the cursor at that position, including wrapped lines and Unicode text.
-Masked fields copy only their visible placeholder, never the secret value.
+Masked fields are not selectable.
 
 Click an `[Image N]` tag to copy its attached image, including tags in the composer.
 After exporting, click the displayed path or **Copy path** to copy the full filename.
