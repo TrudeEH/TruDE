@@ -64,7 +64,12 @@ Commands: `/new`, `/fork`, `/continue`, `/retry`, `/compact`, `/attach PATH`,
 `/workspace`, `/export`, `/events`, and `/help`. `/workspace` opens a directory field
 for the current chat; the clickable workspace path to the right of Export in Actions opens
 the same dialog. The workspace is saved with the chat and restored when reopened.
-Settings' default workspace applies to new chats without changing existing chats.
+Settings' default workspace applies to new chats without changing existing chats. The
+stock agent prompt treats the workspace as the default scope, not an absolute rule:
+explicit user requests may authorize work elsewhere. Filesystem tools remain scoped
+to the selected workspace; use an approved shell command or change the chat workspace
+for authorized access elsewhere. Existing stock prompts update automatically;
+custom system instructions are preserved.
 Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
 
