@@ -353,6 +353,7 @@ local centeredTuiWindows = {
     { name = "shortcuts-tui",        class = "shortcuts-tui" },
     { name = "settings-tui",         class = "settings-tui" },
     { name = "agent-tui",            class = "agent-tui" },
+    { name = "tasks-tui",            class = "tasks-tui" },
     { name = "notification-tui",     class = "notification-tui" },
 }
 

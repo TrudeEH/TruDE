@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tasks
+Comment=Manage local tasks or Todoist projects
+Exec=footclient --app-id=tasks-tui --title=Tasks --override=colors.regular0=222226 --window-size-chars=110x34 tasks
+Terminal=false
+Categories=Office;Utility;
+Keywords=Todo;Tasks;Todoist;Projects;

@@ -119,7 +119,7 @@ install_packages() {
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
         "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
-        atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
+        build-essential atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
@@ -420,6 +420,8 @@ link_configs() {
     link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/dotfiles-icon-picker-tui"
     link_config "$repo_dir/scripts/tui/agent-tui" "$HOME/.local/bin/dotfiles-agent-tui"
+    link_config "$repo_dir/scripts/tui/tasks-tui" "$HOME/.local/bin/tasks"
+    link_config "$repo_dir/scripts/tui/tasks-tui" "$HOME/.local/bin/dotfiles-tasks-tui"
     for desktop_file in "$repo_dir"/configs/applications/*.desktop; do
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
@@ -479,6 +481,9 @@ main() {
 
     ui_step "Installing Superfile"
     install_superfile
+
+    ui_step "Building Tasks"
+    "$repo_dir/scripts/tasks/build.sh"
 
     ui_step "Preparing native Seth"
     "$repo_dir/scripts/agent/setup.sh"
