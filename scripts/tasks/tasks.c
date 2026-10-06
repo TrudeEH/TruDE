@@ -22,7 +22,7 @@ typedef struct { char id[128],project[128],title[TEXT],description[TEXT],due[TEX
 static Project projects[MAX]; static Task tasks[MAX];
 static int np,nt,visible[MAX],nv,project,selected,focus=1,completed,offset,poffset,view,nav;
 static const char *views[]={"All Tasks","Today","Upcoming","Completed"};
-static int rows=34,cols=110; static char backend[16],status[TEXT]="Ready",search[TEXT];
+static int rows=34,cols=110; static char backend[16],status[TEXT]="",search[TEXT];
 static struct termios original; static volatile sig_atomic_t stopped;
 static void copy(char *to,const char *from,size_t n) { size_t length=strnlen(from,n-1);memcpy(to,from,length);to[length]=0; }
 static void restore(void) { tcsetattr(0,TCSAFLUSH,&original); printf("\033[?1000l\033[?1006l\033[?25h\033[0m\033[?1049l"); fflush(stdout); }
@@ -108,9 +108,14 @@ static void select_nav(int index) {
     if(!project)view=index;
     selected=offset=0;
 }
+static void header(int loading) {
+    char heading[TEXT];snprintf(heading,sizeof heading," Tasks   /   %s",backend);
+    line(1,1,heading,cols,RAISED);
+    if(loading && cols>=12)line(1,cols-10,"Loading...",10,RAISED);
+}
 static int refresh(void) {
     char *args[]={"tasks","snapshot",backend,NULL},*output=NULL;
-    copy(status,"Loading tasks...",sizeof status);line(rows-1,1,status,cols,RAISED);fflush(stdout);
+    status[0]=0;header(1);fflush(stdout);
     if(run(args,NULL,&output)) { copy(status,output?output:"Connection failed",sizeof status);free(output);
     return 1; }
     char current[128]="",taskid[128]="";
@@ -132,7 +137,7 @@ static int refresh(void) {
     for(int i=0;i<np;i++)if(!strcmp(current,projects[i].id))project=i+1;
     nav=project?project+3:view;
     filter();for(int i=0;i<nv;i++)if(!strcmp(taskid,tasks[visible[i]].id))selected=i;
-    copy(status,"Ready",sizeof status);
+    status[0]=0;
     return 0;
 }
 static void size(void) { struct winsize ws; if(!ioctl(0,TIOCGWINSZ,&ws) && ws.ws_row && ws.ws_col) {rows=ws.ws_row;cols=ws.ws_col;} }
@@ -140,8 +145,7 @@ static void draw(void) {
     size();printf(BG "\033[2J");
     if(cols<70 || rows<22) {line(1,1,"Tasks needs a window at least 70 columns by 22 rows.",cols,BG);fflush(stdout);return;}
     int sidebar=24,h=rows-14;
-    char heading[TEXT];snprintf(heading,sizeof heading," Tasks   /   %s",backend);
-    line(1,1,heading,cols,RAISED);
+    char heading[TEXT];header(0);
     frame(3,1,24,6,"Tasks",focus==0 && nav<4,0);
     for(int i=0;i<4;i++)line(4+i,2,views[i],22,nav==i?ACCENT:BG);
     int ph=h-6;
@@ -165,10 +169,12 @@ static void draw(void) {
     frame(rows-9,1,cols-1,5,"Details",0,0);
     if(nv) {
         Task *t=&tasks[visible[selected]];line(rows-8,2,t->title,cols-3,BG);
-        snprintf(heading,sizeof heading,"Due: %.1000s   Labels: %.1000s",*t->due?t->due:"None",t->labels);line(rows-7,2,heading,cols-3,MUTED);
+        if(*t->labels)snprintf(heading,sizeof heading,"Due: %.1000s   Labels: %.1000s",*t->due?t->due:"None",t->labels);
+        else snprintf(heading,sizeof heading,"Due: %.1000s",*t->due?t->due:"None");
+        line(rows-7,2,heading,cols-3,MUTED);
         line(rows-6,2,t->description,cols-3,BG);
     }
-    snprintf(heading,sizeof heading," Search: %.4000s",search);line(rows-4,1,heading,cols,MUTED);
+
     line(rows-3,1," Tab pane | arrows navigate | a add | e edit | Space complete | / search",cols,RAISED);
     line(rows-2,1," n project | F2 rename | d delete | v completed | b backend | r refresh | q quit",cols,RAISED);
     line(rows-1,1,status,cols,MUTED);fflush(stdout);

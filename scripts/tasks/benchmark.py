@@ -64,7 +64,7 @@ class Terminal:
         while time.monotonic() < deadline:
             if select.select([self.fd], [], [], .05)[0]:
                 output.extend(os.read(self.fd, 65536))
-                if b'Ready' in output:
+                if b'\x1b[33;1H' in output:
                     return time.perf_counter()
             if self.proc.poll() is not None:
                 break
@@ -102,7 +102,7 @@ def main():
                   for s in Path('/proc/cpuinfo').read_text().splitlines() if s.startswith('model name')), ''),
                   compiler=subprocess.check_output(['cc', '--version'], text=True).splitlines()[0],
                   method='Warm cache; separate CLI processes including launcher; median/p95 wall time. '
-                  'PTY 110x34; UI startup to Ready, refresh key to Ready. Idle RAM: process-tree smaps_rollup '
+                  'PTY 110x34; UI startup to final status-row render, refresh key to final status-row render. Idle RAM: process-tree smaps_rollup '
                   'after startup and refresh; RSS includes shared pages, PSS apportions them, private excludes them. '
                   'Local only; no builds/network in timed sections. Versions alternate order. '
                   'Add restores identical database before each run, outside timing. Memory sampled outside timed runs. '

@@ -71,6 +71,14 @@ with tempfile.TemporaryDirectory() as home:
         assert data()['tasks'][0]['description'] == 'A description'
         drain(.3)
         output.clear()
+        send(b'r')
+        drain(.3)
+        assert b'Labels:' not in output and b'Search:' not in output and b'Ready' not in output
+        assert b'\x1b[1;100H' in output and b'Loading...' in output
+        # The completed redraw clears the loading indicator from the header.
+        final_header=output.rsplit(b'\x1b[1;1H',1)[-1].split(b'\x1b[3;1H',1)[0]
+        assert b'Loading...' not in final_header
+        output.clear()
         send(b' ')
         wait_for(b'No tasks here')
         assert data()['tasks'][0]['is_completed']
@@ -85,6 +93,13 @@ with tempfile.TemporaryDirectory() as home:
         send(b'\x15Edited task\r')
         drain()
         assert data()['tasks'][0]['content'] == 'Edited task'
+        output.clear()
+        send(b'e')
+        wait_for(b'Edit task')
+        send(b'\t\t\twork\r')
+        drain(.3)
+        assert data()['tasks'][0]['labels'] == ['work']
+        assert b'Labels: work' in output
         output.clear()
         send(b'n')
         modal=wait_for(b'New project')
