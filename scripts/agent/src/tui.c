@@ -99,7 +99,9 @@ typedef struct {
     Editor composer;
     Modal *modal, *settings, *settings_drafts[3];
     int settings_section;
-    Cell *cells, *old;
+    Cell *cells, *old, *selection_cells;
+    int selecting, selected, select_start, select_end, select_left, select_right,
+        select_top, select_bottom, select_id, select_index;
     Hit hits[256];
     int hitcount;
     Lines transcript;
@@ -1857,7 +1859,8 @@ static void dispatch(UI *u, int id, int index) {
     case 109: {
         char *p = export_chat(u->chat);
         if (p) {
-            message(u, "Export saved", p);
+            Modal *m = modal(u, MESSAGE, A_EXPORT, "Export saved · click path to copy", p);
+            m->id = strdup(p);
             free(p);
         } else
             error_ui(u);
@@ -2219,6 +2222,10 @@ static void modal_draw(UI *u) {
         text_lines(&l, m->text, NORMAL, 0);
         view_lines(u, &l, x + 3, y + 2, inner, height - 6, &m->scroll, 0, 0);
         lines_free(&l);
+        if (m->action == A_EXPORT) {
+            hit(u, x + 3, y + 2, inner, height - 6, 805, 0);
+            button(u, x + 18, bottom + 1, "Copy path", 805);
+        }
         if (m->kind == CONFIRM) {
             const char *yes = m->action == A_APPROVE      ? "Allow once"
                               : (m->action == A_PERMISSION || m->action == A_SETTINGS_AUTO) ? "Enable Auto"
@@ -2540,6 +2547,16 @@ static void render(UI *u) {
     free(status);
     if (u->modal)
         modal_draw(u);
+    if (!u->modal && u->tab == 0 && u->selection_cells && (u->selecting || u->selected)) {
+        int first = u->select_start < u->select_end ? u->select_start : u->select_end;
+        int last = u->select_start > u->select_end ? u->select_start : u->select_end;
+        for (int y = u->select_top; y <= u->select_bottom; y++)
+            for (int col = u->select_left; col <= u->select_right; col++) {
+                int i = y * u->w + col;
+                u->cells[i] = u->selection_cells[i];
+                if (u->selected && i >= first && i <= last) u->cells[i].color = SELECTED;
+            }
+    }
     Buf out = {0};
     int color = -1, bold = -1;
     for (int y = 0; y < u->h; y++)
@@ -2582,6 +2599,9 @@ static void resize_ui(UI *u) {
         u->w = 124;
         u->h = 38;
     }
+    free(u->selection_cells);
+    u->selection_cells = NULL;
+    u->selecting = u->selected = 0;
     free(u->cells);
     free(u->old);
     u->cells = calloc((size_t)u->w * u->h, sizeof *u->cells);
@@ -2611,10 +2631,77 @@ static void scroll_chat(UI *u, int change) {
         u->chat_scroll = u->chat_max_scroll;
     u->following = u->chat_scroll == u->chat_max_scroll;
 }
+static void copied(UI *u, int result, const char *success) {
+    notice_ui(u, result ? err : success);
+}
+static Buf selected_text(UI *u) {
+    Buf text = {0};
+    int first = u->select_start < u->select_end ? u->select_start : u->select_end;
+    int last = u->select_start > u->select_end ? u->select_start : u->select_end;
+    for (int y = first / u->w; y <= last / u->w; y++) {
+        Buf row = {0};
+        int left = y == first / u->w ? first % u->w : u->select_left;
+        int right = y == last / u->w ? last % u->w : u->select_right;
+        for (int x = left; x <= right; x++) {
+            wchar_t c = u->selection_cells[y * u->w + x].c;
+            if (!c) continue;
+            char bytes[MB_LEN_MAX];
+            mbstate_t state = {0};
+            size_t n = wcrtomb(bytes, c, &state);
+            if (n != (size_t)-1) bput(&row, bytes, n);
+        }
+        while (row.n && row.s[row.n - 1] == ' ') row.s[--row.n] = 0;
+        if (y > first / u->w) bs(&text, "\n");
+        bput(&text, row.s ? row.s : "", row.n);
+        bfree(&row);
+    }
+    return text;
+}
+static int copy_clicked_image(UI *u, int x, int y) {
+    if (x < 0 || y < 0 || x >= u->w || y >= u->h) return 0;
+    int left = x, right = x;
+    while (left > 0 && u->cells[y * u->w + left].c != '[') left--;
+    while (right < u->w - 1 && u->cells[y * u->w + right].c != ']') right++;
+    char label[64];
+    if (right - left >= (int)sizeof label - 1) return 0;
+    for (int i = left; i <= right; i++) label[i - left] = (char)u->cells[y * u->w + i].c;
+    label[right - left + 1] = 0;
+    if (!image_tag_length(label)) return 0;
+    J *messages = jg(u->chat, "messages");
+    for (size_t m = 0; m <= messages->len; m++) {
+        J *images = m == messages->len ? u->images : jg(messages->v[m], "images");
+        for (size_t i = 0; images && i < images->len; i++)
+            if (!strcmp(gs(images->v[i], "label"), label)) {
+                copied(u, clipboard_copy_image(gs(images->v[i], "url")), "Image copied to clipboard.");
+                return 1;
+            }
+    }
+    return 0;
+}
 static void mouse(UI *u, int buttoncode, int x, int y, int release) {
-    if (release)
+    if (u->selecting && (release || (buttoncode & 32))) {
+        if (x < u->select_left) x = u->select_left;
+        if (x > u->select_right) x = u->select_right;
+        if (y < u->select_top) y = u->select_top;
+        if (y > u->select_bottom) y = u->select_bottom;
+        u->select_end = y * u->w + x;
+        u->selected = u->select_end != u->select_start;
+        if (release) {
+            u->selecting = 0;
+            if (u->selected) {
+                Buf text = selected_text(u);
+                copied(u, clipboard_copy(text.s ? text.s : "", text.n, "text/plain;charset=utf-8"),
+                       "Selection copied to clipboard.");
+                bfree(&text);
+            } else if (!copy_clicked_image(u, x, y))
+                dispatch(u, u->select_id, u->select_index);
+        }
+        u->dirty = 1;
         return;
+    }
+    if (release || (buttoncode & 32)) return;
     if (buttoncode & 64) {
+        u->selected = 0;
         int down = buttoncode & 1;
         if (u->modal) {
             Modal *m = u->modal;
@@ -2636,6 +2723,31 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
     }
     if ((buttoncode & 3) != 0)
         return;
+    u->selected = 0;
+    if (!u->modal && u->tab == 0) {
+        int side = u->w * 26 / 100;
+        if (side < 22) side = 22;
+        int bottom = u->h - 13;
+        if (x >= side + 2 && x <= u->w - 4 && y >= 5 && y <= bottom) {
+            free(u->selection_cells);
+            u->selection_cells = malloc((size_t)u->w * u->h * sizeof *u->cells);
+            memcpy(u->selection_cells, u->cells, (size_t)u->w * u->h * sizeof *u->cells);
+            u->selecting = 1;
+            u->select_left = side + 2; u->select_right = u->w - 4;
+            u->select_top = 5; u->select_bottom = bottom;
+            u->select_start = u->select_end = y * u->w + x;
+            u->select_id = 108; u->select_index = 0;
+            for (int i = u->hitcount - 1; i >= 0; i--) {
+                Hit *h = &u->hits[i];
+                if (x >= h->x && x < h->x + h->w && y >= h->y && y < h->y + h->h) {
+                    u->select_id = h->id; u->select_index = h->index; break;
+                }
+            }
+            u->focus = 108;
+            return;
+        }
+        if (copy_clicked_image(u, x, y)) return;
+    }
     for (int i = u->hitcount - 1; i >= 0; i--) {
         Hit *h = &u->hits[i];
         if (x < h->x || x >= h->x + h->w || y < h->y || y >= h->y + h->h)
@@ -2648,6 +2760,8 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
                 if (f->kind == 4)
                     es(&f->e, !strcmp(f->e.s, "true") ? "false" : "true");
             }
+            else if (h->id == 805)
+                copied(u, clipboard_copy(m->id, strlen(m->id), "text/plain;charset=utf-8"), "Export path copied to clipboard.");
             else if (h->id == 801)
                 save_modal(u, 1);
             else if (h->id == 802)
@@ -2689,6 +2803,7 @@ static void cycle_focus(UI *u, int backwards) {
         u->focus = ids[(at + (backwards ? -1 : 1) + n) % n];
 }
 static void key(UI *u, int code, const char *text) {
+    u->selecting = u->selected = 0;
     u->dirty = 1;
     if (code == 17 || code == 3) {
         u->quit = 1;
@@ -3215,7 +3330,7 @@ static void finish_job(UI *u) {
 static void cleanup_terminal(void) {
     if (!active)
         return; /* Restore keyboard state before leaving the alternate screen. */
-    const char *s = "\033[<u\033[>4;0m\033[?2004l\033[?1000l\033[?1006l\033[0m\033[?25h\033[?1049l";
+    const char *s = "\033[<u\033[>4;0m\033[?2004l\033[?1002l\033[?1006l\033[0m\033[?25h\033[?1049l";
     writeall(1, s, strlen(s));
     tcsetattr(0, TCSANOW, &active->term);
     active = NULL;
@@ -3302,7 +3417,7 @@ int tui(J *config) {
     signal(SIGTERM, signals);
     signal(SIGINT, signals);
     const char *init =
-        "\033[?1049h\033[?25l\033[?2004h\033[?1000h\033[?1006h\033[>1u\033[>4;2m\033[2J";
+        "\033[?1049h\033[?25l\033[?2004h\033[?1002h\033[?1006h\033[>1u\033[>4;2m\033[2J";
     writeall(1, init, strlen(init));
     resize_ui(&u);
     start_job(&u, 4, "");
@@ -3377,6 +3492,7 @@ int tui(J *config) {
     jf(u.images);
     jf(u.jobimages);
     jf(u.steering);
+    free(u.selection_cells);
     free(u.cells);
     free(u.old);
     bfree(&u.partial);

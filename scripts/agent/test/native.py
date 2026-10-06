@@ -400,6 +400,49 @@ class NativeTests(unittest.TestCase):
         result=self.bundled("memory","tools/call",{"name":name,"arguments":args},env)
         self.assertFalse(result.get("isError"),result)
         return json.loads(result["content"][0]["text"])
+    def test_tui_selection_image_and_export_copy(self):
+        tools=self.root/"bin"
+        tools.mkdir()
+        copied=self.root/"clipboard"
+        mime=self.root/"clipboard-mime"
+        (tools/"wl-copy").write_text('#!/bin/sh\nprintf "%s" "$2" > "$COPY_MIME"\ncat > "$COPY_DATA"\n')
+        (tools/"wl-paste").write_text('#!/bin/sh\ncase "$1" in\n--list-types) printf "image/png\\n" ;;\n*) printf "fake-image" ;;\nesac\n')
+        for file in tools.iterdir(): file.chmod(0o700)
+        self.env.update(PATH=str(tools)+":"+self.env.get("PATH","/usr/bin:/bin"),WAYLAND_DISPLAY="test",COPY_DATA=str(copied),COPY_MIME=str(mime))
+        self.config["profiles"]["lmstudio"]["visionModels"]={"test-model":True}
+        self.save()
+        self.mock.model_hook=lambda body:{"role":"assistant","content":"Select café 世界 text.\nSecond line."}
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("Describe \x16\r")
+            s.wait("Select café 世界 text.")
+            x,y=s.screen.find("Select café")
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x+6};{y+1}M\x1b[<0;{x+6};{y+1}m")
+            self.assertEqual(copied.read_text(),"Select")
+            self.assertEqual(s.screen.grid[y][x][2],"#ffbe6f")
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x+13};{y+1}M\x1b[<0;{x+13};{y+1}m")
+            self.assertEqual(copied.read_text(),"Select café 世")
+            x2,y2=s.screen.find("Second line.")
+            s.send(f"\x1b[<0;{x+1};{y+1}M\x1b[<32;{x2+12};{y2+1}M\x1b[<0;{x2+12};{y2+1}m")
+            self.assertEqual(copied.read_text(),"Select café 世界 text.\nSecond line.")
+            s.click("[Image 1]")
+            self.assertEqual(copied.read_bytes(),b"fake-image")
+            self.assertEqual(mime.read_text(),"image/png")
+            s.click("Export")
+            s.wait("Export saved")
+            s.click("Copy path")
+            path=copied.read_text()
+            self.assertTrue(Path(path).is_file())
+            self.assertTrue(path.endswith(".md"))
+            s.click(path[:30])
+            self.assertEqual(copied.read_text(),path)
+            (tools/"wl-copy").write_text("#!/bin/sh\nexit 1\n")
+            s.click("Copy path")
+            s.wait("Clipboard copy failed")
+        finally:
+            s.close()
+
     def test_tui_wayland_image_paste_and_vision_warning(self):
         tools=self.root/"bin"
         tools.mkdir()

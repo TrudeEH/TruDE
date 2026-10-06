@@ -98,6 +98,7 @@ void event(J *, const char *);
 J *profile(J *), *models(J *);
 int model_vision(J *);
 char *clipboard_image(void);
+int clipboard_copy(const void *, size_t, const char *), clipboard_copy_image(const char *);
 J *image_content(const char *, J *);
 J *completion(J *, J *, J *, int, int, Chunk, void *, J **, char **);
 typedef struct Agent {

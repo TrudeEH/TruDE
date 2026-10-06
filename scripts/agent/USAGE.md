@@ -68,6 +68,19 @@ Settings' default workspace applies to new chats without changing existing chats
 Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
 
+## Copying from chat
+
+Drag with the left mouse button to highlight chat text. Releasing the button copies
+it automatically to the system clipboard. Selected text stays highlighted until the
+next click, scroll, or keypress. Selection uses the visible rendered text, including
+line breaks, and freezes the visible conversation while you select.
+
+Click an `[Image N]` tag to copy its attached image, including tags in the composer.
+After exporting, click the displayed path or **Copy path** to copy the full filename.
+Wayland uses `wl-copy` from `wl-clipboard` (included in the Debian package list).
+X11 requires `xclip`. Missing clipboard tools and failed copies show an error in the
+footer; clipboard copying does not use shell interpolation.
+
 ## Chat scrolling and response statistics
 
 The chat follows incoming messages while its bottom is visible. Scrolling up pauses
