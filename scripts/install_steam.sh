@@ -48,6 +48,6 @@ BACKPORTS
 fi
 
 sudo apt-get update
-sudo apt-get install -y -t "$backports_suite" steam-installer
+sudo apt-get install -y -t "$backports_suite" steam-installer libdrm-dev
 
 echo "Steam and its 32-bit dependencies are installed."
