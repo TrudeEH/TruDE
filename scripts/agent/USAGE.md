@@ -150,6 +150,18 @@ individual tools in the MCP tab. Tool-list changes refresh automatically when ad
 MCP resources and prompts are exposed to the agent through bridges to the standard MCP
 methods. Form elicitation can ask the user for input; URL requests display a sign-in link.
 
+### MCP startup troubleshooting
+
+A server marked `error (MCP v2 / legacy)` has not necessarily negotiated a legacy
+protocol: that label also appears after the client's fallback attempt fails.
+Read the server error before diagnosing a protocol incompatibility.
+
+For an `npx mcp-remote` server, `MODULE_NOT_FOUND` or `Cannot find module
+'http-errors'` means the local Node dependency installation is incomplete. The
+bridge crashes before MCP negotiation or remote authentication. Repair or reinstall
+the affected npm execution-cache entry, then reconnect from the MCP tab. Changing
+the MCP protocol or Todoist credentials does not fix missing local dependencies.
+
 Bundled defaults:
 
 - `filesystem`: list/read/search files, inspect metadata, write/edit text, and list/restore
