@@ -271,6 +271,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             assert req["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] == "2026-07-28"
             assert self.headers.get("Mcp-Method") == method
         if method in ("server/discover", "initialize"):
+            time.sleep(getattr(self.server,"mcp_connect_delay",0))
             result = {"supportedVersions": ["2026-07-28"], "protocolVersion": "2024-11-05", "capabilities": {"tools": {}, "resources": {}, "prompts": {}}, "serverInfo": {"name": "fixture", "version": "1"}}
         elif method == "tools/list":
             result = {"tools": [{"name": "echo", "description": "Echo", "inputSchema": {"type": "object", "properties": {}}}]}
@@ -1500,6 +1501,27 @@ esac
             self.assertIs(saved["profiles"]["lmstudio"]["visionModels"]["test-model"],True)
         finally:
             s.close()
+
+    def test_mcp_connections_overlap_and_keep_config_order(self):
+        self.mock.mcp_connect_delay=0.8
+        self.config["mcpServers"]={name:{"url":f"http://127.0.0.1:{self.mock.server_port}/mcp","oauth":False} for name in ("first","second","third","fourth")}
+        self.config["mcpServers"]["disabled"]={"url":"http://127.0.0.1:1/mcp","enabled":False}
+        self.config["mcpServers"]["broken"]={"command":"/does-not-exist-seth-fixture"}
+        self.save()
+        start=time.monotonic()
+        result=subprocess.run([BINARY,"--check"],env=self.env,text=True,capture_output=True,timeout=12)
+        elapsed=time.monotonic()-start
+        self.assertLess(elapsed,2.8,result.stderr)
+        for name in ("first","second","third","fourth"):
+            self.assertIn(name+": connected",result.stdout)
+        self.assertIn("disabled: disabled",result.stdout)
+        self.assertIn("broken: error",result.stdout)
+        self.assertIn("Start /does-not-exist-seth-fixture",result.stdout)
+        self.assertLess(result.stdout.index("first:"),result.stdout.index("second:"))
+        self.assertLess(result.stdout.index("second:"),result.stdout.index("third:"))
+        # Delayed discovery requests must overlap, not merely finish quickly.
+        requests=[body for path,body,_ in self.mock.requests if body.get("method")=="server/discover"]
+        self.assertEqual(len(requests),4)
 
     def test_context_compaction_preserves_full_transcript(self):
         self.config.update(contextWindow=4096,maxTokens=256)

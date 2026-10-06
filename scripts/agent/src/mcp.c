@@ -5,6 +5,15 @@
 #include <string.h>
 #include <unistd.h>
 extern char **environ;
+/* The CLI has no elicitation callback to serialize browser sign-in prompts. */
+static pthread_mutex_t browser_signin = PTHREAD_MUTEX_INITIALIZER;
+static int authorize(MCP *m, Server *s, const char *challenge, int interactive) {
+    int gate = m->interactive && !m->elicit;
+    if (gate) pthread_mutex_lock(&browser_signin);
+    int rc = oauth_authorize(m, s, challenge, interactive);
+    if (gate) pthread_mutex_unlock(&browser_signin);
+    return rc;
+}
 static J *client_caps(MCP *m) {
     J *c = jo(), *r = jo();
     jset(r, "listChanged", jb(0));
@@ -298,7 +307,7 @@ static J *request_once(MCP *m, Server *s, const char *method, J *params, int tim
                         &response);
         if (response.status == 401 && s->kind == 1 &&
             !jg(jg(s->config, "headers"), "Authorization") && gb(s->config, "oauth", 1)) {
-            if (!oauth_authorize(m, s, response.headers, 1)) {
+            if (!authorize(m, s, response.headers, 1)) {
                 http_free(&response);
                 jset(h, "Authorization", js(gs(s->headers, "Authorization")));
                 code = http(s->url, "POST", h, req, timeout, 8 * LIMIT, NULL, NULL, &response);
@@ -763,11 +772,56 @@ static int connect_server(MCP *m, Server *s) {
         subscribe(m, s);
     return rc;
 }
+/* Each startup worker owns its tool array and diagnostics. Publish only after
+ * joining, in configuration order. Interactive requests share a separate gate. */
+typedef struct {
+    MCP local;
+    Server *server;
+    MCP *parent;
+    pthread_mutex_t *dialogs;
+    pthread_t thread;
+    int started, failed;
+} ConnectJob;
+static J *connect_input(const char *server, J *params, void *opaque) {
+    ConnectJob *job = opaque;
+    pthread_mutex_lock(job->dialogs);
+    J *answer = cancelled ? NULL : job->parent->elicit(server, params, job->parent->opaque);
+    pthread_mutex_unlock(job->dialogs);
+    return answer;
+}
+static void *connect_worker(void *opaque) {
+    ConnectJob *job = opaque;
+    MCP *m = &job->local;
+    Server *s = job->server;
+    err[0] = 0;
+    J *headers = jg(s->config, "headers");
+    int valid = !!s->url && !cancelled;
+    for (size_t k = 0; valid && headers && k < headers->len; k++) {
+        char *v = expand(jstr(headers->v[k]));
+        if (!v) { valid = 0; break; }
+        jset(s->headers, headers->v[k]->key, js(v));
+        free(v);
+    }
+    if (valid && s->kind == 1 && !jg(s->headers, "Authorization") && gb(s->config, "oauth", 1))
+        valid = !authorize(m, s, NULL, 0);
+    if (valid && !connect_server(m, s)) {
+        s->state = "connected";
+    } else {
+        s->state = "error";
+        free(s->detail);
+        s->detail = strdup(cancelled ? "Stopped" : *err ? err : "Invalid server configuration");
+        server_stop(s);
+        job->failed = 1;
+    }
+    return NULL;
+}
 int mcp_connect(MCP *m) {
     mcp_close(m);
     J *cfg = jg(m->config, "mcpServers");
-    int failures = 0;
-    for (size_t i = 0; cfg && i < cfg->len && !cancelled; i++) {
+    size_t count = cfg ? cfg->len : 0;
+    ConnectJob *jobs = calloc(count ? count : 1, sizeof *jobs);
+    pthread_mutex_t dialogs = PTHREAD_MUTEX_INITIALIZER;
+    for (size_t i = 0; i < count; i++) {
         Server *s = calloc(1, sizeof *s);
         s->name = strdup(cfg->v[i]->key);
         s->config = jc(cfg->v[i]);
@@ -783,32 +837,42 @@ int mcp_connect(MCP *m) {
                                         : 0;
         m->servers = realloc(m->servers, (m->count + 1) * sizeof *m->servers);
         m->servers[m->count++] = s;
-        if (!gb(s->config, "enabled", 1))
-            continue;
-        J *headers = jg(s->config, "headers");
-        int valid = !!s->url;
-        for (size_t k = 0; headers && k < headers->len; k++) {
-            char *v = expand(jstr(headers->v[k]));
-            if (!v) {
-                valid = 0;
-                break;
-            }
-            jset(s->headers, headers->v[k]->key, js(v));
-            free(v);
+        jobs[i].server = s;
+        jobs[i].parent = m;
+        jobs[i].dialogs = &dialogs;
+        mcp_init(&jobs[i].local, m->config);
+        jobs[i].local.interactive = m->interactive;
+        jobs[i].local.elicit = m->elicit ? connect_input : NULL;
+        jobs[i].local.opaque = &jobs[i];
+    }
+    int failures = 0;
+    /* Bound simultaneous sockets/processes; interactive prompts have a gate. */
+    size_t width = 8;
+    for (size_t base = 0; base < count; base += width) {
+        size_t end = base + width < count ? base + width : count;
+        for (size_t i = base; i < end; i++) {
+            if (!gb(jobs[i].server->config, "enabled", 1)) continue;
+            jobs[i].server->state = "connecting";
+            if (!pthread_create(&jobs[i].thread, NULL, connect_worker, &jobs[i]))
+                jobs[i].started = 1;
+            else
+                connect_worker(&jobs[i]);
         }
-        if (valid && s->kind == 1 && !jg(s->headers, "Authorization") && gb(s->config, "oauth", 1))
-            valid = !oauth_authorize(m, s, NULL, 0);
-        if (valid && !connect_server(m, s)) {
-            s->state = "connected";
-            err[0] = 0;
-        } else {
-            s->state = "error";
-            free(s->detail);
-            s->detail = strdup(err);
-            server_stop(s);
-            failures++;
+        for (size_t i = base; i < end; i++) {
+            if (jobs[i].started) pthread_join(jobs[i].thread, NULL);
+            failures += jobs[i].failed;
+            MCP *local = &jobs[i].local;
+            for (size_t k = 0; k < local->toolcount; k++) {
+                m->tools = realloc(m->tools, (m->toolcount + 1) * sizeof *m->tools);
+                m->tools[m->toolcount++] = local->tools[k];
+            }
+            free(local->tools);
+            if (jobs[i].failed) snprintf(err, sizeof err, "%s", jobs[i].server->detail);
         }
     }
+    if (!failures) err[0] = 0;
+    pthread_mutex_destroy(&dialogs);
+    free(jobs);
     return failures;
 }
 int mcp_refresh(MCP *m) {

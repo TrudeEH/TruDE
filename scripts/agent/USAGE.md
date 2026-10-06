@@ -150,6 +150,11 @@ individual tools in the MCP tab. Tool-list changes refresh automatically when ad
 MCP resources and prompts are exposed to the agent through bridges to the standard MCP
 methods. Form elicitation can ask the user for input; URL requests display a sign-in link.
 
+Startup and reconnect run independent server connections in parallel, in batches
+of up to eight. Authentication/input prompts remain serialized, and tool ordering
+follows the configured server order. Existing timeouts and protocol fallback are
+unchanged; a slow remote server can still delay the final ready state.
+
 ### Native OAuth for remote MCP servers
 
 Remote Streamable HTTP servers can authenticate directly, without Node, `npx`, or
