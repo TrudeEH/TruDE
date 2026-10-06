@@ -9,9 +9,15 @@ You can also run `scripts/tui/tasks-tui` or `tasks`.
 The interface is a native C application, not fzf. It has a persistent project
 sidebar, task list, and details panel. Orange pane borders indicate keyboard
 focus; inactive panes have muted borders. Dialogs are centered, opaque, and
-bordered so underlying tasks cannot bleed into their fields. Runtime dependencies: POSIX sh, jq, curl,
-flock (Debian util-linux). Building requires a C compiler (`build-essential` on
-Debian); the installer builds it, and the launcher rebuilds changed source.
+bordered so underlying tasks cannot bleed into their fields.
+
+All application logic is C: UI, CLI, JSON, atomic storage, locking, settings, and
+Todoist HTTPS. The backend is called directly, without shell, jq, curl, or flock
+subprocesses. HTTPS uses libcurl with certificate verification enabled. Runtime
+requires libc and libcurl. Building requires `build-essential` and
+`libcurl4-openssl-dev` on Debian; the installer builds it, and the thin POSIX sh
+launcher rebuilds changed source. Build/launcher scripts are infrastructure,
+not the application backend. The JSON parser is reused from Seth's C source.
 Run `sh scripts/tasks/build.sh` to rebuild manually.
 
 Local mode is the default. Data lives in
@@ -27,8 +33,8 @@ stored under `${XDG_CONFIG_HOME:-$HOME/.config}/tasks/`; the token file is mode
 0600. It is plaintext: keep it private and exclude it from shared backups.
 Use `b`, select Todoist, and paste a new token to replace it. Failed connections
 show an error in the status bar; use `r` to retry or `b` to change backend. CLI users may still set `TODOIST_API_TOKEN`.
-Do not commit tokens. Requests use the HTTPS API v1. Tokens are held in private
-session files and never put in curl's arguments. Requests have a 30-second
+Do not commit tokens. Requests use the HTTPS API v1. Tokens are loaded directly
+into memory and never passed through subprocess arguments or session files. Requests have a 30-second
 limit. Writes are not automatically retried: refresh after a timeout before
 retrying, because the server may already have accepted the write.
 
@@ -96,3 +102,37 @@ navigation run inside the native UI without subprocesses.
 API reference: https://developer.todoist.com/api/v1/
 Run `sh scripts/tasks/test.sh` for backend tests and
 `python3 scripts/tasks/ui-test.py` for real-terminal keyboard/mouse UI tests.
+
+## Performance comparison
+
+Run `python3 scripts/tasks/benchmark.py --samples 25 --output scripts/tasks/benchmark-results.json`
+after building. The harness builds old commit `081fa76` separately and compares
+it with the current build using isolated local datasets (0, 100, 1,000 tasks).
+Python is needed only for tests/benchmarks, not the application.
+
+The recorded run used Debian, Ryzen 7 7700, GCC 14.2, `-O2`, 25 measured
+samples per version/dataset, and one discarded warmup. Versions alternate
+order. Both use the same data and a 110×34 pseudo-terminal. CLI times include
+the launcher; UI times end when Ready is rendered. Builds, dataset resets, and
+memory sampling are outside timed sections. Filesystem cache is warm.
+
+| Median, 1,000 tasks | Old C UI + shell backend | Native C application |
+| --- | ---: | ---: |
+| CLI list | 17.24 ms | 10.59 ms |
+| CLI add | 23.76 ms | 11.72 ms |
+| UI startup | 38.06 ms | 11.30 ms |
+| UI refresh | 35.46 ms | 4.21 ms |
+| Idle RSS | 20.80 MiB | 31.57 MiB |
+| Idle PSS | 19.15 MiB | 25.67 MiB |
+| Idle private memory | 19.13 MiB | 24.52 MiB |
+
+The new version is faster here, **not lower in idle RAM**. Linked libcurl and
+its dependencies remain resident; native JSON parsing/serialization also adds
+heap allocations inside the UI. The old backend subprocesses exit before idle
+memory is sampled. This is not a peak-memory comparison. RSS includes shared
+library pages; PSS apportions shared pages, and private memory excludes them.
+Measurements include the application process tree but not a terminal emulator.
+Raw results, p95 latency, and smaller datasets are in `benchmark-results.json`.
+These are local-mode results on this machine, not Todoist/network benchmarks or
+cold-start guarantees. Todoist integration has not been tested against a live
+account during this migration.

@@ -1,0 +1,181 @@
+{
+  "old_commit": "081fa76f83c2e86325ccd177acf50490191d05fe",
+  "new_version": "working tree",
+  "kernel": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu": "AMD Ryzen 7 7700 8-Core Processor",
+  "compiler": "cc (Debian 14.2.0-19) 14.2.0",
+  "method": "Warm cache; separate CLI processes including launcher; median/p95 wall time. PTY 110x34; UI startup to Ready, refresh key to Ready. Idle RAM: process-tree smaps_rollup after startup and refresh; RSS includes shared pages, PSS apportions them, private excludes them. Local only; no builds/network in timed sections. Versions alternate order. Add restores identical database before each run, outside timing. Memory sampled outside timed runs. One warmup per version and dataset is discarded. No terminal emulator included.",
+  "results": [
+    {
+      "tasks": 0,
+      "old": {
+        "list": {
+          "median_ms": 8.249,
+          "p95_ms": 8.886,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 14.27,
+          "p95_ms": 14.943,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 14.981,
+          "p95_ms": 16.297,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 13.17,
+          "p95_ms": 14.328,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 3864,
+          "pss": 2232,
+          "private": 2220
+        }
+      },
+      "new": {
+        "list": {
+          "median_ms": 5.323,
+          "p95_ms": 5.79,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 7.203,
+          "p95_ms": 7.792,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 4.676,
+          "p95_ms": 5.465,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 0.095,
+          "p95_ms": 0.13,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 10876,
+          "pss": 4795,
+          "private": 3580
+        }
+      }
+    },
+    {
+      "tasks": 100,
+      "old": {
+        "list": {
+          "median_ms": 9.191,
+          "p95_ms": 9.617,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 15.248,
+          "p95_ms": 15.862,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 17.845,
+          "p95_ms": 18.893,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 15.771,
+          "p95_ms": 16.923,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 6868,
+          "pss": 5177,
+          "private": 5164
+        }
+      },
+      "new": {
+        "list": {
+          "median_ms": 5.911,
+          "p95_ms": 6.159,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 7.694,
+          "p95_ms": 8.183,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 5.64,
+          "p95_ms": 6.299,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 0.562,
+          "p95_ms": 0.724,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 13912,
+          "pss": 7879,
+          "private": 6672
+        }
+      }
+    },
+    {
+      "tasks": 1000,
+      "old": {
+        "list": {
+          "median_ms": 17.241,
+          "p95_ms": 17.944,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 23.764,
+          "p95_ms": 24.847,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 38.06,
+          "p95_ms": 38.947,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 35.461,
+          "p95_ms": 37.317,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 21296,
+          "pss": 19605,
+          "private": 19592
+        }
+      },
+      "new": {
+        "list": {
+          "median_ms": 10.588,
+          "p95_ms": 11.377,
+          "samples": 25
+        },
+        "add": {
+          "median_ms": 11.723,
+          "p95_ms": 14.944,
+          "samples": 25
+        },
+        "startup": {
+          "median_ms": 11.297,
+          "p95_ms": 12.496,
+          "samples": 25
+        },
+        "refresh": {
+          "median_ms": 4.212,
+          "p95_ms": 4.545,
+          "samples": 25
+        },
+        "idle_kib": {
+          "rss": 32332,
+          "pss": 26288,
+          "private": 25108
+        }
+      }
+    }
+  ]
+}

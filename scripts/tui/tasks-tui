@@ -1,51 +1,10 @@
 #!/bin/sh
+# Build/launcher glue only; all Tasks application logic runs inside the C binary.
 set -eu
-base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
-. "$base/lib/ui.sh"
-. "$base/tasks/backend.sh"
-usage() {
-    cat <<'HELP'
-Tasks — local tasks or Todoist
-Usage: tasks [--local | --todoist] [command [arguments]]
-Commands (JSON output/input):
-  list                         List tasks
-  projects                     List projects
-  add JSON                     Add a task
-  edit ID JSON                 Edit task fields
-  complete ID | reopen ID      Change completion state
-  project-add NAME             Create a project
-Launcher: choose a backend and connect Todoist inside the app.
-CLI: TODOIST_API_TOKEN or the saved token; use --todoist.
-Data: $XDG_DATA_HOME/tasks/local.json (default ~/.local/share/tasks).
-Keyboard: Tab switches panes, arrows navigate, Enter edits, a adds,
-          Space completes, n new project, F2 rename, d delete, / search,
-          r refresh, b backend, v completed (local), q quit. Mouse: click/wheel.
-Local due dates are literal text. Todoist accepts natural-language recurrence.
-HELP
-}
-case ${1:-} in
-    --help|-h) usage; exit 0 ;;
-    --local) TASKS_BACKEND=local; shift ;;
-    --todoist) TASKS_BACKEND=todoist; shift ;;
-esac
-if [ "$#" -eq 0 ]; then
-    for dependency in jq flock curl; do
-        command -v "$dependency" >/dev/null || { printf 'Install %s to run Tasks.\n' "$dependency" >&2; exit 1; }
-    done
-    if [ ! -x "$base/tasks/bin/tasks" ] || [ "$base/tasks/tasks.c" -nt "$base/tasks/bin/tasks" ]; then
-        "$base/tasks/build.sh"
-    fi
-    if [ -n "${TASKS_BACKEND:-}" ]; then export TASKS_BACKEND; fi
-    exec "$base/tasks/bin/tasks" "$base/tasks/bridge.sh"
+base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/../tasks" && pwd)
+if [ ! -x "$base/bin/tasks" ] || [ "$base/tasks.c" -nt "$base/bin/tasks" ] \
+    || [ "$base/backend.c" -nt "$base/bin/tasks" ] || [ "$base/json.c" -nt "$base/bin/tasks" ] \
+    || [ "$base/backend.h" -nt "$base/bin/tasks" ] || [ "$base/json.h" -nt "$base/bin/tasks" ]; then
+    "$base/build.sh"
 fi
-tasks_init
-case $1 in
-    list) tasks_list ;;
-    projects) projects_list ;;
-    add) task_save '' "${2:?JSON required}" ;;
-    edit) task_save "${2:?ID required}" "${3:?JSON required}" ;;
-    complete) task_complete "${2:?ID required}" true ;;
-    reopen) task_complete "${2:?ID required}" false ;;
-    project-add) project_save '' "${2:?Name required}" ;;
-    *) usage >&2; exit 1 ;;
-esac
+exec "$base/bin/tasks" "$@"

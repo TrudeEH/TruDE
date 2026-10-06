@@ -1,15 +1,13 @@
-/* Tasks: dependency-free terminal UI. Backend values are passed through exec,
- * never interpolated into shell commands. ANSI controls from data are removed. */
+/* Tasks: native UI and backend. Terminal controls from stored data are removed. */
+#include "backend.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
-#include <sys/wait.h>
 #include <sys/select.h>
 #include <signal.h>
-#include <errno.h>
 #include <ctype.h>
 #include <time.h>
 
@@ -24,7 +22,7 @@ typedef struct { char id[128],project[128],title[TEXT],description[TEXT],due[TEX
 static Project projects[MAX]; static Task tasks[MAX];
 static int np,nt,visible[MAX],nv,project,selected,focus=1,completed,offset,poffset,view,nav;
 static const char *views[]={"All Tasks","Today","Upcoming","Completed"};
-static int rows=34,cols=110; static char backend[16],bridge[TEXT],status[TEXT]="Ready",search[TEXT];
+static int rows=34,cols=110; static char backend[16],status[TEXT]="Ready",search[TEXT];
 static struct termios original; static volatile sig_atomic_t stopped;
 static void copy(char *to,const char *from,size_t n) { size_t length=strnlen(from,n-1);memcpy(to,from,length);to[length]=0; }
 static void restore(void) { tcsetattr(0,TCSAFLUSH,&original); printf("\033[?1000l\033[?1006l\033[?25h\033[0m\033[?1049l"); fflush(stdout); }
@@ -63,32 +61,7 @@ static void frame(int y,int x,int w,int h,const char *title,int active,int clear
     text(title,title_width);putchar(' ');fputs(BG,stdout);
 }
 static int run(char **args,const char *input,char **result) {
-    int out[2],in[2]; if(pipe(out)||pipe(in)) return -1;
-    pid_t pid=fork();
-    if(pid==0) {
-        dup2(in[0],0); dup2(out[1],1); dup2(out[1],2);
-        close(in[0]);close(in[1]);close(out[0]);close(out[1]);
-        execv(bridge,args); _exit(127);
-    }
-    close(in[0]);close(out[1]);
-    if(pid<0) { close(in[1]);close(out[0]);
-    return -1; }
-    if(input) { size_t left=strlen(input); const char *p=input; while(left) { ssize_t n=write(in[1],p,left);
-    if(n<=0)break;
-        p+=n;left-=(size_t)n; } }
-    close(in[1]);
-    size_t length=0,cap=8192; char *buf=malloc(cap); if(!buf) exit(1);
-    ssize_t n;
-    while((n=read(out[0],buf+length,cap-length-1))>0) {
-        length+=(size_t)n;
-        if(cap-length<4096) { cap*=2; char *next=realloc(buf,cap);
-    if(!next)exit(1);
-        buf=next; }
-    }
-    close(out[0]);buf[length]=0;int code=0;
-    while(waitpid(pid,&code,0)<0 && errno==EINTR) {}
-    *result=buf;
-    return WIFEXITED(code)?WEXITSTATUS(code):1;
+    return backend_dispatch(args,input,result);
 }
 static int call(char **args,const char *input) {
     char *output=NULL; copy(status,"Working...",sizeof status);
@@ -136,7 +109,7 @@ static void select_nav(int index) {
     selected=offset=0;
 }
 static int refresh(void) {
-    char *args[]={bridge,"snapshot",backend,NULL},*output=NULL;
+    char *args[]={"tasks","snapshot",backend,NULL},*output=NULL;
     copy(status,"Loading tasks...",sizeof status);line(rows-1,1,status,cols,RAISED);fflush(stdout);
     if(run(args,NULL,&output)) { copy(status,output?output:"Connection failed",sizeof status);free(output);
     return 1; }
@@ -291,7 +264,7 @@ static void edit(int existing) {
     while(form(existing?"Edit task":"New task",fields,labels,6,0)) {
         int priority=atoi(fields[4]),proj=atoi(fields[5]);
         if(!*fields[0] || priority<1 || priority>4 || proj<1 || proj>np) {copy(status,"Title, priority 1-4 and a valid project number are required",TEXT);continue;}
-        char *args[]={bridge,"save",backend,existing?t->id:"",fields[0],fields[1],projects[proj-1].id,fields[2],fields[3],fields[4],strcmp(old_due,fields[2])?"1":"0",NULL};
+        char *args[]={"tasks","save",backend,existing?t->id:"",fields[0],fields[1],projects[proj-1].id,fields[2],fields[3],fields[4],strcmp(old_due,fields[2])?"1":"0",NULL};
         if(!call(args,NULL))refresh();
         return;
     }
@@ -299,7 +272,7 @@ static void edit(int existing) {
 static int setup(void) {
     const char *override=getenv("TASKS_BACKEND");
     if(override && (!strcmp(override,"local") || !strcmp(override,"todoist"))) {copy(backend,override,sizeof backend);return 1;}
-    char *args[]={bridge,"preference",NULL},*out=NULL;
+    char *args[]={"tasks","preference",NULL},*out=NULL;
     run(args,NULL,&out);
     if(out){out[strcspn(out,"\r\n")]=0;copy(backend,out,sizeof backend);}free(out);
     return !strcmp(backend,"local") || !strcmp(backend,"todoist");
@@ -334,12 +307,12 @@ static void choose_backend(void) {
         const char *labels[]={"API token: paste to connect; leave empty to use the saved token"};
         if(!form("Connect Todoist — token saved privately on this computer",token,labels,1,1))return;
         if(*token[0]) {
-            char *args[]={bridge,"token",NULL};
+            char *args[]={"tasks","token",NULL};
             int failed=call(args,token[0]);memset(token,0,sizeof token);
             if(failed)return;
         }
     }
-    char *args[]={bridge,"configure",(char *)next,NULL};
+    char *args[]={"tasks","configure",(char *)next,NULL};
     if(call(args,NULL))return;
     copy(backend,next,sizeof backend);
     np=nt=nv=project=selected=offset=poffset=view=nav=0;
@@ -347,9 +320,18 @@ static void choose_backend(void) {
     refresh();
 }
 int main(int argc,char **argv) {
-    if(argc!=2 || !isatty(0) || !isatty(1)) {fprintf(stderr,"Tasks needs a terminal and backend bridge.\n");
-    return 1;}
-    copy(bridge,argv[1],sizeof bridge);
+    if(backend_init())return 1;
+    int first=1;
+    const char *mode=getenv("TASKS_BACKEND");
+    if(argc>1 && (!strcmp(argv[1],"--local") || !strcmp(argv[1],"--todoist"))) {
+        mode=argv[1]+2;setenv("TASKS_BACKEND",mode,1);first++;
+    }
+    if(argc>first && (!strcmp(argv[first],"--help") || !strcmp(argv[first],"-h"))) {
+        puts("Tasks [--local | --todoist] [list | projects | add JSON | edit ID JSON | complete ID | reopen ID | project-add NAME]\nLaunch without commands for the interface. Tab switches panes; b selects backend.");return 0;
+    }
+    if(mode && strcmp(mode,"local") && strcmp(mode,"todoist")){fprintf(stderr,"Invalid backend\n");return 1;}
+    if(argc>first)return backend_cli(mode?mode:"local",argc-first,argv+first);
+    if(!isatty(0) || !isatty(1)){fprintf(stderr,"Tasks needs an interactive terminal.\n");return 1;}
     if(tcgetattr(0,&original))return 1;
     struct termios raw=original;raw.c_lflag&=(tcflag_t)~(ICANON|ECHO|ISIG);raw.c_iflag&=(tcflag_t)~(IXON|ICRNL);raw.c_cc[VMIN]=0;raw.c_cc[VTIME]=0;
     if(tcsetattr(0,TCSAFLUSH,&raw))return 1;
@@ -358,7 +340,7 @@ int main(int argc,char **argv) {
     if(!setup())choose_backend();else refresh();
     if(!*backend) {
         copy(backend,"local",sizeof backend);
-        char *args[]={bridge,"configure",backend,NULL};call(args,NULL);refresh();
+        char *args[]={"tasks","configure",backend,NULL};call(args,NULL);refresh();
     }
     while(!stopped) {
         filter();draw();int k;
@@ -392,7 +374,7 @@ int main(int argc,char **argv) {
         }
         if(k=='a')edit(0);
         else if(k=='e' || k==ENTER)edit(1);
-        else if(k==' ' && nv) {Task *t=&tasks[visible[selected]];char *a[]={bridge,"complete",backend,t->id,t->done?"false":"true",NULL};
+        else if(k==' ' && nv) {Task *t=&tasks[visible[selected]];char *a[]={"tasks","complete",backend,t->id,t->done?"false":"true",NULL};
     if(!call(a,NULL))refresh();
     }
         else if(k=='v') {completed=!completed;copy(status,!strcmp(backend,"todoist")?"Todoist returns active tasks only":"Completed visibility changed",TEXT);}
@@ -405,14 +387,14 @@ int main(int argc,char **argv) {
             char f[1][TEXT]={{0}};
     if(k==F2)copy(f[0],projects[project-1].name,TEXT);
     const char *l[]={"Project name"};
-            if(form(k==F2?"Rename project":"New project",f,l,1,0) && *f[0]) {char *a[]={bridge,"project-save",backend,k==F2?projects[project-1].id:"",f[0],NULL};
+            if(form(k==F2?"Rename project":"New project",f,l,1,0) && *f[0]) {char *a[]={"tasks","project-save",backend,k==F2?projects[project-1].id:"",f[0],NULL};
     if(!call(a,NULL))refresh();
     }
         } else if(k=='d') {
             if(!focus && project && confirm(!strcmp(backend,"todoist")?"Delete project AND its tasks permanently?":"Delete project? Tasks will move to Inbox.")) {
-                char *a[]={bridge,"project-delete",backend,projects[project-1].id,NULL};
+                char *a[]={"tasks","project-delete",backend,projects[project-1].id,NULL};
     if(!call(a,NULL)){project=0;refresh();}
-            } else if(focus && nv && confirm("Delete selected task permanently?")) {char *a[]={bridge,"delete",backend,tasks[visible[selected]].id,NULL};
+            } else if(focus && nv && confirm("Delete selected task permanently?")) {char *a[]={"tasks","delete",backend,tasks[visible[selected]].id,NULL};
     if(!call(a,NULL))refresh();
     }
         }
