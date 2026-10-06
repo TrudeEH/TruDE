@@ -68,6 +68,21 @@ Settings' default workspace applies to new chats without changing existing chats
 Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
 
+## Chat scrolling and response statistics
+
+The chat follows incoming messages while its bottom is visible. Scrolling up pauses
+following; scrolling back to the bottom resumes it. Sending a prompt does not reset
+your scroll position. Mouse wheel, arrow keys with conversation focus, and PgUp/PgDn
+use the same behavior.
+
+Completed responses show elapsed seconds and TPS beneath the response. Elapsed time
+covers the whole agent run, including tools and approval waits. TPS is reported output
+tokens divided by time spent in model requests, including network and prompt-processing
+latency but excluding tools and approval waits. It is an average across tool rounds,
+not a pure model decoding speed. Streaming requests ask the provider to include usage;
+if any round omits output-token usage, the display says `TPS unavailable` rather than
+estimating tokens from text. Statistics persist with saved chats.
+
 ## Settings page
 
 F5 opens inline editors grouped into Connection, Agent, and Instructions. Click a

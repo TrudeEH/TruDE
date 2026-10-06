@@ -66,6 +66,7 @@ J *context(Agent *a) {
             if (images && images->len)
                 jset(msg, "content", image_content(gs(msg, "content"), images));
             jdel(msg, "images");
+            jdel(msg, "responseStats");
             jadd(messages, msg);
         }
     return messages;
@@ -141,8 +142,11 @@ int agent_compact(Agent *a, int force) {
                     "unused tools, or start a new chat.");
     }
     J *old = ja();
-    for (size_t i = compacted; i < boundary; i++)
-        jadd(old, jc(m->v[i]));
+    for (size_t i = compacted; i < boundary; i++) {
+        J *message = jc(m->v[i]);
+        jdel(message, "responseStats");
+        jadd(old, message);
+    }
     char *summary = strdup(gs(a->chat, "summary"));
     unlock(a);
     update(a, "status", "Compacting earlier context…");
@@ -222,7 +226,9 @@ int agent_run(Agent *a, const char *prompt, int resume) {
         free(lockname);
         return -1;
     }
-    int result = 0;
+    int result = 0, usage_complete = 1, requests = 0;
+    double started = mono(), provider_seconds = 0, output_tokens = 0;
+    size_t first_message = jg(a->chat, "messages")->len;
     lock(a);
     repair_chat(a->chat);
     unlock(a);
@@ -300,11 +306,20 @@ int agent_run(Agent *a, const char *prompt, int resume) {
         free(status);
         J *usage = NULL;
         char *finish = NULL;
+        double request_started = mono();
         J *message = completion(a->config, ctx, defs, 1, (int)gn(a->config, "maxTokens", 4096),
                                 delta, a, &usage, &finish);
+        provider_seconds += mono() - request_started;
+        requests++;
+        if (jg(usage, "completion_tokens"))
+            output_tokens += gn(usage, "completion_tokens", 0);
+        else
+            usage_complete = 0;
         jf(ctx);
         jf(defs);
         if (!message) {
+            jf(usage);
+            free(finish);
             result = -1;
             break;
         }
@@ -427,6 +442,20 @@ done:
         snprintf(err, sizeof err, "%s", saved);
     }
     lock(a);
+    J *messages = jg(a->chat, "messages");
+    for (size_t i = messages->len; i > first_message; i--) {
+        J *message = messages->v[i - 1];
+        if (strcmp(gs(message, "role"), "assistant"))
+            continue;
+        J *stats = jo();
+        jset(stats, "elapsedSeconds", jnum(mono() - started));
+        jset(stats, "providerSeconds", jnum(provider_seconds));
+        jset(stats, "status", js(result ? (cancelled ? "Stopped" : "Failed") : "Finished"));
+        if (usage_complete && requests && provider_seconds > 0)
+            jset(stats, "outputTokens", jnum(output_tokens));
+        jset(message, "responseStats", stats);
+        break;
+    }
     if (save_chat(a->chat))
         result = -1;
     unlock(a);

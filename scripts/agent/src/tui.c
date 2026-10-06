@@ -88,7 +88,7 @@ typedef struct {
     pthread_cond_t condition;
     pthread_t thread;
     int busy, job, result, tab, focus, history_sel, server_sel, task_sel, memory_sel, chat_scroll,
-        detail_scroll, following, quit, w, h, paste, memory_reload;
+        detail_scroll, following, chat_max_scroll, quit, w, h, paste, memory_reload;
     atomic_int finished, dirty, approval;
     char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
          *memory_target;
@@ -327,6 +327,17 @@ static void transcript(UI *u) {
                 text_lines(&u->transcript, trim, NORMAL, 1);
                 free(trim);
             }
+            J *stats = jg(v, "responseStats");
+            if (stats) {
+                char *label = jg(stats, "outputTokens")
+                    ? fmt("%s in %.2f s · %.1f TPS", gs(stats, "status"),
+                          gn(stats, "elapsedSeconds", 0),
+                          gn(stats, "outputTokens", 0) / gn(stats, "providerSeconds", 1))
+                    : fmt("%s in %.2f s · TPS unavailable", gs(stats, "status"),
+                          gn(stats, "elapsedSeconds", 0));
+                line(&u->transcript, label, MUTED, 0, NULL);
+                free(label);
+            }
             if (*content || (calls && calls->len))
                 speaker = 2;
             for (size_t k = 0; calls && k < calls->len; k++) {
@@ -540,7 +551,7 @@ static Lines wrap(Lines *source, int width) {
     }
     return out;
 }
-static void view_lines(UI *u, Lines *l, int x, int y, int width, int height, int *scroll,
+static int view_lines(UI *u, Lines *l, int x, int y, int width, int height, int *scroll,
                        int follow, int tools) {
     Lines w = wrap(l, width - 1);
     int max = w.len - height;
@@ -569,6 +580,7 @@ static void view_lines(UI *u, Lines *l, int x, int y, int width, int height, int
             cell(u, x + width - 1, y + r, r == marker ? L'█' : L'│', MUTED, 0);
     }
     lines_free(&w);
+    return max;
 }
 static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, int focused) {
     Lines l = {0};
@@ -1102,7 +1114,6 @@ static void start_job(UI *u, int job, const char *text) {
     if (job == 1 || job == 2) {
         free(u->notice);
         u->notice = strdup("");
-        u->following = 1;
     }
     u->dirty = 1;
     int r = pthread_create(&u->thread, NULL, worker, u);
@@ -2212,8 +2223,9 @@ static void draw_chat(UI *u) {
     box(u, x, 3, width, logheight, gs(u->chat, "title"), u->focus == 108);
     transcript(u);
     hit(u, x + 1, 4, width - 2, logheight - 2, 108, 0);
-    view_lines(u, &u->transcript, x + 2, 5, width - 4, logheight - 4, &u->chat_scroll, u->following,
-               1);
+    u->chat_max_scroll = view_lines(u, &u->transcript, x + 2, 5, width - 4,
+                                    logheight - 4, &u->chat_scroll, u->following, 1);
+    u->following = u->chat_scroll == u->chat_max_scroll;
     int cy = 3 + logheight;
     box(u, x, cy, width, 6, "Message", u->focus == 100);
     editor_draw(u, &u->composer, x + 2, cy + 1, width - 4, 4, u->focus == 100);
@@ -2407,7 +2419,6 @@ static void draw_settings(UI *u) {
         if (height < 3 || row + height > bottom)
             break;
         box(u, 2, row, u->w - 4, height, f->label, u->focus == 520 + i);
-        fill(u, 3, row + 1, u->w - 6, height - 2, SURFACE);
         if (f->kind == 4 || f->kind == 5)
             draw_text(u, 3, row + 1, u->w - 6,
                       f->kind == 4 ? (!strcmp(f->e.s, "true") ? "[x] On" : "[ ] Off") : f->e.s,
@@ -2553,6 +2564,14 @@ static void checkbox(Modal *m, int index) {
     if (!found)
         jadd(m->value, js(name));
 }
+static void scroll_chat(UI *u, int change) {
+    u->chat_scroll += change;
+    if (u->chat_scroll < 0)
+        u->chat_scroll = 0;
+    if (u->chat_scroll > u->chat_max_scroll)
+        u->chat_scroll = u->chat_max_scroll;
+    u->following = u->chat_scroll == u->chat_max_scroll;
+}
 static void mouse(UI *u, int buttoncode, int x, int y, int release) {
     if (release)
         return;
@@ -2570,8 +2589,7 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
             if (i >= u->settings->count) i = u->settings->count - 1;
             u->focus = 520 + i;
         } else if (u->tab == 0) {
-            u->following = 0;
-            u->chat_scroll += down ? 3 : -3;
+            scroll_chat(u, down ? 3 : -3);
         } else
             u->detail_scroll += down ? 3 : -3;
         u->dirty = 1;
@@ -2797,8 +2815,7 @@ static void key(UI *u, int code, const char *text) {
     }
     if (code == 1012 || code == 1013) {
         if (u->tab == 0) {
-            u->following = 0;
-            u->chat_scroll += code == 1012 ? -10 : 10;
+            scroll_chat(u, code == 1012 ? -10 : 10);
         } else
             u->detail_scroll += code == 1012 ? -10 : 10;
         return;
@@ -2840,8 +2857,7 @@ static void key(UI *u, int code, const char *text) {
                 u->detail_scroll = 0;
             }
         } else if (u->tab == 0) {
-            u->following = 0;
-            u->chat_scroll += change;
+            scroll_chat(u, change);
         } else
             u->detail_scroll += change;
     }

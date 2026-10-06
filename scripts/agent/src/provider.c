@@ -183,6 +183,11 @@ J *completion(J *config, J *messages, J *tools, int stream, int max, Chunk delta
     jset(body, "model", js(gs(profile(config), "model")));
     jset(body, "messages", jc(messages));
     jset(body, "stream", jb(stream));
+    if (stream) {
+        J *options = jo();
+        jset(options, "include_usage", jb(1));
+        jset(body, "stream_options", options);
+    }
     jset(body, "max_tokens", jnum(max));
     if (tools && tools->len) {
         jset(body, "tools", jc(tools));

@@ -689,6 +689,58 @@ class NativeTests(unittest.TestCase):
             self.assertEqual(user,"first\nsecond\nthird\nfourth")
         finally:
             s.close()
+    def test_tui_scroll_follows_bottom_and_response_stats(self):
+        counter=[0]
+        def answer(body):
+            counter[0]+=1
+            prefix=f"reply{counter[0]}"
+            return [
+                {"choices":[{"delta":{"content":"\n".join(f"{prefix} line {i:02d}" for i in range(60))},"finish_reason":None}]},
+                {"choices":[],"usage":{"completion_tokens":120,"total_tokens":200}},
+            ]
+        self.mock.model_hook=answer
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("first\r")
+            s.wait("Finished in")
+            s.wait("TPS")
+            self.assertIn("reply1 line 59",s.screen.text)
+            stats=self.chat()["messages"][-1]["responseStats"]
+            self.assertEqual(stats["outputTokens"],120)
+            self.assertGreater(stats["elapsedSeconds"],0)
+            self.assertGreater(stats["providerSeconds"],0)
+            self.assertTrue(self.mock.requests[-1][1]["stream_options"]["include_usage"])
+            s.send("\x1b[5~")
+            self.assertNotIn("reply1 line 59",s.screen.text)
+            s.send("second\r")
+            s.read(.4)
+            self.assertNotIn("reply2 line 59",s.screen.text)
+            s.send("\x1b[6~"*20)
+            s.wait("reply2 line 59")
+            s.send("third\r")
+            s.wait("reply3 line 59")
+            for path,body,_ in self.mock.requests:
+                if path=="/v1/chat/completions":
+                    self.assertFalse(any("responseStats" in m for m in body["messages"]))
+        finally:
+            s.close()
+
+    def test_tui_stats_without_provider_usage_and_uniform_field_background(self):
+        self.mock.model_hook=lambda body:{"role":"assistant","content":"No token usage."}
+        s=Session(self.env)
+        try:
+            s.wait("MCP tools connected")
+            s.send("hello\r")
+            s.wait("TPS unavailable")
+            self.assertNotIn("outputTokens",self.chat()["messages"][-1]["responseStats"])
+            s.send("\x1b[15~")
+            s.wait("Model ID")
+            x,y=s.screen.find("test-model")
+            self.assertEqual(s.screen.grid[y][x+len("test-model")+2][2],"#222226")
+        finally:
+            s.close()
+
     def test_tui_auto_setting_is_saved(self):
         s=Session(self.env)
         try:
