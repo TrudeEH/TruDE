@@ -46,8 +46,8 @@ Headless runs use the same settings and saved chats.
 - Ask, read-only, and automatic tool permission modes. Ask is the default. External
   tools require approval even when a server claims they are read-only. File edit
   approval shows current/proposed text. Changing to automatic mode requires confirmation;
-  the choice is saved across chats and restarts until changed in Settings. The picker
-  highlights the current mode when reopened.
+  the choice is saved across chats and restarts until changed in Settings. The inline permission control
+  shows the current mode; click it or use Space to cycle modes.
 - Atomic private storage, per-chat/process locks, and interrupted tool-call recovery.
 
 Enter sends a message; Shift+Enter adds a line; Ctrl+S also sends. Multiline paste
@@ -67,6 +67,19 @@ the same dialog. The workspace is saved with the chat and restored when reopened
 Settings' default workspace applies to new chats without changing existing chats.
 Retry and branch preserve previous transcripts;
 retry does not undo any prior tool side effects.
+
+## Settings page
+
+F5 opens inline editors grouped into Connection, Agent, and Instructions. Click a
+field to edit it directly. The instructions editor fills the available page height.
+Tab and Shift+Tab move between fields; the mouse wheel or PgUp/PgDn reveals fields
+on shorter terminals. Settings supports terminals down to 80 columns × 20 rows.
+
+Save or Ctrl+S saves the current section. Discard or Escape reloads its saved
+values. Unsaved drafts survive switching sections and views. Validation errors
+keep the draft intact. Enabling Auto still requires confirmation. API keys remain
+masked, including while typing or pasting replacements. Profile selection and
+model discovery remain separate workflows; save connection edits before using them.
 
 ## Provider settings
 

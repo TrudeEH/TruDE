@@ -71,7 +71,8 @@ enum {
     A_PERMISSION,
     A_TIMER,
     A_APPROVE,
-    A_ELICIT
+    A_ELICIT,
+    A_SETTINGS_AUTO
 };
 typedef struct Modal {
     int kind, action, selected, scroll, count, focus;
@@ -96,7 +97,8 @@ typedef struct {
     int request_kind;
     Buf partial, input, pasted;
     Editor composer;
-    Modal *modal;
+    Modal *modal, *settings, *settings_drafts[3];
+    int settings_section;
     Cell *cells, *old;
     Hit hits[256];
     int hitcount;
@@ -686,6 +688,51 @@ static void field_add(Modal *m, const char *key, const char *label, const char *
     f->e.multiline = multiline;
     es(&f->e, value);
     f->kind = kind;
+}
+/* Settings use the same field/editor model as forms, without a modal overlay. */
+static void settings_load(UI *u, int section) {
+    modal_free(u->settings_drafts[section]);
+    Modal *m = calloc(1, sizeof *m);
+    u->settings = u->settings_drafts[section] = m;
+    u->settings_section = section;
+    m->kind = FORM;
+    if (section == 0) {
+        J *p = profile(u->config);
+        field_add(m, "endpoint", "OpenAI-compatible endpoint", gs(p, "endpoint"), 0, 0);
+        field_add(m, "model", "Model ID", gs(p, "model"), 0, 0);
+        field_add(m, "apiKey", "API key", gs(p, "apiKey"), 0, 0);
+        m->fields[2].e.secret = 1;
+        field_add(m, "apiKeyEnv", "API key environment variable", gs(p, "apiKeyEnv"), 0, 0);
+        field_add(m, "vision", "Vision for this model", model_vision(u->config) ? "true" : "false", 0, 4);
+    } else if (section == 1) {
+        field_add(m, "workspace", "Default workspace (new chats only)", gs(u->config, "workspace"), 0, 0);
+        field_add(m, "permissions", "Tool permissions: ask / read-only / auto", gs(u->config, "permissions"), 0, 5);
+        const char *keys[] = {"contextWindow", "maxTokens", "maxSteps", "timeout"};
+        const char *labels[] = {"Context window (tokens)", "Maximum output tokens", "Maximum tool rounds", "Request timeout (seconds)"};
+        for (int i = 0; i < 4; i++) {
+            char *v = fmt("%.0f", gn(u->config, keys[i], 0));
+            field_add(m, keys[i], labels[i], v, 0, 1);
+            free(v);
+        }
+    } else
+        field_add(m, "systemPrompt", "System instructions", gs(u->config, "systemPrompt"), 1, 0);
+    u->focus = 520;
+    u->dirty = 1;
+}
+static Editor *settings_editor(UI *u) {
+    int i = u->focus - 520;
+    return !u->modal && u->tab == 4 && u->settings && i >= 0 && i < u->settings->count &&
+                   u->settings->fields[i].kind != 4 && u->settings->fields[i].kind != 5
+               ? &u->settings->fields[i].e : NULL;
+}
+static void settings_toggle(Field *f, int backwards) {
+    if (f->kind == 4)
+        es(&f->e, !strcmp(f->e.s, "true") ? "false" : "true");
+    else {
+        const char *modes[] = {"ask", "read-only", "auto"};
+        int i = !strcmp(f->e.s, "read-only") ? 1 : !strcmp(f->e.s, "auto") ? 2 : 0;
+        es(&f->e, modes[(i + (backwards ? 2 : 1)) % 3]);
+    }
 }
 static void message(UI *u, const char *title, const char *text) {
     modal(u, MESSAGE, A_NONE, title, text);
@@ -1315,6 +1362,44 @@ static J *form_value(Modal *m) {
     }
     return v;
 }
+static void settings_save(UI *u, int confirmed) {
+    if (!u->settings || u->busy) {
+        notice_ui(u, "Wait for the active operation before saving settings.");
+        return;
+    }
+    J *v = form_value(u->settings);
+    if (!v) {
+        error_ui(u);
+        return;
+    }
+    if (u->settings_section == 1 && !strcmp(gs(v, "permissions"), "auto") &&
+        strcmp(gs(u->config, "permissions"), "auto") && !confirmed) {
+        jf(v);
+        modal(u, CONFIRM, A_SETTINGS_AUTO, "Enable Auto",
+              "Allow tools to act without asking, including shell commands and external MCP tools? "
+              "This mode is saved until changed in Settings.");
+        return;
+    }
+    J *copy = jc(u->config), *target = u->settings_section == 0 ? profile(copy) : copy;
+    for (size_t i = 0; i < v->len; i++)
+        if (strcmp(v->v[i]->key, "vision"))
+            jset(target, v->v[i]->key, jc(v->v[i]));
+    if (u->settings_section == 0) {
+        if (!jg(target, "visionModels"))
+            jset(target, "visionModels", jo());
+        jset(jg(target, "visionModels"), gs(target, "model"), jc(jg(v, "vision")));
+    }
+    jf(v);
+    if (save_config(copy)) {
+        jf(copy);
+        error_ui(u);
+        return;
+    }
+    jf(u->config);
+    u->config = copy;
+    settings_load(u, u->settings_section);
+    notice_ui(u, "Settings saved.");
+}
 static void save_modal(UI *u, int yes) {
     Modal *m = u->modal;
     if (!m)
@@ -1356,6 +1441,11 @@ static void save_modal(UI *u, int yes) {
     }
     if ((m->action == A_MEMORY_EDIT || m->action == A_MEMORY_DELETE) && u->busy)
         return;
+    if (m->action == A_SETTINGS_AUTO) {
+        close_modal(u);
+        settings_save(u, 1);
+        return;
+    }
     int action = m->action;
     J *v = m->kind == FORM ? form_value(m) : NULL;
     if (m->kind == FORM && !v) {
@@ -1587,6 +1677,8 @@ static void save_modal(UI *u, int yes) {
     }
     if (u->modal == m)
         close_modal(u);
+    if (action == A_PROFILE || action == A_MODEL || action == A_PROVIDER)
+        settings_load(u, 0);
     refresh_history(u);
     jf(u->tasklist);
     u->tasklist = tasks();
@@ -1612,6 +1704,32 @@ static void dispatch(UI *u, int id, int index) {
                     start_job(u, 10, "");
             }
         }
+        return;
+    }
+    if (id >= 510 && id <= 512) {
+        int section = id - 510;
+        if (!u->settings_drafts[section])
+            settings_load(u, section);
+        else {
+            u->settings = u->settings_drafts[section];
+            u->settings_section = section;
+            u->focus = 520 + u->settings->focus;
+        }
+        return;
+    }
+    if (id == 530) {
+        settings_save(u, 0);
+        return;
+    }
+    if (id == 531) {
+        settings_load(u, u->settings_section);
+        notice_ui(u, "Unsaved edits discarded.");
+        return;
+    }
+    if (id >= 520 && id < 526 && u->settings) {
+        Field *f = &u->settings->fields[id - 520];
+        if (id - 520 < u->settings->count && (f->kind == 4 || f->kind == 5))
+            settings_toggle(f, 0);
         return;
     }
     if (id == 3000) {
@@ -2053,7 +2171,7 @@ static void modal_draw(UI *u) {
         lines_free(&l);
         if (m->kind == CONFIRM) {
             const char *yes = m->action == A_APPROVE      ? "Allow once"
-                              : m->action == A_PERMISSION ? "Enable Auto"
+                              : (m->action == A_PERMISSION || m->action == A_SETTINGS_AUTO) ? "Enable Auto"
                                                           : "Confirm";
             int a = x + 3, b = x + 22;
             fill(u, a, bottom + 1, 15, 1, m->selected == 1 ? SELECTED : SURFACE);
@@ -2266,37 +2384,47 @@ static void draw_memories(UI *u) {
     actions(u, 0, u->h - 4, u->w, labels, ids, 5, 2);
 }
 static void draw_settings(UI *u) {
-    int width = u->w / 2;
-    box(u, 0, 3, width, u->h - 4, "Connection", u->focus >= 501 && u->focus <= 504);
-    box(u, width, 3, u->w - width, u->h - 4, "Agent", u->focus >= 505 && u->focus <= 508);
-    J *p = profile(u->config);
-    char *text = fmt("%s\n\nEndpoint: %s\nModel: %s\nAPI key: %s\nKey variable: %s", gs(p, "label"),
-                     gs(p, "endpoint"), *gs(p, "model") ? gs(p, "model") : "choose a model",
-                     *gs(p, "apiKey") ? "configured" : "none",
-                     *gs(p, "apiKeyEnv") ? gs(p, "apiKeyEnv") : "none");
-    Lines l = {0};
-    text_lines(&l, text, NORMAL, 0);
-    free(text);
-    int scroll = 0;
-    view_lines(u, &l, 3, 5, width - 6, 10, &scroll, 0, 0);
-    lines_free(&l);
-    button(u, 3, 17, "Profile", 501);
-    button(u, 3, 20, "Edit connection", 502);
-    button(u, 3, 23, "Discover / Test", 503);
-    button(u, 3, 26, "Manual model", 504);
-    text = fmt("Seth\n\nDefault workspace: %s\nPermissions: %s\nContext window: %.0f\nOutput tokens: "
-               "%.0f\nTool rounds: %.0f\nTimeout: %.0f seconds",
-               gs(u->config, "workspace"), gs(u->config, "permissions"),
-               gn(u->config, "contextWindow", 0), gn(u->config, "maxTokens", 0),
-               gn(u->config, "maxSteps", 0), gn(u->config, "timeout", 0));
-    text_lines(&l, text, NORMAL, 0);
-    free(text);
-    view_lines(u, &l, width + 3, 5, width - 6, 10, &scroll, 0, 0);
-    lines_free(&l);
-    button(u, width + 3, 17, "Default workspace", 505);
-    button(u, width + 3, 20, "Tool permissions", 506);
-    button(u, width + 3, 23, "Context and limits", 507);
-    button(u, width + 3, 26, "System instructions", 508);
+    if (!u->settings)
+        settings_load(u, 0);
+    Modal *m = u->settings;
+    button(u, 2, 3, "Connection", 510);
+    button(u, 18, 3, "Agent", 511);
+    button(u, 29, 3, "Instructions", 512);
+    const char *titles[] = {"Connection", "Agent", "Instructions"};
+    box(u, 0, 5, u->w, u->h - 7, titles[u->settings_section], 0);
+    draw_text(u, 3, 6, u->w - 6, "Edit inline · Tab moves focus · Ctrl+S saves · Escape discards", MUTED, 0, 0);
+    int bottom = u->h - 5, row = 8, start = 0;
+    int focused = u->focus >= 520 && u->focus < 520 + m->count ? u->focus - 520 : m->focus;
+    m->focus = focused;
+    int visible = (bottom - row) / 4;
+    if (visible < 1)
+        visible = 1;
+    if (focused >= visible)
+        start = focused - visible + 1;
+    for (int i = start; i < m->count; i++) {
+        Field *f = &m->fields[i];
+        int height = f->e.multiline ? bottom - row : 3;
+        if (height < 3 || row + height > bottom)
+            break;
+        box(u, 2, row, u->w - 4, height, f->label, u->focus == 520 + i);
+        fill(u, 3, row + 1, u->w - 6, height - 2, SURFACE);
+        if (f->kind == 4 || f->kind == 5)
+            draw_text(u, 3, row + 1, u->w - 6,
+                      f->kind == 4 ? (!strcmp(f->e.s, "true") ? "[x] On" : "[ ] Off") : f->e.s,
+                      ACCENT, 0, 0);
+        else
+            editor_draw(u, &f->e, 3, row + 1, u->w - 6, height - 2, u->focus == 520 + i);
+        hit(u, 2, row, u->w - 4, height, 520 + i, i);
+        row += height + 1;
+    }
+    button(u, 3, u->h - 4, "Save", 530);
+    button(u, 15, u->h - 4, "Discard", 531);
+    if (u->settings_section == 0) {
+        button(u, 32, u->h - 4, "Profile", 501);
+        button(u, 47, u->h - 4, "Discover / Test", 503);
+    }
+    draw_text(u, 3, u->h - 3, u->w - 6,
+              "Save applies this section. Switching sections or views keeps edits until discarded.", MUTED, 0, 0);
 }
 static const char *styles[] = {
     "\033[38;2;255;255;255m\033[48;2;34;34;38m", "\033[38;2;170;170;170m\033[48;2;34;34;38m",
@@ -2335,7 +2463,7 @@ static void render(UI *u) {
         hit(u, x, 1, w, 1, 10 + i, 0);
         x += w + padding;
     }
-    if (u->w < 80 || u->h < 30)
+    if (u->w < 80 || u->h < (u->tab == 4 ? 20 : 30))
         draw_text(u, 2, 5, u->w - 4, "Resize the terminal to at least 80 columns × 30 rows.",
                   ACCENT, 0, 0);
     else if (u->tab == 0)
@@ -2436,6 +2564,11 @@ static void mouse(UI *u, int buttoncode, int x, int y, int release) {
                 m->selected += down ? 1 : -1;
             else
                 m->scroll += down ? 3 : -3;
+        } else if (u->tab == 4 && u->settings) {
+            int i = u->settings->focus + (down ? 1 : -1);
+            if (i < 0) i = 0;
+            if (i >= u->settings->count) i = u->settings->count - 1;
+            u->focus = 520 + i;
         } else if (u->tab == 0) {
             u->following = 0;
             u->chat_scroll += down ? 3 : -3;
@@ -2599,6 +2732,43 @@ static void key(UI *u, int code, const char *text) {
         dispatch(u, 10 + code - 1016, 0);
         return;
     }
+    if (u->tab == 4 && u->settings) {
+        if (code == 1012 || code == 1013) {
+            int i = u->settings->focus + (code == 1012 ? -1 : 1);
+            if (i < 0) i = 0;
+            if (i >= u->settings->count) i = u->settings->count - 1;
+            u->focus = 520 + i;
+            return;
+        }
+        if (code == 19) {
+            settings_save(u, 0);
+            return;
+        }
+        if (code == 27) {
+            settings_load(u, u->settings_section);
+            notice_ui(u, "Unsaved edits discarded.");
+            return;
+        }
+        int i = u->focus - 520;
+        if (i >= 0 && i < u->settings->count) {
+            Field *f = &u->settings->fields[i];
+            if (code == 9 || code == 1011) {
+                u->focus = code == 1011 ? (i ? 520 + i - 1 : 510) :
+                           i + 1 < u->settings->count ? 520 + i + 1 : 530;
+            } else if (f->kind == 4 || f->kind == 5) {
+                if (code == 13 || code == 32 || code == 1004 || code == 1005)
+                    settings_toggle(f, code == 1004);
+            } else {
+                if (f->e.secret == 1 && text && *text) {
+                    es(&f->e, "");
+                    /* Keep replacement keys masked too. */
+                    f->e.secret = 2;
+                }
+                editor_key(&f->e, code == 13 ? 10 : code, text);
+            }
+            return;
+        }
+    }
     if (text && !strcmp(text, "?") && (u->focus != 100 || !*u->composer.s)) {
         help(u);
         return;
@@ -2721,7 +2891,7 @@ static void consume_input(UI *u, int flush) {
                 Editor *e = u->modal && u->modal->kind == FORM && u->modal->focus < u->modal->count
                                 ? &u->modal->fields[u->modal->focus].e
                             : u->tab == 0 && u->focus == 100 ? &u->composer
-                                                             : NULL;
+                                                             : settings_editor(u);
                 if (u->modal && u->modal->kind == FORM && u->modal->focus < u->modal->count &&
                     u->modal->fields[u->modal->focus].kind == 4)
                     e = NULL;
@@ -2738,6 +2908,10 @@ static void consume_input(UI *u, int flush) {
                             c = ' ';
                         if (c >= 32 || c == '\n' || c == '\t')
                             bput(&clean, (char *)&c, 1);
+                    }
+                    if (e->secret == 1 && clean.n) {
+                        es(e, "");
+                        e->secret = 2;
                     }
                     insert(e, clean.s ? clean.s : "", clean.n);
                     bfree(&clean);
@@ -2997,7 +3171,7 @@ int tui(J *config) {
             "Seth needs an interactive terminal (use --check or --run-due for headless runs)");
     UI u = {0};
     u.steering = ja();
-    u.config = config;
+    u.config = jc(config);
     u.chat = new_chat(config);
     u.expanded = jo();
     u.memories = ja();
@@ -3122,8 +3296,11 @@ int tui(J *config) {
     cleanup_terminal();
     while (u.modal)
         close_modal(&u);
+    for (int i = 0; i < 3; i++)
+        modal_free(u.settings_drafts[i]);
     mcp_close(&u.mcp);
     jf(u.mcp_config);
+    jf(u.config);
     jf(u.chat);
     jf(u.history);
     jf(u.tasklist);
