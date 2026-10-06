@@ -141,10 +141,11 @@ static int refresh(void) {
     return 0;
 }
 static void size(void) { struct winsize ws; if(!ioctl(0,TIOCGWINSZ,&ws) && ws.ws_row && ws.ws_col) {rows=ws.ws_row;cols=ws.ws_col;} }
+static int list_height(void) { return rows-11-(*status?1:0); }
 static void draw(void) {
     size();printf(BG "\033[2J");
     if(cols<70 || rows<22) {line(1,1,"Tasks needs a window at least 70 columns by 22 rows.",cols,BG);fflush(stdout);return;}
-    int sidebar=24,h=rows-14;
+    int sidebar=24,h=list_height();
     char heading[TEXT];header(0);
     frame(3,1,24,6,"Tasks",focus==0 && nav<4,0);
     for(int i=0;i<4;i++)line(4+i,2,views[i],22,nav==i?ACCENT:BG);
@@ -166,18 +167,21 @@ static void draw(void) {
     }
     if(!nv)line(5,sidebar+3,!project && view==3 && !strcmp(backend,"todoist")?
         "Todoist completed history is not loaded.":"No tasks here. Press a to add a task.",cols-sidebar-4,MUTED);
-    frame(rows-9,1,cols-1,5,"Details",0,0);
+    int details=rows-6-(*status?1:0);
+    frame(details,1,cols-1,5,"Details",0,0);
     if(nv) {
-        Task *t=&tasks[visible[selected]];line(rows-8,2,t->title,cols-3,BG);
+        Task *t=&tasks[visible[selected]];line(details+1,2,t->title,cols-3,BG);
         if(*t->labels)snprintf(heading,sizeof heading,"Due: %.1000s   Labels: %.1000s",*t->due?t->due:"None",t->labels);
         else snprintf(heading,sizeof heading,"Due: %.1000s",*t->due?t->due:"None");
-        line(rows-7,2,heading,cols-3,MUTED);
-        line(rows-6,2,t->description,cols-3,BG);
+        line(details+2,2,heading,cols-3,MUTED);
+        line(details+3,2,t->description,cols-3,BG);
     }
 
-    line(rows-3,1," Tab pane | arrows navigate | a add | e edit | Space complete | / search",cols,RAISED);
-    line(rows-2,1," n project | F2 rename | d delete | v completed | b backend | r refresh | q quit",cols,RAISED);
-    line(rows-1,1,status,cols,MUTED);fflush(stdout);
+    int footer=rows-1-(*status?1:0);
+    line(footer,1," Tab pane | arrows navigate | a add | e edit | Space complete | / search",cols,RAISED);
+    line(footer+1,1," n project | F2 rename | d delete | v completed | b backend | r refresh | q quit",cols-1,RAISED);
+    if(*status)line(rows,1,status,cols-1,MUTED);
+    fflush(stdout);
 }
 enum { UP=1000,DOWN,LEFT,RIGHT,ESC,TAB,ENTER,BACK,CLICK,WHEELUP,WHEELDOWN,F2 };
 static int mx,my;
@@ -367,10 +371,10 @@ int main(int argc,char **argv) {
                 select_nav(next);
             }
         } else if(k==CLICK) {
-            int h=rows-14;
+            int h=list_height();
             if(mx<=24) {
                 if(my>=4 && my<=7) {select_nav(my-4);focus=0;}
-                else if(my>=10 && my<rows-10) {
+                else if(my>=10 && my<4+h) {
                     int p=my-10+poffset;
                     if(p<np) {select_nav(p+4);focus=0;}
                 }

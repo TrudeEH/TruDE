@@ -78,6 +78,9 @@ with tempfile.TemporaryDirectory() as home:
         # The completed redraw clears the loading indicator from the header.
         final_header=output.rsplit(b'\x1b[1;1H',1)[-1].split(b'\x1b[3;1H',1)[0]
         assert b'Loading...' not in final_header
+        assert b'\x1b[28;1H' in output  # Details uses reclaimed rows.
+        assert b'\x1b[33;1H' in output and b'\x1b[34;1H' in output
+        assert b'\x1b[34;1H' in output.split(b' n project')[0]
         output.clear()
         send(b' ')
         wait_for(b'No tasks here')
