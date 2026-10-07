@@ -47,9 +47,9 @@ printf '%s\n' 'PASS: local CRUD, projects, completion, validation, concurrency, 
 
 ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -Werror \
     ${TASKS_CFLAGS:-} "$base/tasks/filter-test.c" "$base/tasks/backend.c" "$base/tasks/json.c" \
-    ${TASKS_LIBS:--lcurl} -lm -o "$temporary/filter-test"
+    ${TASKS_LIBS:--lcurl} -lm -lcrypto -pthread -o "$temporary/filter-test"
 "$temporary/filter-test"
 ${CC:-cc} -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -Werror \
     ${TASKS_CFLAGS:-} "$base/tasks/backend-test.c" "$base/tasks/backend.c" "$base/tasks/json.c" \
-    ${TASKS_LIBS:--lcurl} -lm -o "$temporary/backend-test"
+    ${TASKS_LIBS:--lcurl} -lm -lcrypto -pthread -o "$temporary/backend-test"
 "$temporary/backend-test"

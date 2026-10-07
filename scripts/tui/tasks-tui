@@ -4,6 +4,7 @@ set -eu
 base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/../tasks" && pwd)
 if [ ! -x "$base/bin/tasks" ] || [ "$base/tasks.c" -nt "$base/bin/tasks" ] \
     || [ "$base/backend.c" -nt "$base/bin/tasks" ] || [ "$base/json.c" -nt "$base/bin/tasks" ] \
+    || [ "$base/offline.inc" -nt "$base/bin/tasks" ] \
     || [ "$base/backend.h" -nt "$base/bin/tasks" ] || [ "$base/json.h" -nt "$base/bin/tasks" ]; then
     "$base/build.sh"
 fi

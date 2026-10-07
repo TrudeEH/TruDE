@@ -22,6 +22,8 @@ typedef struct { char id[128],project[128],title[TEXT],description[TEXT],due[TEX
 static Project projects[MAX]; static Task tasks[MAX];
 static int np,nt,visible[MAX],nv,project,selected,focus=1,completed,offset,poffset,view,nav;
 static const char *views[]={"All Tasks","Today","Upcoming","Completed"};
+static int sync_busy,sync_redraw;
+static time_t next_sync;
 static int rows=34,cols=110; static char backend[16],status[TEXT]="",search[TEXT];
 static struct termios original; static volatile sig_atomic_t stopped;
 static void copy(char *to,const char *from,size_t n) { size_t length=strnlen(from,n-1);memcpy(to,from,length);to[length]=0; }
@@ -138,6 +140,7 @@ static int refresh(void) {
     nav=project?project+3:view;
     filter();for(int i=0;i<nv;i++)if(!strcmp(taskid,tasks[visible[i]].id))selected=i;
     status[0]=0;
+    if(!strcmp(backend,"todoist") && !sync_redraw){backend_sync_start();sync_busy=1;next_sync=time(NULL)+30;}
     return 0;
 }
 static void size(void) { struct winsize ws; if(!ioctl(0,TIOCGWINSZ,&ws) && ws.ws_row && ws.ws_col) {rows=ws.ws_row;cols=ws.ws_col;} }
@@ -146,7 +149,7 @@ static void draw(void) {
     size();printf(BG "\033[2J");
     if(cols<70 || rows<22) {line(1,1,"Tasks needs a window at least 70 columns by 22 rows.",cols,BG);fflush(stdout);return;}
     int sidebar=24,h=list_height();
-    char heading[TEXT];header(0);
+    char heading[TEXT];header(sync_busy && !strcmp(backend,"todoist"));
     frame(3,1,24,6,"Tasks",focus==0 && nav<4,0);
     for(int i=0;i<4;i++)line(4+i,2,views[i],22,nav==i?ACCENT:BG);
     int ph=h-6;
@@ -166,7 +169,7 @@ static void draw(void) {
         at(4+j,sidebar+2);fputs(j+offset==selected?RAISED:BG,stdout);text(prefix,9);text(t->title,cols-sidebar-12);fputs(BG,stdout);
     }
     if(!nv)line(5,sidebar+3,!project && view==3 && !strcmp(backend,"todoist")?
-        "Todoist completed history is not loaded.":"No tasks here. Press a to add a task.",cols-sidebar-4,MUTED);
+        "Todoist completed history is not loaded.":!np && !strcmp(backend,"todoist")?"No cached projects yet. Connect once to load Todoist.":"No tasks here. Press a to add a task.",cols-sidebar-4,MUTED);
     int details=rows-6-(*status?1:0);
     frame(details,1,cols-1,5,"Details",0,0);
     if(nv) {
@@ -337,7 +340,7 @@ int main(int argc,char **argv) {
         mode=argv[1]+2;setenv("TASKS_BACKEND",mode,1);first++;
     }
     if(argc>first && (!strcmp(argv[first],"--help") || !strcmp(argv[first],"-h"))) {
-        puts("Tasks [--local | --todoist] [list | projects | add JSON | edit ID JSON | complete ID | reopen ID | project-add NAME]\nLaunch without commands for the interface. Tab switches panes; b selects backend.");return 0;
+        puts("Tasks [--local | --todoist] [list | projects | add JSON | edit ID JSON | complete ID | reopen ID | project-add NAME | sync]\nLaunch without commands for the interface. Tab switches panes; b selects backend.");return 0;
     }
     if(mode && strcmp(mode,"local") && strcmp(mode,"todoist")){fprintf(stderr,"Invalid backend\n");return 1;}
     if(argc>first)return backend_cli(mode?mode:"local",argc-first,argv+first);
@@ -355,7 +358,14 @@ int main(int argc,char **argv) {
     while(!stopped) {
         filter();draw();int k;
         do {
-            k=key();int previous_rows=rows,previous_cols=cols;size();
+            k=key();
+            if(!strcmp(backend,"todoist")) {
+                char message[TEXT]="";int state=backend_sync_poll(message,sizeof message);
+                sync_busy=state==1;
+                if(state==2){sync_redraw=1;refresh();sync_redraw=0;copy(status,message,sizeof status);draw();}
+                if(!sync_busy && time(NULL)>=next_sync){backend_sync_start();sync_busy=1;next_sync=time(NULL)+30;draw();}
+            }
+            int previous_rows=rows,previous_cols=cols;size();
             if(rows!=previous_rows || cols!=previous_cols)draw();
         } while(k<0 && !stopped);
         if(k=='q' || k==3)break;

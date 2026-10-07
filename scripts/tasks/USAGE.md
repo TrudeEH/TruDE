@@ -14,8 +14,8 @@ bordered so underlying tasks cannot bleed into their fields.
 All application logic is C: UI, CLI, JSON, atomic storage, locking, settings, and
 Todoist HTTPS. The backend is called directly, without shell, jq, curl, or flock
 subprocesses. HTTPS uses libcurl with certificate verification enabled. Runtime
-requires libc and libcurl. Building requires `build-essential` and
-`libcurl4-openssl-dev` on Debian; the installer builds it, and the thin POSIX sh
+requires libc, libcurl, libcrypto, and POSIX threads. Building requires `build-essential` and
+`libcurl4-openssl-dev` and `libssl-dev` on Debian; the installer builds it, and the thin POSIX sh
 launcher rebuilds changed source. Build/launcher scripts are infrastructure,
 not the application backend. The JSON parser is reused from Seth's C source.
 Run `sh scripts/tasks/build.sh` to rebuild manually.
@@ -34,9 +34,52 @@ stored under `${XDG_CONFIG_HOME:-$HOME/.config}/tasks/`; the token file is mode
 Use `b`, select Todoist, and paste a new token to replace it. Failed connections
 show an error in the status bar; use `r` to retry or `b` to change backend. CLI users may still set `TODOIST_API_TOKEN`.
 Do not commit tokens. Requests use the HTTPS API v1. Tokens are loaded directly
-into memory and never passed through subprocess arguments or session files. Requests have a 30-second
-limit. Writes are not automatically retried: refresh after a timeout before
-retrying, because the server may already have accepted the write.
+into memory and never passed through subprocess arguments or session files. Requests have a 3-second connection timeout and a 30-second total limit.
+Todoist changes are saved to a private persistent queue before network access;
+retries reuse stable request IDs, including a separate ID for the move phase of
+a task edit. Do not submit an edit again because of a network timeout: it is
+already queued.
+
+## Todoist cache and offline sync
+
+Todoist opens immediately from the last cached snapshot. `Loading...` in the
+header indicates background sync; navigation and editing remain available.
+The app syncs on startup, after edits, on `r`, and every 30 seconds while open.
+When offline, cached tasks/projects remain usable and changes survive closing
+the app. On reconnect, the app uploads queued changes in order, then downloads
+the current project/task lists. A closed app does not sync; reopen it or run
+`tasks --todoist sync` to upload pending changes.
+
+Cache and queue are stored together atomically in mode-0600
+`${XDG_DATA_HOME:-$HOME/.local/share}/tasks/todoist-TOKEN_SHA256/cache.json`.
+The token fingerprint isolates credentials so a different token never uploads
+another token's pending changes. Changing a token creates a separate cache;
+changes queued under the old token remain there. Local mode stays separate.
+Back up the cache file to preserve unsynced work. Never delete it to retry sync.
+
+An initial online sync is required to obtain Todoist projects. Before that,
+there is no remote project list to use offline. CLI `list` and `projects` read
+cached data, and CLI mutations queue changes; use `tasks --todoist sync` to
+explicitly synchronize. The TUI performs that synchronization automatically.
+New tasks/projects have temporary IDs until upload; dependent queued changes
+are remapped to the server IDs. Project deletion still deletes its tasks.
+Completed tasks disappear after a successful download because the API lists
+active tasks only; completed history is not an offline archive.
+
+Pending local fields are sent before fetching fresh server data: they take
+precedence over edits to the same fields made elsewhere. Untouched fields are
+not deliberately changed. This is not a three-way merge. A rejected operation
+(e.g. expired credentials or an object deleted elsewhere) stays queued and
+shows an error; later operations wait behind it. There is no queue-resolution
+UI yet. Do not delete the cache or switch accounts as a substitute for resolving
+such an error. Request IDs reduce duplicate writes after ambiguous timeouts,
+but server deduplication is not a promise of indefinite exactly-once delivery.
+
+Run `python3 scripts/tasks/offline-test.py` for isolated local HTTP-server tests
+of cached reads, offline changes, retries, ID remapping, account isolation,
+corruption safety, and nonblocking cached UI startup. The HTTP endpoint override
+exists only in test builds; production remains HTTPS-only. No live Todoist
+account was used for these tests.
 
 ## Sidebar views
 
@@ -95,9 +138,9 @@ editable fields. JSON values are data, never shell commands.
 Scope: task CRUD, completion/reopening, projects, moving tasks, descriptions,
 priorities, dates/recurrence (Todoist), labels, and search. This is not a full
 Todoist client: sections, subtasks, comments, attachments, reminders, shared
-assignments, saved filters, completed history, and offline Todoist sync are not
-implemented. Remote calls are synchronous and bounded; local filtering and
-navigation run inside the native UI without subprocesses.
+assignments, saved filters, completed history, and conflict-resolution dialogs
+are not implemented. Remote calls run in a background C thread; local filtering
+and navigation run inside the native UI without subprocesses.
 
 API reference: https://developer.todoist.com/api/v1/
 Run `sh scripts/tasks/test.sh` for backend tests and
@@ -135,4 +178,5 @@ Measurements include the application process tree but not a terminal emulator.
 Raw results, p95 latency, and smaller datasets are in `benchmark-results.json`.
 These are local-mode results on this machine, not Todoist/network benchmarks or
 cold-start guarantees. Todoist integration has not been tested against a live
-account during this migration.
+account during this migration. The recorded benchmark predates the offline-cache/thread
+implementation and is historical, not a measurement of the current build.

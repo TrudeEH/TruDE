@@ -119,7 +119,7 @@ install_packages() {
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
         "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
-        build-essential libcurl4-openssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
+        build-essential libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \

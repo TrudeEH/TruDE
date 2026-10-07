@@ -13,8 +13,14 @@
 #include <time.h>
 #include <ctype.h>
 #include <math.h>
+#include <openssl/sha.h>
+#include <pthread.h>
 
-static char data[4096],config[4096],error[1024];
+static char data[4096],config[4096];
+static _Thread_local char error[1024];
+static _Thread_local const char *request_id;
+static _Thread_local long http_status;
+static _Thread_local char *sync_token;
 static int fail(const char *format,...) {va_list args;va_start(args,format);vsnprintf(error,sizeof error,format,args);va_end(args);return 1;}
 static char *path(const char *dir,const char *name) {size_t n=strlen(dir)+strlen(name)+2;char *p=malloc(n);if(!p)exit(1);snprintf(p,n,"%s/%s",dir,name);return p;}
 static int mkdirs(char *p) {
@@ -80,24 +86,38 @@ static size_t receive(char *ptr,size_t size,size_t count,void *user) {
     Buffer *b=user;size_t n=size*count;if(n>32*1024*1024-b->n)return 0;
     char *s=realloc(b->s,b->n+n+1);if(!s)return 0;b->s=s;memcpy(s+b->n,ptr,n);b->n+=n;s[b->n]=0;return n;
 }
-static J *api(const char *method,const char *endpoint,J *payload) {
+static char *get_token(void) {
+    if(sync_token)return strdup(sync_token);
     const char *env=getenv("TODOIST_API_TOKEN");char *token=NULL;
     if(env && *env)token=strdup(env);else {char *p=path(config,"token");token=read_file(p);free(p);if(token)token[strcspn(token,"\r\n")]=0;}
     if(!token || !*token || strchr(token,'\n') || strchr(token,'\r')){free(token);fail("Connect Todoist in backend settings");return NULL;}
+    return token;
+}
+static J *api(const char *method,const char *endpoint,J *payload) {
+    char *token=get_token();if(!token)return NULL;
     CURL *curl=curl_easy_init();if(!curl){free(token);fail("Cannot initialize HTTPS");return NULL;}
     char *auth=malloc(strlen(token)+24);if(!auth)exit(1);sprintf(auth,"Authorization: Bearer %s",token);free(token);
     struct curl_slist *headers=NULL;headers=curl_slist_append(headers,auth);free(auth);headers=curl_slist_append(headers,"Content-Type: application/json");
+    if(request_id){char header[128];snprintf(header,sizeof header,"X-Request-Id: %s",request_id);headers=curl_slist_append(headers,header);}
     char url[8192];snprintf(url,sizeof url,"https://api.todoist.com/api/v1/%s",endpoint);
+#ifdef TASKS_TEST_API
+    const char *test_url=getenv("TASKS_TEST_API_URL");
+    if(test_url)snprintf(url,sizeof url,"%s/%s",test_url,endpoint);
+#endif
     Buffer body={0};char *json=payload?jd(payload,0):NULL;char curl_error[CURL_ERROR_SIZE]={0};
     curl_easy_setopt(curl,CURLOPT_URL,url);curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,method);
-    curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,10L);curl_easy_setopt(curl,CURLOPT_TIMEOUT,30L);
+    curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,3L);curl_easy_setopt(curl,CURLOPT_TIMEOUT,30L);
     curl_easy_setopt(curl,CURLOPT_NOSIGNAL,1L);curl_easy_setopt(curl,CURLOPT_PROTOCOLS_STR,"https");
+#ifdef TASKS_TEST_API
+    if(test_url)curl_easy_setopt(curl,CURLOPT_PROTOCOLS_STR,"http,https");
+#endif
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,receive);curl_easy_setopt(curl,CURLOPT_WRITEDATA,&body);curl_easy_setopt(curl,CURLOPT_ERRORBUFFER,curl_error);
     if(json)curl_easy_setopt(curl,CURLOPT_POSTFIELDS,json);
     CURLcode code=curl_easy_perform(curl);long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
+    http_status=status;
     curl_easy_cleanup(curl);curl_slist_free_all(headers);free(json);
     J *result=NULL;
-    if(code!=CURLE_OK)fail("Todoist: %s. Refresh before retrying writes.",curl_error[0]?curl_error:curl_easy_strerror(code));
+    if(code!=CURLE_OK)fail("Todoist: %s. Changes remain queued.",curl_error[0]?curl_error:curl_easy_strerror(code));
     else if(status<200 || status>=300)fail("Todoist HTTP %ld: %.600s",status,body.s?body.s:"");
     else if(!body.n)result=jnull();
     else {char *why=NULL;result=jp(body.s,&why);free(why);if(!result)fail("Invalid Todoist response");}
@@ -118,48 +138,43 @@ static J *api_list(const char *endpoint) {
     }
     free(cursor);jf(all);fail("Todoist pagination limit reached");return NULL;
 }
+static J *remote_cache(void);
+static int queued_mutation(const char *,const char *,J *);
 static J *list(const char *backend,const char *kind) {
-    if(!strcmp(backend,"todoist"))return api_list(kind);
+    if(!strcmp(backend,"todoist")){J *db=remote_cache();J *items=db?jc(jg(db,kind)):NULL;jf(db);return items;}
     int fd=lock_db();if(fd<0)return NULL;J *db=load_db(),*result=db?jc(jg(db,kind)):NULL;
     jf(db);close(fd);return result;
 }
-static int mutate(const char *backend,const char *action,const char *id,J *item) {
+static int apply(J *db,const char *action,const char *id,J *item,const char *forced) {
     int task=!strncmp(action,"task-",5);
-    if(!strcmp(action,"task-save") && valid_task(item))return 1;
-    if(!strcmp(backend,"todoist")) {
-        char endpoint[512];J *result=NULL;
-        for(const char *p=id;*p;p++)if(!isalnum((unsigned char)*p) && *p!='_' && *p!='-')return fail("Invalid Todoist ID");
-        if(!strcmp(action,"task-save")) {
-            J *payload=jc(item);if(jg(payload,"due_string") && !*gs(payload,"due_string"))jset(payload,"due_string",js("no date"));
-            char *project=strdup(gs(payload,"project_id"));if(*id)jdel(payload,"project_id");
-            snprintf(endpoint,sizeof endpoint,"tasks%s%s",*id?"/":"",id);result=api("POST",endpoint,payload);jf(payload);
-            if(result && *id && *project) {jf(result);J *move=jo();jset(move,"project_id",js(project));snprintf(endpoint,sizeof endpoint,"tasks/%s/move",id);result=api("POST",endpoint,move);jf(move);}free(project);
-        }else if(!strcmp(action,"task-complete")) {snprintf(endpoint,sizeof endpoint,"tasks/%s/%s",id,item->n?"close":"reopen");result=api("POST",endpoint,NULL);}
-        else if(!strcmp(action,"project-save")){snprintf(endpoint,sizeof endpoint,"projects%s%s",*id?"/":"",id);result=api("POST",endpoint,item);}
-        else {snprintf(endpoint,sizeof endpoint,"%s/%s",task?"tasks":"projects",id);result=api("DELETE",endpoint,NULL);}
-        int rc=result?0:1;jf(result);return rc;
-    }
-    int fd=lock_db();if(fd<0)return 1;J *db=load_db();if(!db){close(fd);return 1;}
     J *array=jg(db,task?"tasks":"projects"),*existing=find(array,id);int rc=0;
     if(!strcmp(action,"task-save")) {
         const char *project=gs(item,"project_id");if(!*project)project=existing?gs(existing,"project_id"):"inbox";
         if(!find(jg(db,"projects"),project))rc=fail("Project not found");
         else if(*id && !existing)rc=fail("Task not found");
         else {
-            if(!existing){char *new=new_id();if(!new)rc=fail("Cannot create task ID");else {existing=jo();jset(existing,"id",js(new));free(new);jset(existing,"is_completed",jb(0));jadd(array,existing);}}
-            if(!rc){for(size_t i=0;i<item->len;i++){J *field=item->v[i];if(strcmp(field->key,"id") && strcmp(field->key,"is_completed"))jset(existing,field->key,jc(field));}if(!jg(existing,"project_id"))jset(existing,"project_id",js(project));}
+            if(!existing){char *new=forced?strdup(forced):new_id();if(!new)rc=fail("Cannot create task ID");else {existing=jo();jset(existing,"id",js(new));free(new);jset(existing,"is_completed",jb(0));jadd(array,existing);}}
+            if(!rc){if(jg(item,"due_string"))jdel(existing,"due");for(size_t i=0;i<item->len;i++){J *field=item->v[i];if(strcmp(field->key,"id") && strcmp(field->key,"is_completed"))jset(existing,field->key,jc(field));}if(!jg(existing,"project_id"))jset(existing,"project_id",js(project));}
         }
     }else if(!strcmp(action,"project-save")) {
         if(!*gs(item,"name"))rc=fail("Project name required");
         else if(*id && !existing)rc=fail("Project not found");
         else if(existing)jset(existing,"name",js(gs(item,"name")));
-        else {char *new=new_id();if(!new)rc=fail("Cannot create project ID");else {existing=jc(item);jset(existing,"id",js(new));free(new);jadd(array,existing);}}
+        else {char *new=forced?strdup(forced):new_id();if(!new)rc=fail("Cannot create project ID");else {existing=jc(item);jset(existing,"id",js(new));free(new);jadd(array,existing);}}
     }else if(!strcmp(action,"task-complete")) {if(!existing)rc=fail("Task not found");else jset(existing,"is_completed",jc(item));}
     else if(!task && !strcmp(id,"inbox"))rc=fail("Cannot delete Inbox");
     else {
         for(size_t i=0;i<array->len;i++)if(!strcmp(gs(array->v[i],"id"),id)){jremove(array,i);break;}
         if(!task){J *tasks=jg(db,"tasks");for(size_t i=0;i<tasks->len;i++)if(!strcmp(gs(tasks->v[i],"project_id"),id))jset(tasks->v[i],"project_id",js("inbox"));}
     }
+    return rc;
+}
+#include "offline.inc"
+static int mutate(const char *backend,const char *action,const char *id,J *item) {
+    if(!strcmp(action,"task-save") && valid_task(item))return 1;
+    if(!strcmp(backend,"todoist"))return queued_mutation(action,id,item);
+    int fd=lock_db();if(fd<0)return 1;J *db=load_db();if(!db){close(fd);return 1;}
+    int rc=apply(db,action,id,item,NULL);
     if(!rc){char *s=jd(db,0);rc=atomic_write(data,"local.json",s);free(s);}jf(db);close(fd);return rc;
 }
 static int task_order(const void *left,const void *right) {
@@ -181,7 +196,7 @@ int backend_dispatch(char **args,const char *input,char **output) {
         if(!strcmp(backend,"local")) {
             int fd=lock_db();
             if(fd>=0){J *db=load_db();if(db){projects=jc(jg(db,"projects"));tasks=jc(jg(db,"tasks"));}jf(db);close(fd);}
-        }else {projects=list(backend,"projects");tasks=projects?list(backend,"tasks"):NULL;}
+        }else {J *db=remote_cache();if(db){projects=jc(jg(db,"projects"));tasks=jc(jg(db,"tasks"));}jf(db);}
         if(!projects || !tasks)rc=1;
         else {
             qsort(tasks->v,tasks->len,sizeof *tasks->v,task_order);
@@ -207,7 +222,8 @@ int backend_dispatch(char **args,const char *input,char **output) {
 }
 int backend_cli(const char *backend,int argc,char **argv) {
     const char *action=argv[0];J *item=NULL;int rc=0;
-    if(!strcmp(action,"list") || !strcmp(action,"projects")){J *result=list(backend,!strcmp(action,"list")?"tasks":"projects");if(!result)rc=1;else {char *s=jd(result,1);puts(s);free(s);jf(result);}}
+    if(!strcmp(action,"sync") && argc==1 && !strcmp(backend,"todoist")){rc=sync_now();}
+    else if(!strcmp(action,"list") || !strcmp(action,"projects")){J *result=list(backend,!strcmp(action,"list")?"tasks":"projects");if(!result)rc=1;else {char *s=jd(result,1);puts(s);free(s);jf(result);}}
     else {
         const char *mapped=NULL,*id="";
         if(!strcmp(action,"add") && argc==2){mapped="task-save";item=jp(argv[1],NULL);}
