@@ -22,7 +22,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        data = {'data': [{'id': 'tavily/search', 'kind': 'webSearch'}]} if body is None else {'results': [{'title': 'Example', 'url': 'https://example.org', 'snippet': 'Result'}]}
+        data = {'url':'https://example.org','content':{'format':'markdown','text':'Example page'}} if self.path=='/v1/web/fetch' else {'results': [{'title': 'Example', 'url': 'https://example.org', 'snippet': 'Result'}]}
         self.wfile.write(b'not json' if self.server.invalid else json.dumps(data).encode())
 
     def do_GET(self):
@@ -54,35 +54,42 @@ class RouterTests(unittest.TestCase):
         proc = subprocess.run([BINARY,'--mcp-9router'], input=json.dumps(request)+'\n', text=True, capture_output=True, env=self.env, timeout=10, check=True)
         return json.loads(proc.stdout)['result']
 
-    def test_search_and_discovery(self):
-        result = self.call('list_models', {})
-        self.assertFalse(result.get('isError', False))
-        self.assertIn('tavily/search', result['content'][0]['text'])
-        self.assertEqual(self.server.requests[-1], ('/v1/models/web','Bearer test-secret',None))
-        self.call('search', {'query':'example'})
-        self.assertEqual(self.server.requests[-1][2], {'query':'example','model':'search-combo','max_results':5})
-        self.call('search', {'query':'news','model':'tavily/search','max_results':3,'search_type':'news'})
-        self.assertEqual(self.server.requests[-1][2]['model'], 'tavily/search')
+    def test_search_and_fetch_defaults_and_overrides(self):
+        self.env.pop('NINEROUTER_SEARCH_MODEL')
+        self.assertFalse(self.call('search', {'query':'example'}).get('isError',False))
+        self.assertEqual(self.server.requests[-1], ('/v1/search','Bearer test-secret',{'query':'example','model':'search-combo','max_results':5}))
+        result=self.call('fetch_page', {'url':'https://example.org'})
+        self.assertIn('Example page',result['content'][0]['text'])
+        self.assertEqual(self.server.requests[-1][2], {'url':'https://example.org','model':'fetch-combo','format':'markdown','max_characters':14000})
+        self.env['NINEROUTER_SEARCH_MODEL']='exa/search'
+        self.env['NINEROUTER_FETCH_MODEL']='exa/fetch'
+        self.call('search', {'query':'news','max_results':3,'search_type':'news'})
+        self.assertEqual(self.server.requests[-1][2]['model'], 'exa/search')
+        self.call('fetch_page', {'url':'https://example.org','format':'text','max_characters':100})
+        self.assertEqual(self.server.requests[-1][2]['model'], 'exa/fetch')
+        self.assertEqual(self.server.requests[-1][2]['max_characters'], 100)
 
     def test_errors_and_validation(self):
         url = self.env.pop('NINEROUTER_URL')
-        self.assertTrue(self.call('list_models', {})['isError'])
+        self.assertTrue(self.call('search', {'query':'example'})['isError'])
         self.assertEqual(self.server.requests, [])
         self.env['NINEROUTER_URL']=url
         self.env['NINEROUTER_KEY']='test-secret'
         self.env.pop('NINEROUTER_SEARCH_MODEL')
-        self.assertTrue(self.call('search', {'query':'example'})['isError'])
+        self.assertTrue(self.call('search', {'query':'example','model':'exa/search'})['isError'])
+        self.assertTrue(self.call('list_models', {})['isError'])
+        self.assertTrue(self.call('fetch_page', {'url':'file:///etc/passwd'})['isError'])
         self.assertTrue(self.call('search', {'query':'example','max_results':21})['isError'])
         self.assertEqual(self.server.requests, [])
         self.server.status=401
-        self.assertIn('HTTP 401',self.call('list_models', {})['content'][0]['text'])
+        self.assertIn('HTTP 401',self.call('search', {'query':'example'})['content'][0]['text'])
         self.server.status=200
         self.server.invalid=True
-        self.assertTrue(self.call('list_models', {})['isError'])
+        self.assertTrue(self.call('search', {'query':'example'})['isError'])
 
     def test_unauthenticated_gateway(self):
         self.env.pop('NINEROUTER_KEY')
-        self.assertFalse(self.call('list_models', {}).get('isError',False))
+        self.assertFalse(self.call('search', {'query':'example'}).get('isError',False))
         self.assertIsNone(self.server.requests[-1][1])
 
     def test_default_migration_and_preservation(self):

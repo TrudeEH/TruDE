@@ -660,11 +660,12 @@ class NativeTests(unittest.TestCase):
             self.assertFalse(json.loads(self.settings.read_text())['mcpServers']['9router']['enabled'])
             s.click('Toggle')
             s.wait('9Router web search settings')
-            s.send('\t'+f'http://127.0.0.1:{self.mock.server_port}'+'\tsecret-key\tsearch-combo\x13')
+            s.send('\t'+f'http://127.0.0.1:{self.mock.server_port}'+'\tsecret-key\tsearch-combo\tfetch-combo\x13')
             s.wait('MCP tools connected')
             saved=json.loads(self.settings.read_text())['mcpServers']['9router']
             self.assertTrue(saved['enabled'])
             self.assertEqual(saved['env']['NINEROUTER_KEY'],'secret-key')
+            self.assertEqual(saved['env']['NINEROUTER_FETCH_MODEL'],'fetch-combo')
             s.click('9router')
             s.click('Edit')
             s.wait('9Router web search settings')

@@ -189,26 +189,31 @@ Without a configured profile or explicit gateway environment, enabling opens a
 setup form. Enter the gateway root URL and API key, then save. The key is masked;
 leave it empty only if your gateway does not require authentication. Canceling
 setup leaves the server disabled. **Edit** always opens the same form so the URL,
-key and default search model remain editable. Turn off **Use configured 9router
+key and search/fetch providers remain editable. Turn off **Use configured 9router
 profile** to use independent MCP credentials. Blank fields inherit profile values
 when profile reuse is enabled; explicit fields override them.
 
 Advanced configuration still accepts `env` values named `NINEROUTER_URL`,
-`NINEROUTER_KEY`, and `NINEROUTER_SEARCH_MODEL`, including `${ENV_VAR}` references.
+`NINEROUTER_KEY`, `NINEROUTER_SEARCH_MODEL`, and `NINEROUTER_FETCH_MODEL`, including `${ENV_VAR}` references.
 Environment values are inherited when not supplied by either MCP settings or the
 profile. Never commit API keys. Use HTTPS for a remote gateway; plain HTTP sends
 credentials unencrypted and should be limited to trusted local connections.
 The independent URL is the gateway root, **not** its `/v1` endpoint. A URL is
 required; the key is optional for unauthenticated gateways.
 
-`list_models` calls `GET /v1/models/web` to discover configured providers and combos.
-`search` calls `POST /v1/search` with a query, optional model, `max_results` (1–20,
-default 5), and optional `search_type` (`web`, `news`, or `x`). The optional
-`NINEROUTER_SEARCH_MODEL` supplies the default model or fallback combo; without it,
-search calls must specify a model. Choose a discovered `webSearch` entry or search
-combo available on your gateway. Provider accounts must be configured in 9Router,
-and searches may incur provider charges. Results preserve URLs and gateway usage
-metadata. Fetching pages still uses the existing `web.fetch_page` tool.
+`search` calls `POST /v1/search` using **search-combo** by default. It accepts a
+query, `max_results` (1–20, default 5), and optional `search_type` (`web`, `news`,
+or `x`). `fetch_page` calls `POST /v1/web/fetch` using **fetch-combo** by default.
+It accepts an HTTP(S) URL, optional `format` (`markdown`, `text`, or `html`), and
+`max_characters` (1–100000, default 14000). Results preserve gateway metadata,
+including source URLs and usage.
+
+Users can select another provider or combo in **Edit**, independently for search
+and fetch, or set `NINEROUTER_SEARCH_MODEL` and `NINEROUTER_FETCH_MODEL`. Blank
+values use the default combos. Provider selection is not exposed to the AI;
+there is no `list_models` tool or per-call model argument. Configure the selected
+combos/providers in 9Router. Provider charges may apply. DuckDuckGo search and
+its independent page fetch remain available through the `web` MCP server.
 
 ### Native OAuth for remote MCP servers
 

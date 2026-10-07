@@ -1246,8 +1246,9 @@ static void mcp_form(UI *u, int edit) {
         field_add(m, "routerUrl", "Gateway root URL (blank uses profile)", gs(env, "NINEROUTER_URL"), 0, 0);
         field_add(m, "routerKey", "API key (blank uses profile; optional without auth)", gs(env, "NINEROUTER_KEY"), 0, 0);
         m->fields[2].e.secret = 1;
-        field_add(m, "routerModel", "Default search model or combo (optional)", gs(env, "NINEROUTER_SEARCH_MODEL"), 0, 0);
-        field_add(m, "enabled", "Enable 9Router web search", gb(s, "enabled", 0) ? "true" : "false", 0, 4);
+        field_add(m, "routerModel", "Search provider or combo (blank: search-combo)", gs(env, "NINEROUTER_SEARCH_MODEL"), 0, 0);
+        field_add(m, "routerFetchModel", "Fetch provider or combo (blank: fetch-combo)", gs(env, "NINEROUTER_FETCH_MODEL"), 0, 0);
+        field_add(m, "enabled", "Enable 9Router web tools", gb(s, "enabled", 0) ? "true" : "false", 0, 4);
         return;
     }
     if (edit && *gs(s, "builtin")) {
@@ -1750,9 +1751,9 @@ static void save_modal(UI *u, int yes) {
         J *server = jg(v, "json") ? jc(jg(v, "json")) : existing ? jc(existing) : jo();
         if (existing && !strcmp(gs(existing, "builtin"), "9router") && jg(v, "routerUrl")) {
             J *env = jg(server, "env") ? jc(jg(server, "env")) : jo();
-            const char *fields[] = {"routerUrl", "routerKey", "routerModel"};
-            const char *keys[] = {"NINEROUTER_URL", "NINEROUTER_KEY", "NINEROUTER_SEARCH_MODEL"};
-            for (int i = 0; i < 3; i++) {
+            const char *fields[] = {"routerUrl", "routerKey", "routerModel", "routerFetchModel"};
+            const char *keys[] = {"NINEROUTER_URL", "NINEROUTER_KEY", "NINEROUTER_SEARCH_MODEL", "NINEROUTER_FETCH_MODEL"};
+            for (int i = 0; i < 4; i++) {
                 if (*gs(v, fields[i])) jset(env, keys[i], jc(jg(v, fields[i])));
                 else jdel(env, keys[i]);
             }
@@ -2087,7 +2088,7 @@ static void dispatch(UI *u, int id, int index) {
                 jf(env);
                 if (!ready) {
                     mcp_form(u, 1);
-                    es(&u->modal->fields[4].e, "true");
+                    es(&u->modal->fields[5].e, "true");
                     break;
                 }
             }

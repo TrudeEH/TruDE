@@ -4,20 +4,26 @@
 
 J *router_tools(void) {
     J *tools = ja();
-    server_tool(tools, "list_models", "List available 9Router web search/fetch models and combos.",
-                "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}", 1);
-    server_tool(tools, "search", "Search the web through 9Router. Use a discovered webSearch model "
-                "or combo, or the configured default. Provider charges may apply.",
+    server_tool(tools, "search", "Search the web through the user-configured 9Router search provider "
+                "or combo (default search-combo). Provider charges may apply.",
                 "{\"type\":\"object\",\"properties\":{"
                 "\"query\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":2000},"
-                "\"model\":{\"type\":\"string\",\"minLength\":1},"
                 "\"max_results\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":20},"
                 "\"search_type\":{\"type\":\"string\",\"enum\":[\"web\",\"news\",\"x\"]}},"
                 "\"required\":[\"query\"],\"additionalProperties\":false}", 1);
+    server_tool(tools, "fetch_page", "Fetch a page through the user-configured 9Router fetch provider "
+                "or combo (default fetch-combo). Provider charges may apply.",
+                "{\"type\":\"object\",\"properties\":{"
+                "\"url\":{\"type\":\"string\",\"minLength\":1},"
+                "\"format\":{\"type\":\"string\",\"enum\":[\"markdown\",\"text\",\"html\"]},"
+                "\"max_characters\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100000}},"
+                "\"required\":[\"url\"],\"additionalProperties\":false}", 1);
     return tools;
 }
 J *router_call(const char *name, J *args) {
     err[0] = 0;
+    if (jg(args, "model") || jg(args, "provider"))
+        return server_result("Provider selection belongs in the 9Router MCP settings, not tool arguments.", 1);
     const char *base = getenv("NINEROUTER_URL"), *key = getenv("NINEROUTER_KEY");
     if (!base || !*base)
         return server_result("Configure the 9Router gateway URL in the MCP settings or 9router profile.", 1);
@@ -27,26 +33,22 @@ J *router_call(const char *name, J *args) {
     for (const unsigned char *p = (const unsigned char *)key; *p; p++)
         if (iscntrl(*p))
             return server_result("NINEROUTER_KEY must not contain control characters.", 1);
-    J *body = NULL;
-    const char *path, *method;
-    if (!strcmp(name, "list_models")) {
-        path = "/v1/models/web";
-        method = "GET";
-    } else if (!strcmp(name, "search")) {
-        const char *model = gs(args, "model");
-        if (!*model) {
-            model = getenv("NINEROUTER_SEARCH_MODEL");
-            if (!model || !*model)
-                return server_result("Choose a webSearch model or combo from list_models, or configure NINEROUTER_SEARCH_MODEL.", 1);
-        }
-        body = jc(args);
-        jset(body, "model", js(model));
-        if (!jg(body, "max_results"))
-            jset(body, "max_results", jnum(5));
-        path = "/v1/search";
-        method = "POST";
-    } else
+    int search = !strcmp(name, "search"), fetch = !strcmp(name, "fetch_page");
+    if (!search && !fetch)
         return server_result("Unknown 9Router tool", 1);
+    if (fetch && valid_url(gs(args, "url"), 0))
+        return server_result("Page URL must be HTTP(S).", 1);
+    const char *model = getenv(search ? "NINEROUTER_SEARCH_MODEL" : "NINEROUTER_FETCH_MODEL");
+    if (!model || !*model) model = search ? "search-combo" : "fetch-combo";
+    J *body = jc(args);
+    jset(body, "model", js(model));
+    if (search && !jg(body, "max_results"))
+        jset(body, "max_results", jnum(5));
+    if (fetch) {
+        if (!jg(body, "format")) jset(body, "format", js("markdown"));
+        if (!jg(body, "max_characters")) jset(body, "max_characters", jnum(14000));
+    }
+    const char *path = search ? "/v1/search" : "/v1/web/fetch";
     size_t n = strlen(base);
     while (n && base[n - 1] == '/')
         n--;
@@ -58,7 +60,7 @@ J *router_call(const char *name, J *args) {
     free(auth);
     Http h = {0};
     J *result;
-    if (http(url, method, headers, body, 30, 2000000, NULL, NULL, &h)) {
+    if (http(url, "POST", headers, body, 30, 2000000, NULL, NULL, &h)) {
         /* Do not echo upstream bodies or transport details that might contain credentials. */
         char *message = h.status ? fmt("9Router HTTP %d. Check gateway credentials, provider configuration and availability.", h.status)
                                  : strdup("9Router request failed. Check gateway URL, connectivity and timeout.");
