@@ -86,6 +86,21 @@ int selftest(void) {
     private_text(path, "first\nsecond\n");
     J *config = load_config();
     jset(config, "workspace", js(root));
+    J *rp = jg(jg(config, "profiles"), "9router");
+    jset(rp, "endpoint", js("http://127.0.0.1:20128/v1/"));
+    jset(rp, "apiKeyEnv", js("ROUTER_TEST_KEY"));
+    J *rs = jo(), *re = router_env(config, rs);
+    check(!strcmp(gs(re, "NINEROUTER_URL"), "http://127.0.0.1:20128") &&
+          !strcmp(gs(re, "NINEROUTER_KEY"), "${ROUTER_TEST_KEY}"), "9Router profile URL and key reuse");
+    jf(re);
+    J *overrides = jo();
+    jset(overrides, "NINEROUTER_URL", js("https://example.org"));
+    jset(overrides, "NINEROUTER_KEY", js("override"));
+    jset(rs, "env", overrides);
+    re = router_env(config, rs);
+    check(!strcmp(gs(re, "NINEROUTER_KEY"), "override") &&
+          !strcmp(gs(re, "NINEROUTER_URL"), "https://example.org"), "9Router MCP overrides preserved");
+    jf(re); jf(rs);
     MCP m;
     mcp_init(&m, config);
     int rc = mcp_connect(&m);

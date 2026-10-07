@@ -19,10 +19,11 @@ J *router_tools(void) {
 J *router_call(const char *name, J *args) {
     err[0] = 0;
     const char *base = getenv("NINEROUTER_URL"), *key = getenv("NINEROUTER_KEY");
-    if (!base || !*base || !key || !*key)
-        return server_result("Configure NINEROUTER_URL and NINEROUTER_KEY in the 9router MCP server environment.", 1);
+    if (!base || !*base)
+        return server_result("Configure the 9Router gateway URL in the MCP settings or 9router profile.", 1);
     if (strpbrk(base, "\r\n?#") || valid_url(base, 1))
         return server_result("NINEROUTER_URL must be an HTTP(S) gateway URL without query or fragment.", 1);
+    if (!key) key = "";
     for (const unsigned char *p = (const unsigned char *)key; *p; p++)
         if (iscntrl(*p))
             return server_result("NINEROUTER_KEY must not contain control characters.", 1);
@@ -52,7 +53,7 @@ J *router_call(const char *name, J *args) {
     char *url = fmt("%.*s%s", (int)n, base, path);
     J *headers = jo();
     char *auth = fmt("Bearer %s", key);
-    jset(headers, "Authorization", js(auth));
+    if (*key) jset(headers, "Authorization", js(auth));
     jset(headers, "Content-Type", js("application/json"));
     free(auth);
     Http h = {0};

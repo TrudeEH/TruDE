@@ -85,6 +85,7 @@ typedef struct {
     pthread_mutex_t *mutex;
 } MCP;
 int oauth_authorize(MCP *, Server *, const char *, int);
+int oauth_forget(const char *);
 void mcp_init(MCP *, J *), mcp_close(MCP *);
 int mcp_connect(MCP *), mcp_refresh(MCP *), mcp_poll(MCP *);
 J *mcp_definitions(MCP *), *mcp_request(MCP *, Server *, const char *, J *, int);
@@ -99,7 +100,7 @@ void unlock_store(const char *), repair_chat(J *);
 J *load_config(void), *new_chat(J *), *chats(void), *load_chat(const char *), *tasks(void);
 int save_tasks(J *), delete_chat(const char *);
 void event(J *, const char *);
-J *profile(J *), *models(J *);
+J *profile(J *), *models(J *), *router_env(J *, J *);
 int model_vision(J *);
 char *clipboard_image(void);
 int clipboard_copy(const void *, size_t, const char *), clipboard_copy_image(const char *);

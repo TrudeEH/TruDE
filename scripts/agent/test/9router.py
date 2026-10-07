@@ -65,9 +65,10 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(self.server.requests[-1][2]['model'], 'tavily/search')
 
     def test_errors_and_validation(self):
-        self.env.pop('NINEROUTER_KEY')
+        url = self.env.pop('NINEROUTER_URL')
         self.assertTrue(self.call('list_models', {})['isError'])
         self.assertEqual(self.server.requests, [])
+        self.env['NINEROUTER_URL']=url
         self.env['NINEROUTER_KEY']='test-secret'
         self.env.pop('NINEROUTER_SEARCH_MODEL')
         self.assertTrue(self.call('search', {'query':'example'})['isError'])
@@ -78,6 +79,11 @@ class RouterTests(unittest.TestCase):
         self.server.status=200
         self.server.invalid=True
         self.assertTrue(self.call('list_models', {})['isError'])
+
+    def test_unauthenticated_gateway(self):
+        self.env.pop('NINEROUTER_KEY')
+        self.assertFalse(self.call('list_models', {}).get('isError',False))
+        self.assertIsNone(self.server.requests[-1][1])
 
     def test_default_migration_and_preservation(self):
         # Invalid option-independent profile avoids any real model requests.

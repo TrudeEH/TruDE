@@ -430,6 +430,8 @@ static int server_start(MCP *m, Server *s) {
         size_t argc = 0, envn = 0;
         J *a = jg(s->config, "args"), *e = jg(s->config, "env");
         const char *builtin = gs(s->config, "builtin");
+        J *router = !strcmp(builtin, "9router") ? router_env(m->config, s->config) : NULL;
+        if (router) e = router;
         args = calloc((a ? a->len : 0) + 4, sizeof *args);
         if (*builtin) {
             args[argc++] = strdup(executable);
@@ -444,6 +446,7 @@ static int server_start(MCP *m, Server *s) {
                 for (size_t k = 0; k < argc; k++)
                     free(args[k]);
                 free(args);
+                jf(router);
                 return -1;
             }
         while (environ[envn])
@@ -467,11 +470,13 @@ static int server_start(MCP *m, Server *s) {
                 for (size_t k = 0; k < count; k++)
                     free(env[k]);
                 free(env);
+                jf(router);
                 return -1;
             }
             env[count++] = fmt("%s=%s", e->v[i]->key, v);
             free(v);
         }
+        jf(router);
         int r = spawn(&s->proc, args, env, gs(m->config, "workspace"));
         for (size_t i = 0; i < argc; i++)
             free(args[i]);

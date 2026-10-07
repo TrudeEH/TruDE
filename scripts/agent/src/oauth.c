@@ -336,3 +336,17 @@ done:
     bfree(&form); bfree(&query);
     return rc;
 }
+
+int oauth_forget(const char *url) {
+    char *key = hash(url);
+    if (!key) return -1;
+    char *path = fmt("%s/oauth-%s.json", config_dir, key);
+    char *lockpath = fmt("%s/oauth-%s.lock", config_dir, key);
+    int fd = open(lockpath, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int r = 0;
+    if (fd < 0 || flock(fd, LOCK_EX | LOCK_NB)) r = fail("OAuth storage is busy or unavailable");
+    else if (unlink(path) && errno != ENOENT) r = fail("Cannot clear saved OAuth login");
+    if (fd >= 0) close(fd);
+    free(key); free(path); free(lockpath);
+    return r;
+}

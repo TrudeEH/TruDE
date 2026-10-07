@@ -609,6 +609,54 @@ class NativeTests(unittest.TestCase):
         finally:
             s.close()
 
+    def test_tui_9router_setup_edit_and_profile_reuse(self):
+        for key in list(self.env):
+            if key.startswith('NINEROUTER_'): self.env.pop(key)
+        self.config['profiles']['9router'].update(model='',apiKey='',apiKeyEnv='')
+        self.config['mcpServers']['9router']={'builtin':'9router','enabled':False}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait('MCP tools connected')
+            s.click('F2 MCP servers')
+            s.click('9router')
+            s.click('Toggle')
+            s.wait('9Router web search settings')
+            self.assertIn('API key',s.screen.text)
+            # Toggle opens setup but cancellation must not enable the server.
+            s.send('\x1b')
+            self.assertFalse(json.loads(self.settings.read_text())['mcpServers']['9router']['enabled'])
+            s.click('Toggle')
+            s.wait('9Router web search settings')
+            s.send('\t'+f'http://127.0.0.1:{self.mock.server_port}'+'\tsecret-key\tsearch-combo\x13')
+            s.wait('MCP tools connected')
+            saved=json.loads(self.settings.read_text())['mcpServers']['9router']
+            self.assertTrue(saved['enabled'])
+            self.assertEqual(saved['env']['NINEROUTER_KEY'],'secret-key')
+            s.click('9router')
+            s.click('Edit')
+            s.wait('9Router web search settings')
+            self.assertNotIn('secret-key',s.screen.text)
+            s.send('\t\x01\x0b'+f'http://127.0.0.1:{self.mock.server_port}'+'\t\x01\x0breplacement-key\x13')
+            s.wait('MCP tools connected')
+            self.assertEqual(json.loads(self.settings.read_text())['mcpServers']['9router']['env']['NINEROUTER_KEY'],'replacement-key')
+        finally:
+            s.close()
+        self.config['profiles']['9router'].update(endpoint=f'http://127.0.0.1:{self.mock.server_port}/v1',apiKey='profile-key')
+        self.config['mcpServers']['9router']={'builtin':'9router','enabled':False}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait('MCP tools connected')
+            s.click('F2 MCP servers')
+            s.click('9router')
+            s.click('Toggle')
+            s.wait('MCP tools connected')
+            self.assertNotIn('9Router web search settings',s.screen.text)
+            self.assertTrue(json.loads(self.settings.read_text())['mcpServers']['9router']['enabled'])
+        finally:
+            s.close()
+
     def test_native_oauth_pkce_callback_cache_and_refresh(self):
         server=http.server.ThreadingHTTPServer(("127.0.0.1",0),OAuthHandler)
         server.daemon_threads=True

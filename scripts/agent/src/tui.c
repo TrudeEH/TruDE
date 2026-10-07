@@ -54,6 +54,7 @@ enum {
     A_MCP_EDIT,
     A_MCP_IMPORT,
     A_MCP_REMOVE,
+    A_MCP_LOGIN,
     A_MCP_TOOLS,
     A_TASK_NEW,
     A_TASK_EDIT,
@@ -1237,6 +1238,18 @@ static void mcp_form(UI *u, int edit) {
     J *cfg = jg(u->config, "mcpServers"), *s = edit ? ji(cfg, (size_t)u->server_sel) : NULL;
     if (edit && !s)
         return;
+    if (edit && !strcmp(gs(s, "builtin"), "9router")) {
+        J *env = jg(s, "env");
+        Modal *m = modal(u, FORM, A_MCP_EDIT, "9Router web search settings", "");
+        m->id = strdup(s->key);
+        field_add(m, "useProfile", "Use configured 9router profile", gb(s, "useProfile", 1) ? "true" : "false", 0, 4);
+        field_add(m, "routerUrl", "Gateway root URL (blank uses profile)", gs(env, "NINEROUTER_URL"), 0, 0);
+        field_add(m, "routerKey", "API key (blank uses profile; optional without auth)", gs(env, "NINEROUTER_KEY"), 0, 0);
+        m->fields[2].e.secret = 1;
+        field_add(m, "routerModel", "Default search model or combo (optional)", gs(env, "NINEROUTER_SEARCH_MODEL"), 0, 0);
+        field_add(m, "enabled", "Enable 9Router web search", gb(s, "enabled", 0) ? "true" : "false", 0, 4);
+        return;
+    }
     if (edit && *gs(s, "builtin")) {
         char *raw = jd(s, 1);
         Modal *m = modal(u, FORM, A_MCP_EDIT, "Edit bundled MCP server", "");
@@ -1735,7 +1748,26 @@ static void save_modal(UI *u, int yes) {
             break;
         }
         J *server = jg(v, "json") ? jc(jg(v, "json")) : existing ? jc(existing) : jo();
-        if (!jg(v, "json")) {
+        if (existing && !strcmp(gs(existing, "builtin"), "9router") && jg(v, "routerUrl")) {
+            J *env = jg(server, "env") ? jc(jg(server, "env")) : jo();
+            const char *fields[] = {"routerUrl", "routerKey", "routerModel"};
+            const char *keys[] = {"NINEROUTER_URL", "NINEROUTER_KEY", "NINEROUTER_SEARCH_MODEL"};
+            for (int i = 0; i < 3; i++) {
+                if (*gs(v, fields[i])) jset(env, keys[i], jc(jg(v, fields[i])));
+                else jdel(env, keys[i]);
+            }
+            jset(server, "env", env);
+            jset(server, "useProfile", jc(jg(v, "useProfile")));
+            jset(server, "enabled", jc(jg(v, "enabled")));
+            J *resolved = router_env(u->config, server);
+            const char *url = gs(resolved, "NINEROUTER_URL");
+            if (!*url) url = getenv("NINEROUTER_URL");
+            if (gb(server, "enabled", 0) && (!url || !*url)) r = fail("Enter a gateway URL or configure the 9router profile.");
+            else if (*gs(env, "NINEROUTER_URL") && !strstr(gs(env, "NINEROUTER_URL"), "${"))
+                r = valid_url(gs(env, "NINEROUTER_URL"), 1);
+            jf(resolved);
+            if (r) { jf(server); break; }
+        } else if (!jg(v, "json")) {
             for (size_t i = 0; i < v->len; i++)
                 jset(server, v->v[i]->key, jc(v->v[i]));
             jdel(server, "name");
@@ -1775,6 +1807,15 @@ static void save_modal(UI *u, int yes) {
             r = save_config(u->config);
             reconnect = !r;
         }
+        break;
+    }
+    case A_MCP_LOGIN: {
+        J *server = jg(jg(u->config, "mcpServers"), m->id);
+        char *url = expand(gs(server, "url"));
+        if (!url) { r = -1; break; }
+        r = oauth_forget(url);
+        free(url);
+        reconnect = !r;
         break;
     }
     case A_MCP_REMOVE:
@@ -2036,6 +2077,18 @@ static void dispatch(UI *u, int id, int index) {
     case 204: {
         J *s = ji(jg(u->config, "mcpServers"), u->server_sel);
         if (s) {
+            if (!strcmp(gs(s, "builtin"), "9router") && !gb(s, "enabled", 0)) {
+                J *env = router_env(u->config, s);
+                const char *url = gs(env, "NINEROUTER_URL");
+                if (!*url) url = getenv("NINEROUTER_URL");
+                int ready = url && *url;
+                jf(env);
+                if (!ready) {
+                    mcp_form(u, 1);
+                    es(&u->modal->fields[4].e, "true");
+                    break;
+                }
+            }
             jset(s, "enabled", jb(!gb(s, "enabled", 1)));
             if (save_config(u->config))
                 error_ui(u);
@@ -2080,6 +2133,16 @@ static void dispatch(UI *u, int id, int index) {
                              "Remove this server from Settings?");
             m->id = strdup(s->key);
         }
+        break;
+    }
+    case 208: {
+        J *s = ji(jg(u->config, "mcpServers"), u->server_sel);
+        if (s && *gs(s, "url") && gb(s, "enabled", 1)) {
+            Modal *m = modal(u, CONFIRM, A_MCP_LOGIN, "Sign in again",
+                             "Clear this server's saved OAuth login and reconnect to sign in again? "
+                             "Other servers using the same URL share this login.");
+            m->id = strdup(s->key);
+        } else notice_ui(u, "Select an enabled remote OAuth MCP server. Use Edit for API keys.");
         break;
     }
     case 207:
@@ -2454,9 +2517,9 @@ static void draw_mcp(UI *u) {
     }
     view_lines(u, &l, side + 2, 5, u->w - side - 4, height - 4, &u->detail_scroll, 0, 0);
     lines_free(&l);
-    const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect"};
-    int ids[] = {201, 202, 203, 204, 205, 206, 207};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
+    const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect", "Sign in again"};
+    int ids[] = {201, 202, 203, 204, 205, 206, 207, 208};
+    actions(u, 0, u->h - 4, u->w, labels, ids, 8, 2);
 }
 static void draw_tasks(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;

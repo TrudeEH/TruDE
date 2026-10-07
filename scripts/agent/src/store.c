@@ -458,3 +458,28 @@ char *export_chat(J *j) {
     bfree(&b);
     return p;
 }
+
+/* Explicit MCP values override the profile; default entries follow profile updates. */
+J *router_env(J *config, J *server) {
+    J *env = jg(server, "env") ? jc(jg(server, "env")) : jo();
+    J *p = jg(jg(config, "profiles"), "9router");
+    int configured = *gs(p, "model") || *gs(p, "apiKey") || *gs(p, "apiKeyEnv") ||
+                     !strcmp(gs(config, "profile"), "9router");
+    if (gb(server, "useProfile", 1) && configured) {
+        if (!jg(env, "NINEROUTER_URL")) {
+            const char *endpoint = gs(p, "endpoint");
+            size_t n = strlen(endpoint);
+            while (n && endpoint[n - 1] == '/') n--;
+            if (n >= 3 && !strncmp(endpoint + n - 3, "/v1", 3)) n -= 3;
+            char *url = strndup(endpoint, n);
+            jset(env, "NINEROUTER_URL", js(url));
+            free(url);
+        }
+        if (!jg(env, "NINEROUTER_KEY")) {
+            char *key = *gs(p, "apiKeyEnv") ? fmt("${%s}", gs(p, "apiKeyEnv")) : strdup(gs(p, "apiKey"));
+            jset(env, "NINEROUTER_KEY", js(key));
+            free(key);
+        }
+    }
+    return env;
+}

@@ -179,25 +179,27 @@ existing installations. Enabling it and editing its configuration in the MCP tab
 persists across restarts and upgrades. DuckDuckGo remains independently available.
 This server is separate from the 9router chat provider profile.
 
-In the MCP tab, edit the `9router` server JSON and configure its environment:
+In the MCP tab, select `9router` and click **Toggle**. A configured 9router chat
+profile supplies its endpoint and API key (including `apiKeyEnv` references)
+automatically, even when another chat profile is active. Seth strips the trailing
+`/v1` from the profile endpoint to obtain the gateway root. A stock, unused profile
+is not treated as configured.
 
-```json
-{
-  "builtin": "9router",
-  "enabled": true,
-  "env": {
-    "NINEROUTER_URL": "http://127.0.0.1:20128",
-    "NINEROUTER_KEY": "${NINEROUTER_KEY}",
-    "NINEROUTER_SEARCH_MODEL": "tavily/search"
-  }
-}
-```
+Without a configured profile or explicit gateway environment, enabling opens a
+setup form. Enter the gateway root URL and API key, then save. The key is masked;
+leave it empty only if your gateway does not require authentication. Canceling
+setup leaves the server disabled. **Edit** always opens the same form so the URL,
+key and default search model remain editable. Turn off **Use configured 9router
+profile** to use independent MCP credentials. Blank fields inherit profile values
+when profile reuse is enabled; explicit fields override them.
 
-Export `NINEROUTER_KEY` in the environment that launches Seth. Environment values
-are inherited when omitted from `env`; `${ENV_VAR}` references are expanded at
-connection time. Never commit API keys. Use HTTPS for a remote gateway; plain HTTP
-sends credentials unencrypted and should be limited to trusted local connections.
-The URL is the gateway root, **not** its `/v1` endpoint. Both URL and key are required.
+Advanced configuration still accepts `env` values named `NINEROUTER_URL`,
+`NINEROUTER_KEY`, and `NINEROUTER_SEARCH_MODEL`, including `${ENV_VAR}` references.
+Environment values are inherited when not supplied by either MCP settings or the
+profile. Never commit API keys. Use HTTPS for a remote gateway; plain HTTP sends
+credentials unencrypted and should be limited to trusted local connections.
+The independent URL is the gateway root, **not** its `/v1` endpoint. A URL is
+required; the key is optional for unauthenticated gateways.
 
 `list_models` calls `GET /v1/models/web` to discover configured providers and combos.
 `search` calls `POST /v1/search` with a query, optional model, `max_results` (1–20,
@@ -256,7 +258,11 @@ Set `"oauth": false` to disable OAuth. Providers requiring pre-registration acce
 Register `http://127.0.0.1:8765/callback` with that provider. Without a configured
 port Seth chooses a free ephemeral port. Without an explicit scope it requests the
 protected resource's advertised scopes, not every authorization-server scope.
-The MCP editor includes an OAuth JSON field for these options.
+The MCP editor includes an OAuth JSON field for these options. To change the
+account used by Todoist or another remote OAuth server, select the enabled server
+and click **Sign in again**. Confirm to clear its saved URL-scoped login and
+reconnect for browser authorization. OAuth tokens are managed by the provider,
+not editable API keys; servers with the same URL share the saved login.
 
 Runtime requirements remain curl and Debian coreutils (`sha256sum` for PKCE and
 URL-scoped storage keys). No OAuth SDK, Node, Python, or OpenSSL command is needed.
