@@ -259,8 +259,8 @@ Register `http://127.0.0.1:8765/callback` with that provider. Without a configur
 port Seth chooses a free ephemeral port. Without an explicit scope it requests the
 protected resource's advertised scopes, not every authorization-server scope.
 The MCP editor includes an OAuth JSON field for these options. To change the
-account used by Todoist or another remote OAuth server, select the enabled server
-and click **Sign in again**. Confirm to clear its saved URL-scoped login and
+account used by Todoist or another remote OAuth server, select the server, open **Edit**,
+and click **Sign in again** inside the form. Confirm to clear its saved URL-scoped login and
 reconnect for browser authorization. OAuth tokens are managed by the provider,
 not editable API keys; servers with the same URL share the saved login.
 

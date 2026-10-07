@@ -609,6 +609,38 @@ class NativeTests(unittest.TestCase):
         finally:
             s.close()
 
+    def test_tui_oauth_sign_in_action_inside_edit(self):
+        self.config['mcpServers']={'remote':{'url':f'http://127.0.0.1:{self.mock.server_port}/mcp','transport':'http'}}
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait('MCP tools connected')
+            s.click('F2 MCP servers')
+            self.assertNotIn('Sign in again',s.screen.text)
+            s.click('remote')
+            s.click('Edit')
+            s.wait('Sign in again')
+            s.click('Sign in again')
+            s.wait("Clear this server's saved OAuth login")
+            s.click('Cancel')
+            s.wait('Edit MCP server')
+            self.assertIn('Sign in again',s.screen.text)
+            s.click('Cancel')
+        finally:
+            s.close()
+        self.config['mcpServers']['remote']['oauth']=False
+        self.save()
+        s=Session(self.env)
+        try:
+            s.wait('MCP tools connected')
+            s.click('F2 MCP servers')
+            s.click('remote')
+            s.click('Edit')
+            s.wait('Edit MCP server')
+            self.assertNotIn('Sign in again',s.screen.text)
+        finally:
+            s.close()
+
     def test_tui_9router_setup_edit_and_profile_reuse(self):
         for key in list(self.env):
             if key.startswith('NINEROUTER_'): self.env.pop(key)

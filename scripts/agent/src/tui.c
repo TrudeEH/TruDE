@@ -1857,6 +1857,8 @@ static void save_modal(UI *u, int yes) {
     }
     if (u->modal == m)
         close_modal(u);
+    if (action == A_MCP_LOGIN && u->modal && u->modal->action == A_MCP_EDIT)
+        close_modal(u);
     if (action == A_PROFILE || action == A_MODEL || action == A_PROVIDER)
         settings_load(u, 0);
     refresh_history(u);
@@ -2135,16 +2137,6 @@ static void dispatch(UI *u, int id, int index) {
         }
         break;
     }
-    case 208: {
-        J *s = ji(jg(u->config, "mcpServers"), u->server_sel);
-        if (s && *gs(s, "url") && gb(s, "enabled", 1)) {
-            Modal *m = modal(u, CONFIRM, A_MCP_LOGIN, "Sign in again",
-                             "Clear this server's saved OAuth login and reconnect to sign in again? "
-                             "Other servers using the same URL share this login.");
-            m->id = strdup(s->key);
-        } else notice_ui(u, "Select an enabled remote OAuth MCP server. Use Edit for API keys.");
-        break;
-    }
     case 207:
         start_job(u, 4, "");
         break;
@@ -2347,6 +2339,10 @@ static void modal_draw(UI *u) {
         int bx = x + 3;
         button(u, bx, bottom + 1, "Save", 801);
         button(u, bx + 12, bottom + 1, "Cancel", 802);
+        J *server = m->action == A_MCP_EDIT ? jg(jg(u->config, "mcpServers"), m->id) : NULL;
+        if (server && *gs(server, "url") && gb(server, "oauth", 1) &&
+            !jg(jg(server, "headers"), "Authorization"))
+            button(u, bx + 26, bottom + 1, "Sign in again", 806);
         if (m->action == A_TASK_NEW || m->action == A_TASK_EDIT)
             button(u, bx + 26, bottom + 1, "Allowed tools", 804);
     } else if (m->kind == PICK || m->kind == CHECKS) {
@@ -2517,9 +2513,9 @@ static void draw_mcp(UI *u) {
     }
     view_lines(u, &l, side + 2, 5, u->w - side - 4, height - 4, &u->detail_scroll, 0, 0);
     lines_free(&l);
-    const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect", "Sign in again"};
-    int ids[] = {201, 202, 203, 204, 205, 206, 207, 208};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 8, 2);
+    const char *labels[] = {"Add", "Import", "Edit", "Toggle", "Tools", "Remove", "Reconnect"};
+    int ids[] = {201, 202, 203, 204, 205, 206, 207};
+    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
 }
 static void draw_tasks(UI *u) {
     int side = u->w * 36 / 100, height = u->h - 7;
@@ -2924,6 +2920,13 @@ static void mouse_click(UI *u, int buttoncode, int x, int y) {
                 Field *f = &m->fields[m->focus];
                 if (f->kind == 4)
                     es(&f->e, !strcmp(f->e.s, "true") ? "false" : "true");
+            }
+            else if (h->id == 806 && m->action == A_MCP_EDIT) {
+                Modal *confirm = modal(u, CONFIRM, A_MCP_LOGIN, "Sign in again",
+                    "Clear this server's saved OAuth login and reconnect to sign in again? "
+                    "Other servers using the same URL share this login. "
+                    "Unsaved edits are not applied; save changes before signing in.");
+                confirm->id = strdup(m->id);
             }
             else if (h->id == 805)
                 copied(u, clipboard_copy(m->id, strlen(m->id), "text/plain;charset=utf-8"),
