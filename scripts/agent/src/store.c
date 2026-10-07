@@ -50,7 +50,8 @@ int validate_server(const char *name, J *s) {
         return fail("Server must be an object");
     if (*gs(s, "builtin")) {
         if (strcmp(gs(s, "builtin"), "filesystem") && strcmp(gs(s, "builtin"), "web") &&
-            strcmp(gs(s, "builtin"), "shell") && strcmp(gs(s, "builtin"), "memory"))
+            strcmp(gs(s, "builtin"), "shell") && strcmp(gs(s, "builtin"), "memory") &&
+            strcmp(gs(s, "builtin"), "9router"))
             return fail("Unknown bundled server");
     } else if (*gs(s, "url")) {
         if (valid_url(gs(s, "url"), 1))
@@ -197,6 +198,7 @@ J *load_config(void) {
     const char *bundled[] = {"filesystem", "web", "shell", "memory"};
     for (size_t i = 0; i < sizeof bundled / sizeof *bundled; i++)
         add_bundled(s, bundled[i], 1);
+    add_bundled(s, "9router", 0);
     jset(d, "mcpServers", s);
     char *path = fmt("%s/settings.json", config_dir);
     J *c = readjson(path, d);
@@ -233,6 +235,14 @@ J *load_config(void) {
             migrated = 1;
         }
         free(previous);
+    }
+    /* Add new optional servers without resetting existing configuration or enabled state. */
+    J *servers = jg(c, "mcpServers");
+    if (servers && servers->type == JOBJ) {
+        size_t count = servers->len;
+        add_bundled(servers, "9router", 0);
+        if (servers->len != count)
+            migrated = 1;
     }
     if (c && validate_config(c)) {
         jf(c);

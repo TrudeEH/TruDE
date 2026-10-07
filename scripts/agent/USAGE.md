@@ -172,6 +172,42 @@ of up to eight. Authentication/input prompts remain serialized, and tool orderin
 follows the configured server order. Existing timeouts and protocol fallback are
 unchanged; a slow remote server can still delay the final ready state.
 
+### 9Router web search
+
+The bundled `9router` MCP server is disabled by default, including when added to
+existing installations. Enabling it and editing its configuration in the MCP tab
+persists across restarts and upgrades. DuckDuckGo remains independently available.
+This server is separate from the 9router chat provider profile.
+
+In the MCP tab, edit the `9router` server JSON and configure its environment:
+
+```json
+{
+  "builtin": "9router",
+  "enabled": true,
+  "env": {
+    "NINEROUTER_URL": "http://127.0.0.1:20128",
+    "NINEROUTER_KEY": "${NINEROUTER_KEY}",
+    "NINEROUTER_SEARCH_MODEL": "tavily/search"
+  }
+}
+```
+
+Export `NINEROUTER_KEY` in the environment that launches Seth. Environment values
+are inherited when omitted from `env`; `${ENV_VAR}` references are expanded at
+connection time. Never commit API keys. Use HTTPS for a remote gateway; plain HTTP
+sends credentials unencrypted and should be limited to trusted local connections.
+The URL is the gateway root, **not** its `/v1` endpoint. Both URL and key are required.
+
+`list_models` calls `GET /v1/models/web` to discover configured providers and combos.
+`search` calls `POST /v1/search` with a query, optional model, `max_results` (1–20,
+default 5), and optional `search_type` (`web`, `news`, or `x`). The optional
+`NINEROUTER_SEARCH_MODEL` supplies the default model or fallback combo; without it,
+search calls must specify a model. Choose a discovered `webSearch` entry or search
+combo available on your gateway. Provider accounts must be configured in 9Router,
+and searches may incur provider charges. Results preserve URLs and gateway usage
+metadata. Fetching pages still uses the existing `web.fetch_page` tool.
+
 ### Native OAuth for remote MCP servers
 
 Remote Streamable HTTP servers can authenticate directly, without Node, `npx`, or
@@ -362,7 +398,7 @@ To rebuild the packaged executable, run `scripts/agent/build.sh`. It uses only t
 compiler, standard Linux libc headers/archive, and the linker; no dependency fetch
 or package manager is involved. `CC` selects a compiler. Native server processes
 use the same executable with `--mcp-filesystem`, `--mcp-web`, `--mcp-shell`, or
-`--mcp-memory`; all their actions
+`--mcp-memory`, or `--mcp-9router`; all their actions
 remain MCP requests rather than being moved into the agent loop.
 
 ## Pasting images (Wayland)

@@ -9,5 +9,6 @@ export XDG_DATA_HOME="$test_dir/data"
 export XDG_STATE_HOME="$test_dir/state"
 "$test_dir/seth" --self-test
 if command -v python3 >/dev/null 2>&1; then
+    python3 "$agent_dir/test/9router.py" "$test_dir/seth"
     python3 "$agent_dir/test/native.py" "$test_dir/seth"
 fi

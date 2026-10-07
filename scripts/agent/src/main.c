@@ -55,6 +55,8 @@ int main(int argc, char **argv) {
             server = "filesystem";
         else if (!strcmp(argv[i], "--mcp-web"))
             server = "web";
+        else if (!strcmp(argv[i], "--mcp-9router"))
+            server = "9router";
         else if (!strcmp(argv[i], "--mcp-shell"))
             server = "shell";
         else if (!strcmp(argv[i], "--mcp-memory"))
