@@ -9,11 +9,11 @@ OpenAI-compatible server, then select its endpoint and a model that supports too
 From this checkout, run `scripts/agent/setup.sh` once, then `scripts/tui/agent-tui`.
 The desktop installer links the application launcher and the `dotfiles-agent-tui`
 command. Seth is written entirely in C, with POSIX sh launch/build scripts. The
-provided amd64 executable is about 1.2 MB and statically linked. Starting it needs
-no compiler, Node.js, npm, Python, ncurses, or downloaded library tree. HTTP/TLS uses
-`curl` and the system certificate store, which the Debian installer already includes.
-Other Debian CPU architectures can rebuild from source with an existing C compiler;
-the installer never adds a compiler or another runtime package.
+installer builds the native executable from source on every run, using the
+`build-essential` package already included in the Debian package list. Generated
+binaries are not shipped in Git. The launcher rebuilds when the executable is
+missing or its sources change. No Node.js, npm, Python, ncurses, or downloaded
+library tree is needed. HTTP/TLS uses `curl` and the system certificate store.
 The installer enables and starts the scheduler timer. When no user service manager
 is running during installation, the timer starts with the next user session.
 
@@ -376,8 +376,8 @@ Uses XDG directories, defaulting to:
 
 | File | Purpose |
 | --- | --- |
-| `../tui/agent-tui` | POSIX sh launcher; chooses the native CPU binary |
-| `bin/seth-amd64`, `bin/SHA256SUMS` | Static native executable and release checksum |
+| `../tui/agent-tui` | POSIX sh launcher; rebuilds missing or outdated executable |
+| `bin/seth` | Locally built native executable (ignored by Git) |
 | `src/main.c` | Interactive/headless dispatch and bundled server modes |
 | `src/tui.c` | Terminal rendering, tabs, mouse/keyboard editor, dialogs and history |
 | `src/agent.c` | Model/tool loop, permissions, context compaction and cancellation |
@@ -392,7 +392,7 @@ Uses XDG directories, defaulting to:
 | `src/store.c` | Settings, private atomic JSON storage, history and process locks |
 | `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
 | `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |
-| `build.sh`, `setup.sh` | Optional native rebuild and dependency-free setup |
+| `build.sh`, `setup.sh` | Native build and compatibility build entry point |
 | `src/tests.c`, `test/native.py`, `test.sh` | Native checks and development-only integration fixtures |
 
 Desktop integration lives in `configs/applications/dotfiles-agent.desktop`, the two
@@ -405,8 +405,8 @@ pseudo-terminal interactions. Python is only a development test helper; the agen
 installer, scheduler, and bundled servers never invoke it. Tests use temporary XDG
 directories and do not contact a real model server or change user settings.
 
-To rebuild the packaged executable, run `scripts/agent/build.sh`. It uses only the
-compiler, standard Linux libc headers/archive, and the linker; no dependency fetch
+To rebuild the local executable, run `scripts/agent/build.sh`. It uses only the
+compiler, standard Linux libc headers, and the linker; no dependency fetch
 or package manager is involved. `CC` selects a compiler. Native server processes
 use the same executable with `--mcp-filesystem`, `--mcp-web`, `--mcp-shell`, or
 `--mcp-memory`, or `--mcp-9router`; all their actions

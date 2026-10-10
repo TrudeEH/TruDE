@@ -1,3 +1,4 @@
 *.o
 build/
 __pycache__/
+/bin/

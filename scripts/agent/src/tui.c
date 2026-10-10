@@ -598,8 +598,8 @@ static Lines wrap(Lines *source, int width) {
         }
         while (*p) {
             mbstate_t st = {0};
-            const char *end = p;
-            int cols = 0;
+            const char *end = p, *boundary = NULL;
+            int cols = 0, space = 0;
             while (*end) {
                 wchar_t c;
                 size_t n = mbrtowc(&c, end, strlen(end), &st);
@@ -610,16 +610,25 @@ static Lines wrap(Lines *source, int width) {
                 }
                 if (!n)
                     break;
+                /* Keep whitespace in the rows so editor byte offsets remain exact.
+                 * Punctuation stays attached to its word. Only oversized tokens
+                 * fall back to character wrapping, always at UTF-8 boundaries. */
+                if (!iswspace(c) && space)
+                    boundary = end;
+                space = iswspace(c);
                 int w = wcwidth(c);
-                if (w < 1)
+                if (w < 0)
                     w = 1;
-                if (cols + w > width)
+                if (cols + w > width) {
+                    if (end == p)
+                        end += n;
+                    else if (!space && boundary)
+                        end = boundary;
                     break;
+                }
                 cols += w;
                 end += n;
             }
-            if (end == p)
-                end = p + 1;
             char *part = strndup(p, end - p);
             line(&out, part, l->color, l->bold, l->key);
             free(part);
@@ -671,33 +680,40 @@ static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, i
     text_lines(&l, e->secret ? "(hidden — type to replace)" : e->s, NORMAL, 0);
     Lines w = wrap(&l, width);
     int cursorrow = 0, cursorcol = 0;
-    mbstate_t st = {0};
-    for (size_t p = 0; p < e->pos;) {
-        wchar_t c;
-        size_t n = mbrtowc(&c, e->s + p, strlen(e->s + p), &st);
-        if (n == (size_t)-1 || n == (size_t)-2) {
-            n = 1;
-            c = L'�';
-            memset(&st, 0, sizeof st);
-        }
-        if (c == '\n') {
-            cursorrow++;
-            cursorcol = 0;
-        } else {
-            int cw = wcwidth(c);
-            if (cw < 1)
-                cw = 1;
-            if (cursorcol + cw > width) {
-                cursorrow++;
-                cursorcol = 0;
+    size_t offset = 0;
+    for (int row = 0; row < w.len; row++) {
+        size_t len = strlen(w.v[row].s);
+        size_t end = offset + len;
+        if (e->pos <= end) {
+            /* At a soft boundary the cursor belongs to the following row;
+             * before an explicit newline it belongs to this row. */
+            if (e->pos == end && e->s[end] && e->s[end] != '\n' && row + 1 < w.len) {
+                offset = end;
+                continue;
             }
-            cursorcol += cw;
-            if (cursorcol >= width && p + n < e->pos) {
-                cursorrow++;
-                cursorcol = 0;
+            cursorrow = row;
+            mbstate_t st = {0};
+            for (size_t p = offset; p < e->pos;) {
+                wchar_t c;
+                size_t n = mbrtowc(&c, e->s + p, e->pos - p, &st);
+                if (n == (size_t)-1 || n == (size_t)-2) {
+                    n = 1;
+                    c = L'�';
+                    memset(&st, 0, sizeof st);
+                }
+                if (!n)
+                    break;
+                int cw = wcwidth(c);
+                cursorcol += cw < 0 ? 1 : cw;
+                p += n;
             }
+            break;
         }
-        p += n;
+        offset = end + (e->s[end] == '\n');
+    }
+    if (cursorcol >= width) {
+        cursorcol = 0;
+        cursorrow++;
     }
     int first = cursorrow >= height ? cursorrow - height + 1 : 0;
     if (u->editorcount < 64) {
@@ -727,17 +743,13 @@ static void editor_draw(UI *u, Editor *e, int x, int y, int width, int height, i
             if (marker && row >= first && col < width)
                 u->cells[(y + row - first) * u->w + x + col].color = ACCENT;
             int cw = wcwidth(c);
-            col += cw > 0 ? cw : 1;
+            col += cw < 0 ? 1 : cw;
             if (c == L']')
                 marker = 0;
             p += n;
         }
     }
     if (focused) {
-        if (cursorcol >= width) {
-            cursorcol = 0;
-            cursorrow++;
-        }
         int cy = cursorrow - first;
         if (cy >= 0 && cy < height) {
             Cell *c = &u->cells[(y + cy) * u->w + x + cursorcol];
@@ -2873,7 +2885,7 @@ static void editor_click(UI *u, int x, int y) {
                     n = 1; c = L'�'; memset(&st, 0, sizeof st);
                 }
                 int cw = wcwidth(c);
-                if (cw < 1) cw = 1;
+                if (cw < 0) cw = 1;
                 if (col + cw > x - ex) break;
                 col += cw; p += n; offset += n;
             }

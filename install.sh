@@ -515,8 +515,8 @@ main() {
     ui_step "Building Tasks"
     "$repo_dir/scripts/tasks/build.sh"
 
-    ui_step "Preparing native Seth"
-    "$repo_dir/scripts/agent/setup.sh"
+    ui_step "Building Seth"
+    "$repo_dir/scripts/agent/build.sh"
 
     ui_step "Installing fonts and configuring Flatpak"
     install_font
