@@ -132,7 +132,7 @@ menu separator {
 
 /* Center modules */
 
-#custom-temperature, #memory, #cpu, #custom-status-indicators, #clock.time, #clock.date {
+#custom-temperature, #custom-memory, #cpu, #custom-status-indicators, #clock.time, #clock.date {
     padding: 0 8px;
 }
 
@@ -140,7 +140,7 @@ menu separator {
     background-color: @bg-1;
 }
 
-#memory, #clock.date {
+#custom-memory, #clock.date {
     background-color: @bg-2;
 }
 
@@ -148,13 +148,13 @@ menu separator {
     background-color: @bg-3;
 }
 
-#memory.warning,
+#custom-memory.warning,
 #cpu.warning {
     color: @warning;
 }
 
 #custom-temperature.critical,
-#memory.critical,
+#custom-memory.critical,
 #cpu.critical {
     color: @critical;
 }

@@ -59,18 +59,12 @@
         "max-length": 8,
         "on-click": "footclient --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui"
     },
-    "memory": {
-        "format": "󰘚 {percentage}%",
-        "format-warning": "󰀧 {percentage}%",
-        "format-critical": "󰀧 {percentage}%",
-        "states": {
-            "warning": 75,
-            "critical": 90
-        },
+    "custom/memory": {
+        "exec": "dotfiles-waybar-memory-status",
+        "return-type": "json",
         "interval": 2,
         "min-length": 8,
         "max-length": 8,
-        "tooltip-format": "Used: {used:0.1f} / {total:0.1f} GiB ({percentage}%)\nAvailable: {avail:0.1f} GiB\nSwap: {swapUsed:0.1f} / {swapTotal:0.1f} GiB ({swapPercentage}%)",
         "on-click": "footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui"
     },
     "cpu": {
@@ -103,7 +97,7 @@
             "custom/left#bg-1",
             "custom/temperature",
             "custom/left#bg-2",
-            "memory",
+            "custom/memory",
             "custom/left#bg-3",
             "cpu",
             "custom/left#inverse"

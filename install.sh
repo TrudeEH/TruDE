@@ -55,6 +55,11 @@ check_platform() {
         ui_error "This installer supports Debian 13 (trixie) and newer Debian releases."
         exit 1
     fi
+    # Two independent managers must not configure the same zRAM device.
+    if [ "$(dpkg-query -W -f='${Status}' zram-tools 2>/dev/null || :)" = 'install ok installed' ]; then
+        ui_error "zram-tools is installed. Remove it before using systemd-zram-generator; do not run both managers."
+        exit 1
+    fi
     backports_suite=$VERSION_CODENAME-backports
 }
 
@@ -127,7 +132,7 @@ install_packages() {
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
         wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
-        file fontconfig procps util-linux pipewire-bin xdg-user-dirs xdg-utils \
+        file fontconfig procps util-linux systemd-zram-generator pipewire-bin xdg-user-dirs xdg-utils \
         </dev/tty
 }
 
@@ -250,6 +255,21 @@ configure_lightdm() {
     sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
         /var/lib/lightdm/.config/gtk-3.0/gtk.css
     sudo systemctl enable lightdm.service
+}
+
+configure_zram() {
+    sudo install -D -m 0644 "$repo_dir/configs/systemd/zram-generator.conf.d/60-dotfiles.conf" \
+        /etc/systemd/zram-generator.conf.d/60-dotfiles.conf
+    sudo install -D -m 0644 "$repo_dir/configs/sysctl.d/60-dotfiles-zram.conf" \
+        /etc/sysctl.d/60-dotfiles-zram.conf
+    sudo sysctl -p /etc/sysctl.d/60-dotfiles-zram.conf
+    sudo systemctl daemon-reload
+    # Never swapoff/restart an active device: doing so can exhaust small hosts.
+    if awk '$1 == "/dev/zram0" { found=1 } END { exit !found }' /proc/swaps; then
+        printf '%s\n' 'zRAM is already active; size and compression changes take effect after reboot.'
+    else
+        sudo systemctl start dev-zram0.swap
+    fi
 }
 
 configure_hardware_services() {
@@ -432,6 +452,7 @@ link_configs() {
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
     link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/dotfiles-superfile-open"
+    link_config "$repo_dir/scripts/waybar/memory-status" "$HOME/.local/bin/dotfiles-waybar-memory-status"
     link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
     link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
     link_config "$repo_dir/scripts/waybar/status-indicators" "$HOME/.local/bin/dotfiles-waybar-status-indicators"
@@ -484,6 +505,9 @@ main() {
 
     ui_step "Installing desktop packages"
     install_packages
+
+    ui_step "Configuring adaptive zRAM swap"
+    configure_zram
 
     ui_step "Installing Superfile"
     install_superfile

@@ -1,0 +1,81 @@
+#!/bin/sh
+set -eu
+
+# Override roots for fixture tests. All arithmetic uses awk doubles.
+proc_root=${DOTFILES_PROC_ROOT:-/proc}
+sys_root=${DOTFILES_SYS_ROOT:-/sys}
+LC_ALL=C awk -v proc="$proc_root" -v sys="$sys_root" '
+function size(bytes) {
+    if (bytes < 1073741824) return sprintf("%.1f MiB", bytes / 1048576)
+    return sprintf("%.1f GiB", bytes / 1073741824)
+}
+function percent(used, capacity) {
+    return capacity > 0 ? int(100 * used / capacity + 0.5) : 0
+}
+function clamp(value, maximum) {
+    return value < 0 ? 0 : (value > maximum ? maximum : value)
+}
+BEGIN {
+    while ((getline line < (proc "/meminfo")) > 0) {
+        split(line, field, /[[:space:]]+/)
+        mem[field[1]] = field[2] * 1024
+    }
+    close(proc "/meminfo")
+    total = mem["MemTotal:"]
+    if (total <= 0) {
+        print "{\"text\":\"󰘚 —\",\"tooltip\":\"RAM information unavailable\",\"class\":\"normal\"}"
+        exit
+    }
+    available = ("MemAvailable:" in mem) ? mem["MemAvailable:"] : \
+        mem["MemFree:"] + mem["Buffers:"] + mem["Cached:"] + \
+        mem["SReclaimable:"] - mem["Shmem:"]
+    available = clamp(available, total)
+    used = total - available
+    ram_percent = percent(used, total)
+
+    zram_count = 0
+    zram_total = 0
+    zram_used = 0
+    swap_total = 0
+    swap_used = 0
+
+    while ((getline line < (proc "/swaps")) > 0) {
+        split(line, field, /[[:space:]]+/)
+        if (field[1] == "Filename" || field[1] == "") continue
+        device = field[1]
+        sub(/^.*\//, "", device)
+        if (device ~ /^zram[0-9]+$/) {
+            zram_count++
+            zram_total += field[3] * 1024
+            zram_used += field[4] * 1024
+        } else {
+            swap_total += field[3] * 1024
+            swap_used += field[4] * 1024
+        }
+    }
+    close(proc "/swaps")
+
+    tooltip = sprintf("RAM: %s / %s (%d%%)", \
+        size(used), size(total), ram_percent)
+
+    if (zram_count > 0) {
+        tooltip = tooltip sprintf("\\nzRAM: %s / %s (%d%%)", \
+            size(zram_used), size(zram_total), percent(zram_used, zram_total))
+    } else {
+        tooltip = tooltip "\\nzRAM: not active"
+    }
+
+    if (swap_total > 0) {
+        tooltip = tooltip sprintf("\\nSWAP: %s / %s (%d%%)", \
+            size(swap_used), size(swap_total), percent(swap_used, swap_total))
+    } else {
+        tooltip = tooltip "\\nSWAP: none"
+    }
+
+    text = sprintf("󰘚 %d%%", ram_percent)
+
+    class = ram_percent >= 90 ? "critical" : (ram_percent >= 75 ? "warning" : "normal")
+    printf "{\"text\":\"%s\",\"tooltip\":\"%s\",\"percentage\":%d,\"class\":\"%s\"}\n", \
+        text, tooltip, ram_percent, class
+}
+'
