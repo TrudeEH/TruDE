@@ -124,14 +124,14 @@ install_packages() {
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
         "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
-        build-essential libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
+        build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
-        wl-clipboard swaybg hyprpolkitagent waybar mako-notifier fzf dex jq \
+        wl-clipboard swaybg hyprpolkitagent mako-notifier fzf dex jq \
         file fontconfig procps util-linux systemd-zram-generator pipewire-bin xdg-user-dirs xdg-utils \
         </dev/tty
 }
@@ -452,19 +452,11 @@ link_configs() {
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
     link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/dotfiles-superfile-open"
-    link_config "$repo_dir/scripts/waybar/memory-status" "$HOME/.local/bin/dotfiles-waybar-memory-status"
-    link_config "$repo_dir/scripts/waybar/temperature-status" "$HOME/.local/bin/dotfiles-waybar-temperature-status"
-    link_config "$repo_dir/scripts/waybar/notification-status" "$HOME/.local/bin/dotfiles-waybar-notification-status"
-    link_config "$repo_dir/scripts/waybar/status-indicators" "$HOME/.local/bin/dotfiles-waybar-status-indicators"
-    link_config "$repo_dir/scripts/waybar/status-menu" "$HOME/.local/bin/dotfiles-waybar-status-menu"
-    link_config "$repo_dir/scripts/waybar/power-status" "$HOME/.local/bin/dotfiles-waybar-power-status"
-    link_config "$repo_dir/scripts/waybar/maintenance-status" "$HOME/.local/bin/dotfiles-waybar-maintenance-status"
-    link_config "$repo_dir/scripts/waybar/launcher-status" "$HOME/.local/bin/dotfiles-waybar-launcher-status"
-    link_config "$repo_dir/scripts/waybar/start" "$HOME/.local/bin/dotfiles-waybar"
-    link_config "$repo_dir/configs/waybar/config.jsonc" "$config_dir/waybar/config.jsonc"
-    link_config "$repo_dir/configs/waybar/style.css" "$config_dir/waybar/style.css"
+    link_config "$repo_dir/scripts/bar/status-menu" "$HOME/.local/bin/dotfiles-bar-status-menu"
+    link_config "$repo_dir/scripts/bar/maintenance-status" "$HOME/.local/bin/dotfiles-bar-maintenance-status"
+    link_config "$repo_dir/scripts/bar/start" "$HOME/.local/bin/dotfiles-bar"
+    link_config "$repo_dir/configs/systemd/user/dotfiles-bar.service" "$config_dir/systemd/user/dotfiles-bar.service"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
-    link_config "$repo_dir/configs/systemd/user/waybar.service.d/override.conf" "$config_dir/systemd/user/waybar.service.d/override.conf"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
     link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
     link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
@@ -512,6 +504,9 @@ main() {
     ui_step "Installing Superfile"
     install_superfile
 
+    ui_step "Building native bar"
+    "$repo_dir/scripts/bar/build.sh"
+
     ui_step "Building Tasks"
     "$repo_dir/scripts/tasks/build.sh"
 
@@ -546,7 +541,8 @@ main() {
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
-        systemctl --user enable --now foot-server.socket waybar.service mako.service || :
+        systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
+        systemctl --user enable --now foot-server.socket dotfiles-bar.service mako.service || :
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 

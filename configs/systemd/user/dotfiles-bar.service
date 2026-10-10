@@ -1,0 +1,15 @@
+[Unit]
+Description=Native dotfiles Wayland bar
+Documentation=man:systemd.service(5)
+After=graphical-session.target
+PartOf=graphical-session.target
+Conflicts=waybar.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/dotfiles-bar
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

@@ -2,8 +2,8 @@
 set -u
 
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
-cache_file=$runtime_dir/dotfiles-waybar-maintenance.json
-lock_dir=$runtime_dir/dotfiles-waybar-maintenance.lock
+cache_file=$runtime_dir/dotfiles-bar-maintenance.json
+lock_dir=$runtime_dir/dotfiles-bar-maintenance.lock
 cache_lifetime=240
 
 cache_is_fresh() {
@@ -70,7 +70,7 @@ else
     class=updated
 fi
 
-temporary=$(mktemp "$runtime_dir/dotfiles-waybar-maintenance.XXXXXX") || exit 1
+temporary=$(mktemp "$runtime_dir/dotfiles-bar-maintenance.XXXXXX") || exit 1
 printf '{"text":"%s","tooltip":"APT updates: %s\\nFlatpak updates: %s\\nTruDE updates: %s","class":"%s"}\n' \
     "$text" "$apt_updates" "$flatpak_updates" "$trude_updates" "$class" > "$temporary"
 mv "$temporary" "$cache_file"

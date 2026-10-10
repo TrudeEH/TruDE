@@ -1,0 +1,14 @@
+#!/bin/sh
+# Build/launcher glue only; status collection runs in the persistent C helper.
+set -eu
+base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
+if [ ! -x "$base/bin/status" ] || [ "$base/status.c" -nt "$base/bin/status" ] \
+    || [ "$base/build-status.sh" -nt "$base/bin/status" ]; then
+    "$base/build-status.sh"
+fi
+part=${1:-center}
+[ "$#" -eq 0 ] || shift
+watch=false
+if [ "${1:-}" = --watch ]; then watch=true; fi
+if [ "$watch" = true ]; then exec "$base/bin/status" launcher "$part"; fi
+exec "$base/bin/status" launcher "$part" --once

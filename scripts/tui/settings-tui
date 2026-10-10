@@ -276,11 +276,11 @@ apply_wallpaper() {
 
 apply_waybar() {
     if [ "$(preference '.waybar.enabled')" = true ]; then
-        systemctl --user reset-failed waybar.service >/dev/null 2>&1 || :
-        systemctl --user enable waybar.service >/dev/null 2>&1 || :
-        systemctl --user restart waybar.service >/dev/null 2>&1 || :
+        systemctl --user reset-failed dotfiles-bar.service >/dev/null 2>&1 || :
+        systemctl --user enable dotfiles-bar.service >/dev/null 2>&1 || :
+        systemctl --user restart dotfiles-bar.service >/dev/null 2>&1 || :
     else
-        systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
+        systemctl --user disable --now dotfiles-bar.service >/dev/null 2>&1 || :
     fi
 }
 
@@ -576,7 +576,7 @@ save_monitor_settings() {
     replace_local_section "$monitor_begin_marker" "$monitor_end_marker" \
         "$monitor_block" || return 1
     if output=$(hyprctl reload 2>&1); then
-        systemctl --user try-restart waybar.service >/dev/null 2>&1 || :
+        systemctl --user try-restart dotfiles-bar.service >/dev/null 2>&1 || :
         message "Display settings saved and applied."
     else
         message "Settings were saved, but Hyprland could not reload them:\n\n$output"
@@ -801,7 +801,7 @@ waybar_settings() {
             launcher_icon_summary='Default (󰀻)'
         fi
         set -- \
-            "󰐥 enabled" "Waybar: $enabled" \
+            "󰐥 enabled" "Native bar: $enabled" \
             "󰘸 position" "Position: $position" \
             "󰹑 primary-only" "Primary display only: $primary" \
             "󰀻 launcher-icon" "Launcher icon: $launcher_icon_summary"
@@ -809,12 +809,12 @@ waybar_settings() {
             set -- "$@" "󰑐 reset-icon" "Use the default launcher icon"
         fi
         set -- "$@" "󰅖 back" "Back to settings"
-        action=$(dialog --menu "Waybar settings" 20 92 8 "$@" \
+        action=$(dialog --menu "Native bar settings" 20 92 8 "$@" \
             3>&1 1>&2 2>&3) || return
         case $action in
             *" enabled") toggle_preference '.waybar.enabled' waybar ;;
             *" position")
-                choice=$(dialog --menu "󰘸 Waybar position" 13 64 4 \
+                choice=$(dialog --menu "󰘸 Native bar position" 13 64 4 \
                     "󰘸 top" "Top edge" \
                     "󰘷 bottom" "Bottom edge" \
                     3>&1 1>&2 2>&3) || continue
@@ -900,7 +900,7 @@ while :; do
         "󰍹 displays" "Monitor layout, modes, scale, rotation, and position" \
         "󰌌 input" "Keyboard, pointer, and touchpad" \
         "󰏘 appearance" "Wallpaper, animations, blur, gaps, and borders" \
-        "󰍜 waybar" "Visibility, position, and displays" \
+        "󰍜 bar" "Visibility, position, and displays" \
         "󰍬 dictation" "Voice dictation, models, and testing"
     if find /proc/acpi/button/lid -mindepth 1 -maxdepth 1 -type d \
         -print -quit 2>/dev/null | grep -q .; then
@@ -913,7 +913,7 @@ while :; do
         *" displays") display_settings ;;
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
-        *" waybar") waybar_settings ;;
+        *" bar") waybar_settings ;;
         *" dictation") dotfiles-dictation-tui; load_preferences ;;
         *" laptop") laptop_settings ;;
         *" close") exit 0 ;;

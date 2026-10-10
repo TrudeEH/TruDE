@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
+if [ ! -x "$base/bin/bar" ] || [ "$base/bar.c" -nt "$base/bin/bar" ] \
+    || [ "$base/status.c" -nt "$base/bin/bar" ] || [ "$base/build.sh" -nt "$base/bin/bar" ] || [ "$base/layer-shell.xml" -nt "$base/bin/bar" ]; then
+    "$base/build.sh"
+fi
+# Keep the legacy settings key so existing preferences survive the migration.
+settings=${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/settings.json
+if [ "$#" -eq 0 ] && command -v jq >/dev/null 2>&1 \
+    && [ -f "$settings" ] && [ "$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$settings")" = false ]; then
+    outputs=$(hyprctl -j monitors | jq -r '.[].name')
+    children=
+    trap 'for pid in $children; do kill "$pid" 2>/dev/null || :; done; wait' 0
+    trap 'exit 0' HUP INT TERM
+    trap ':' USR1
+    for output in $outputs; do
+        "$base/bin/bar" "$output" &
+        children="$children $!"
+    done
+    wait
+    exit 0
+fi
+exec "$base/bin/bar" "$@"

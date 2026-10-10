@@ -21,7 +21,7 @@ model=$(jq -r '.dictation.model // "base"' "$preferences_file" 2>/dev/null || pr
 model_valid "$model" || model=base
 refresh_launcher() {
     # Refresh the original center and both dividers with the same realtime signal.
-    pkill -RTMIN+9 -u "$(id -u)" -x waybar 2>/dev/null || :
+    systemctl --user kill --signal=USR1 dotfiles-bar.service 2>/dev/null || :
 }
 state() {
     printf '%s\n' "$1" > "$runtime/state.new"

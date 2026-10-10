@@ -180,7 +180,7 @@ update_system() {
                 printf '\nReloading Hyprland…\n\n'
                 hyprctl reload || update_failed=1
                 printf '\nRestarting Waybar…\n\n'
-                systemctl --user restart waybar.service || update_failed=1
+                systemctl --user restart dotfiles-bar.service || update_failed=1
             else
                 printf '\nThe TruDE installer failed; skipping desktop reload.\n'
                 update_failed=1
@@ -199,8 +199,8 @@ update_system() {
     fi
     printf 'Press Enter to return to maintenance status.'
     IFS= read -r _
-    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-waybar-maintenance.json"
-    pkill -RTMIN+8 waybar 2>/dev/null || :
+    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-bar-maintenance.json"
+    systemctl --user kill --signal=USR1 dotfiles-bar.service 2>/dev/null || :
     collect_status
 }
 

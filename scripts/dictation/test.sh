@@ -69,7 +69,7 @@ grep -q 'start dotfiles-dictation.service' "$temporary/systemctl"
 [ "$(cat "$temporary/clipboard")" = 'Hello world. Another sentence.' ]
 grep -Fq 'hl.dsp.send_shortcut({mods="CTRL_SHIFT",key="v",window="address:0x123"})' "$temporary/paste"
 grep -q -- '--foreground --type text/plain' "$temporary/clipboard-unit"
-grep -q -- '-RTMIN+9' "$temporary/signals"
+grep -q -- 'kill --signal=USR1 dotfiles-bar.service' "$temporary/systemctl"
 TEST_CLASS=firefox "$repo/scripts/dictation/worker"
 grep -Fq 'hl.dsp.send_shortcut({mods="CTRL",key="v",window="address:0x123"})' "$temporary/paste"
 [ ! -f "$XDG_RUNTIME_DIR/dotfiles-dictation/state" ]
@@ -86,22 +86,22 @@ chmod +x "$temporary/bin/pw-cli"
 for inactive in dictation-error recording transcribing; do
     printf '%s\n' "$inactive" > "$XDG_RUNTIME_DIR/dotfiles-dictation/state"
     rm -f "$XDG_RUNTIME_DIR/dotfiles-waybar-launcher-status"
-    "$repo/scripts/waybar/launcher-status" center | jq -e '.class == "launcher"' >/dev/null
+    "$repo/scripts/bar/launcher-status" center | jq -e '.class == "launcher"' >/dev/null
 done
 exec 7>"$XDG_RUNTIME_DIR/dotfiles-dictation/worker.lock"
 flock 7
 rm -f "$XDG_RUNTIME_DIR/dotfiles-waybar-launcher-status"
 printf recording > "$XDG_RUNTIME_DIR/dotfiles-dictation/state"
-"$repo/scripts/waybar/launcher-status" center | jq -e '.class == "recording" and (.tooltip | contains("Super+D"))' >/dev/null
+"$repo/scripts/bar/launcher-status" center | jq -e '.class == "recording" and (.tooltip | contains("Super+D"))' >/dev/null
 printf transcribing > "$XDG_RUNTIME_DIR/dotfiles-dictation/state"
 rm -f "$XDG_RUNTIME_DIR/dotfiles-waybar-launcher-status"
-"$repo/scripts/waybar/launcher-status" center | jq -e '.class == "transcribing"' >/dev/null
+"$repo/scripts/bar/launcher-status" center | jq -e '.class == "transcribing"' >/dev/null
 for part in left right; do
-    "$repo/scripts/waybar/launcher-status" "$part" | jq -e '.class == "transcribing"' >/dev/null
+    "$repo/scripts/bar/launcher-status" "$part" | jq -e '.class == "transcribing"' >/dev/null
 done
 # No cached timer state: the next call must observe this change immediately.
 printf recording > "$XDG_RUNTIME_DIR/dotfiles-dictation/state"
-"$repo/scripts/waybar/launcher-status" center | jq -e '.class == "recording"' >/dev/null
+"$repo/scripts/bar/launcher-status" center | jq -e '.class == "recording"' >/dev/null
 # Removing one model preserves a runtime still needed by another.
 flock -u 7
 mkdir -p "$XDG_DATA_HOME/dotfiles/dictation/backends/sherpa/bin" "$XDG_DATA_HOME/dotfiles/dictation/models/moonshine-tiny" "$XDG_DATA_HOME/dotfiles/dictation/models/parakeet-v3"
