@@ -63,15 +63,32 @@ static void bar_status(const char *text, const char *tooltip, const char *class)
 static void plain(int index,const char *text) { if(strcmp(items[index].text,text)) {snprintf(items[index].text,sizeof items[index].text,"%s",text);redraw=1;} }
 static void color(cairo_t *c,unsigned rgb) { cairo_set_source_rgb(c,((rgb>>16)&255)/255.,((rgb>>8)&255)/255.,(rgb&255)/255.); }
 static void rect(cairo_t *c,double x,double y,double w,double h,unsigned rgb) {color(c,rgb);cairo_rectangle(c,x,y,w,h);cairo_fill(c);}
+/* Bounded layout cache: avoid font setup and markup parsing on every frame. */
+struct text_cache { char markup[4096]; int size; PangoLayout *layout; };
+static struct text_cache text_cache[32];
+static unsigned text_cache_next;
 static void text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb) {
-    PangoLayout *l=pango_cairo_create_layout(c); PangoFontDescription *font=pango_font_description_new();
-    pango_font_description_set_family(font,"JetBrainsMono Nerd Font");pango_font_description_set_weight(font,PANGO_WEIGHT_MEDIUM);
-    pango_font_description_set_absolute_size(font,size*PANGO_SCALE);pango_layout_set_font_description(l,font);
-    GError *err=NULL; PangoAttrList *attrs=NULL;char *parsed=NULL;
-    if(pango_parse_markup(markup,-1,0,&attrs,&parsed,NULL,&err)) {pango_layout_set_text(l,parsed,-1);pango_layout_set_attributes(l,attrs);pango_attr_list_unref(attrs);g_free(parsed);}
-    else {g_clear_error(&err);pango_layout_set_text(l,markup,-1);}
-    int tw,th;pango_layout_get_pixel_size(l,&tw,&th);color(c,rgb);cairo_move_to(c,x+(w-tw)/2,y+(27-th)/2);pango_cairo_show_layout(c,l);
-    pango_font_description_free(font);g_object_unref(l);
+    struct text_cache *entry=NULL;
+    for(unsigned i=0;i<32;i++)if(text_cache[i].layout&&text_cache[i].size==size&&!strcmp(text_cache[i].markup,markup)){entry=&text_cache[i];break;}
+    if(!entry){
+        entry=&text_cache[text_cache_next++%32];
+        if(entry->layout)g_object_unref(entry->layout);
+        entry->layout=pango_cairo_create_layout(c);entry->size=size;
+        snprintf(entry->markup,sizeof entry->markup,"%s",markup);
+        PangoFontDescription *font=pango_font_description_new();
+        pango_font_description_set_family(font,"JetBrainsMono Nerd Font");
+        pango_font_description_set_weight(font,PANGO_WEIGHT_MEDIUM);
+        pango_font_description_set_absolute_size(font,size*PANGO_SCALE);
+        pango_layout_set_font_description(entry->layout,font);pango_font_description_free(font);
+        GError *err=NULL;PangoAttrList *attrs=NULL;char *parsed=NULL;
+        if(pango_parse_markup(markup,-1,0,&attrs,&parsed,NULL,&err)){
+            pango_layout_set_text(entry->layout,parsed,-1);pango_layout_set_attributes(entry->layout,attrs);
+            pango_attr_list_unref(attrs);g_free(parsed);
+        }else{g_clear_error(&err);pango_layout_set_text(entry->layout,markup,-1);}
+    }
+    pango_cairo_update_layout(c,entry->layout);
+    int tw,th;pango_layout_get_pixel_size(entry->layout,&tw,&th);
+    color(c,rgb);cairo_move_to(c,x+(w-tw)/2,y+(27-th)/2);pango_cairo_show_layout(c,entry->layout);
 }
 static void wedge(cairo_t *c,double x,int direction,unsigned rgb) {
     color(c,rgb);cairo_move_to(c,x+(direction>0?0:12),3);cairo_line_to(c,x+(direction>0?12:0),16.5);cairo_line_to(c,x+(direction>0?0:12),30);cairo_close_path(c);cairo_fill(c);
@@ -118,7 +135,7 @@ static void render(void) {
         if(id==POWER&&!strcmp(i->class,"power-saver"))fg=0x57e389;
         if(id==hover)fg=id==LAUNCH?0x595953:id==MENU?0xffa348:0xbfbfc0;
         rect(c,i->x,3,i->w,27,bg);
-        text(c,i->text,i->x,3,i->w,id==LAUNCH?20:id==MENU?16:12,fg);
+        if(id!=LAUNCH)text(c,i->text,i->x,3,i->w,id==MENU?16:12,fg);
         if(id>=TEMP&&id<=CPU){rect(c,i->x-12,3,12,27,id==TEMP?bg0:items[id-1].bg);wedge(c,i->x-12,-1,bg);}
         if(id>=CLOCK&&id<=INDICATORS){rect(c,i->x+i->w,3,12,27,id==INDICATORS?bg0:items[id+1].bg);wedge(c,i->x+i->w,1,bg);}
         if(id>=VOLUME&&id<=POWER){rect(c,i->x-12,3,12,27,id==VOLUME?bg0:items[id-1].bg);wedge(c,i->x-12,-1,bg);}
@@ -261,6 +278,23 @@ static void maintenance(void) {char path[PATH_MAX];snprintf(path,sizeof path,"%s
 #include <pulse/pulseaudio.h>
 static pa_mainloop *audio_loop;
 static pa_context *audio;
+/* Mirror PulseAudio descriptors into the outer poll so audio stays event-driven. */
+static struct pollfd *audio_fds;
+static unsigned audio_nfds,audio_capacity;
+static int audio_poll_failed;
+static struct pollfd *poll_fds;
+static unsigned poll_capacity;
+static int audio_poll(struct pollfd *fds,unsigned long n,int timeout,void *data){
+    (void)timeout;(void)data;
+    struct pollfd *copy=n>audio_capacity?realloc(audio_fds,n*sizeof *copy):audio_fds;
+    audio_poll_failed=n&&!copy;
+    if(!audio_poll_failed){
+        audio_fds=copy;audio_nfds=(unsigned)n;
+        if(n>audio_capacity)audio_capacity=(unsigned)n;
+        for(unsigned i=0;i<audio_nfds;i++){audio_fds[i]=fds[i];audio_fds[i].revents=0;}
+    }else audio_nfds=0;
+    return poll(fds,n,0);
+}
 static char default_sink[256];
 static void server_info(pa_context *c,const pa_server_info *info,void *data);
 static pa_cvolume sink_volume;
@@ -294,7 +328,7 @@ static void sink_info(pa_context *c,const pa_sink_info *info,int eol,void *data)
 static void server_info(pa_context *c,const pa_server_info *info,void *data){(void)data;if(!info)return;snprintf(default_sink,sizeof default_sink,"%s",info->default_sink_name?info->default_sink_name:"");pa_operation *o=pa_context_get_sink_info_by_name(c,default_sink,sink_info,NULL);if(o)pa_operation_unref(o);}
 static void audio_event(pa_context *c,pa_subscription_event_type_t t,uint32_t idx,void *data){(void)t;(void)idx;(void)data;pa_operation *o=pa_context_get_server_info(c,server_info,NULL);if(o)pa_operation_unref(o);}
 static void audio_state(pa_context *c,void *data){(void)data;if(pa_context_get_state(c)==PA_CONTEXT_READY){pa_context_set_subscribe_callback(c,audio_event,NULL);pa_operation *o=pa_context_subscribe(c,PA_SUBSCRIPTION_MASK_SINK|PA_SUBSCRIPTION_MASK_SERVER,NULL,NULL);if(o)pa_operation_unref(o);o=pa_context_get_server_info(c,server_info,NULL);if(o)pa_operation_unref(o);}}
-static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio_loop=pa_mainloop_new();audio=pa_context_new(pa_mainloop_get_api(audio_loop),"dotfiles-bar");pa_context_set_state_callback(audio,audio_state,NULL);pa_context_connect(audio,NULL,PA_CONTEXT_NOFLAGS,NULL);}
+static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio_loop=pa_mainloop_new();pa_mainloop_set_poll_func(audio_loop,audio_poll,NULL);audio=pa_context_new(pa_mainloop_get_api(audio_loop),"dotfiles-bar");pa_context_set_state_callback(audio,audio_state,NULL);pa_context_connect(audio,NULL,PA_CONTEXT_NOFLAGS,NULL);}
 
 /* StatusNotifier watcher: clients register their own D-Bus name/object path.
  * IconPixmap works without loading a GTK icon theme; common IconName clients
@@ -491,10 +525,26 @@ int main(int argc,char **argv){
         while(wl_display_prepare_read(display)!=0)if(wl_display_dispatch_pending(display)<0){running=0;break;}
         if(!running)break;
         wl_display_flush(display);
-        struct pollfd fds[5]={{wl_display_get_fd(display),POLLIN,0},{system_bus?sd_bus_get_fd(system_bus):-1,POLLIN,0},{session_bus?sd_bus_get_fd(session_bus):-1,POLLIN,0},{pw_loop_get_fd(pw_main_loop_get_loop(pwloop)),POLLIN,0},{event_fd,POLLIN,0}};
-        poll(fds,5,(hover>=0||workspace_hover||volume_requests)?16:250);if(fds[0].revents&POLLIN){if(wl_display_read_events(display)<0)running=0;}else wl_display_cancel_read(display);wl_display_dispatch_pending(display);
+        /* One-second status deadline; input and all backend sockets wake us earlier.
+         * Hover needs no busy polling: Wayland delivers motion/button events. */
+        if(poll_capacity<5+audio_nfds){
+            struct pollfd *next=realloc(poll_fds,(5+audio_nfds)*sizeof *next);
+            if(!next){wl_display_cancel_read(display);running=0;break;}
+            poll_fds=next;poll_capacity=5+audio_nfds;
+        }
+        struct pollfd *fds=poll_fds;
+        fds[0]=(struct pollfd){wl_display_get_fd(display),POLLIN,0};
+        fds[1]=(struct pollfd){system_bus?sd_bus_get_fd(system_bus):-1,POLLIN,0};
+        fds[2]=(struct pollfd){session_bus?sd_bus_get_fd(session_bus):-1,POLLIN,0};
+        fds[3]=(struct pollfd){pw_loop_get_fd(pw_main_loop_get_loop(pwloop)),POLLIN,0};
+        fds[4]=(struct pollfd){event_fd,POLLIN,0};
+        for(unsigned i=0;i<audio_nfds;i++)fds[5+i]=audio_fds[i];
+        poll(fds,5+audio_nfds,audio_poll_failed?16:1000);
+        if(fds[0].revents&POLLIN){if(wl_display_read_events(display)<0)running=0;}else wl_display_cancel_read(display);
+        wl_display_dispatch_pending(display);
+        short event_ready=fds[4].revents;
         drain(&system_bus);drain(&session_bus);pw_loop_iterate(pw_main_loop_get_loop(pwloop),0);pa_mainloop_iterate(audio_loop,0,NULL);
-        if(event_fd>=0&&fds[4].revents){char events[4096];ssize_t n=read(event_fd,events,sizeof events);if(n>0){events[(size_t)n<sizeof events?(size_t)n:sizeof events-1]=0;if(strstr(events,"workspace")||strstr(events,"focusedmon")||strstr(events,"openwindow")||strstr(events,"closewindow")||strstr(events,"movewindow"))workspaces();}else if(n==0){close(event_fd);event_fd=-1;}}
+        if(event_fd>=0&&event_ready){char events[4096];ssize_t n=read(event_fd,events,sizeof events);if(n>0){events[(size_t)n<sizeof events?(size_t)n:sizeof events-1]=0;if(strstr(events,"workspace")||strstr(events,"focusedmon")||strstr(events,"openwindow")||strstr(events,"closewindow")||strstr(events,"movewindow"))workspaces();}else if(n==0){close(event_fd);event_fd=-1;}}
         time_t now=time(NULL);
         if(refresh_requested){refresh_requested=0;dirty=1;last_maintenance=0;last_power=0;}
         if(dirty||now!=last_second){char out[128];struct tm tm;localtime_r(&now,&tm);strftime(out,sizeof out,"%I:%M %p",&tm);plain(CLOCK,out);strftime(out,sizeof out,"%d %b",&tm);plain(DATE,out);selected_mode=LAUNCH;launcher();last_second=now;}
@@ -507,6 +557,8 @@ int main(int argc,char **argv){
         if(hover>=0&&now-hover_since>=1)show_tooltip();
     }
     hide_tooltip();
+    free(audio_fds);free(poll_fds);
+    for(unsigned i=0;i<32;i++)if(text_cache[i].layout)g_object_unref(text_cache[i].layout);
     fprintf(stderr,"dotfiles-bar: %u frames rendered\n",frames);
     if(event_fd>=0)close(event_fd);
     pa_context_disconnect(audio);pa_context_unref(audio);pa_mainloop_free(audio_loop);disconnect_pipewire();pw_context_destroy(context);pw_main_loop_destroy(pwloop);pw_deinit();
