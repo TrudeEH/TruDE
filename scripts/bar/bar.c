@@ -44,7 +44,11 @@ static struct wl_callback *frame_callback;
 static int frame_pending;
 static void show_tooltip(void);
 static void hide_tooltip(void);
-static time_t hover_since;
+static int64_t hover_deadline;
+static int64_t monotonic_ms(void){
+    struct timespec now;clock_gettime(CLOCK_MONOTONIC,&now);
+    return (int64_t)now.tv_sec*1000+now.tv_nsec/1000000;
+}
 static void draw_tray(cairo_t *c);
 static void click_tray(uint32_t button);
 static void adjust_volume(int steps);
@@ -195,7 +199,7 @@ static void workspaces(void) {
         json_object_put(a);}redraw=1;
 }
 static void spawn(const char *command) {if(!command)return;pid_t pid=fork();if(pid==0){setsid();execl("/bin/sh","sh","-c",command,(char*)NULL);_exit(127);}}
-static void hover_at(double x){tray_hover=x>=17&&x<17+tray_count*24?(int)(x-17)/24:-1;int h=-1;for(int i=0;i<ITEM_COUNT;i++)if(!(i>=VOLUME&&i<=POWER&&items[i].x<items[INDICATORS].x+items[INDICATORS].w+24)&&x>=items[i].x-((i==LAUNCH||i<=CPU||(i>=VOLUME&&i<=POWER))?12:0)&&x<items[i].x+items[i].w+((i==LAUNCH||(i>=CLOCK&&i<=INDICATORS))?12:0)){h=i;break;}int ws=x>=workspace_x&&x<workspace_x+160?1+(int)(x-workspace_x)/32:0;if(h!=hover||ws!=workspace_hover){hide_tooltip();hover_since=time(NULL);hover=h;workspace_hover=ws;redraw=1;}}
+static void hover_at(double x){tray_hover=x>=17&&x<17+tray_count*24?(int)(x-17)/24:-1;int h=-1;for(int i=0;i<ITEM_COUNT;i++)if(!(i>=VOLUME&&i<=POWER&&items[i].x<items[INDICATORS].x+items[INDICATORS].w+24)&&x>=items[i].x-((i==LAUNCH||i<=CPU||(i>=VOLUME&&i<=POWER))?12:0)&&x<items[i].x+items[i].w+((i==LAUNCH||(i>=CLOCK&&i<=INDICATORS))?12:0)){h=i;break;}int ws=x>=workspace_x&&x<workspace_x+160?1+(int)(x-workspace_x)/32:0;if(h!=hover||ws!=workspace_hover){hide_tooltip();hover_deadline=monotonic_ms()+250;hover=h;workspace_hover=ws;redraw=1;}}
 static void pointer_enter(void*d,struct wl_pointer*p,uint32_t serial,struct wl_surface*s,wl_fixed_t x,wl_fixed_t y){
     (void)d;(void)s;(void)y;
     if(hand_cursor){
@@ -525,8 +529,7 @@ int main(int argc,char **argv){
         while(wl_display_prepare_read(display)!=0)if(wl_display_dispatch_pending(display)<0){running=0;break;}
         if(!running)break;
         wl_display_flush(display);
-        /* One-second status deadline; input and all backend sockets wake us earlier.
-         * Hover needs no busy polling: Wayland delivers motion/button events. */
+        /* Backend events wake us early; a pending tooltip bounds the status timeout. */
         if(poll_capacity<5+audio_nfds){
             struct pollfd *next=realloc(poll_fds,(5+audio_nfds)*sizeof *next);
             if(!next){wl_display_cancel_read(display);running=0;break;}
@@ -539,7 +542,12 @@ int main(int argc,char **argv){
         fds[3]=(struct pollfd){pw_loop_get_fd(pw_main_loop_get_loop(pwloop)),POLLIN,0};
         fds[4]=(struct pollfd){event_fd,POLLIN,0};
         for(unsigned i=0;i<audio_nfds;i++)fds[5+i]=audio_fds[i];
-        poll(fds,5+audio_nfds,audio_poll_failed?16:1000);
+        int timeout=audio_poll_failed?16:1000;
+        if(hover>=0&&hover_deadline){
+            int64_t remaining=hover_deadline-monotonic_ms();
+            if(remaining<timeout)timeout=remaining>0?(int)remaining:0;
+        }
+        poll(fds,5+audio_nfds,timeout);
         if(fds[0].revents&POLLIN){if(wl_display_read_events(display)<0)running=0;}else wl_display_cancel_read(display);
         wl_display_dispatch_pending(display);
         short event_ready=fds[4].revents;
@@ -554,7 +562,9 @@ int main(int argc,char **argv){
         if((dirty&&now-last_power>=1)||now-last_power>=30){selected_mode=POWER;power();last_power=now;}dirty=0;
         if(now-last_retry>=5){if(pa_context_get_state(audio)==PA_CONTEXT_FAILED){pa_context_unref(audio);pa_mainloop_free(audio_loop);init_audio();}connect_buses();if(pw_failed)disconnect_pipewire();if(!core)connect_pipewire();if(event_fd<0){event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;}last_retry=now;}
         render();
-        if(hover>=0&&now-hover_since>=1)show_tooltip();
+        if(hover>=0&&(!hover_deadline||monotonic_ms()>=hover_deadline)){
+            hover_deadline=0;show_tooltip();
+        }
     }
     hide_tooltip();
     free(audio_fds);free(poll_fds);
