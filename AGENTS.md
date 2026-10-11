@@ -3,6 +3,7 @@ Do not create or edit a README file unless the user asks.
 Assume the base system these dotfiles are meant for is a minimal debian installation.
 Always use `sh` for scripting instead of `bash`.
 Never add tests to the repository. If you need to test your changes do it in a temporary way and don't commit scripts used for testing.
+Never add reports, benchmarks, or any other temporary information to the repo, unless the user asks for it to be included.
 
 ## Visual design
 
