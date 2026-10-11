@@ -300,7 +300,7 @@ static void indicators(void) {
 
 struct node {
     struct node *next; uint32_t id; struct pw_node *proxy;
-    struct spa_hook hook; int screen, video;
+    struct spa_hook hook; struct pw_properties *props; int screen, video;
 };
 static struct node *nodes;
 static struct pw_main_loop *pwloop;
@@ -316,9 +316,14 @@ static void core_error(void *data, uint32_t id, int seq, int res, const char *me
 static const struct pw_core_events core_events = { PW_VERSION_CORE_EVENTS, .error = core_error };
 static void node_info(void *data, const struct pw_node_info *info) {
     struct node *n = data;
-    if (!info->props) return;
-    const char *role = spa_dict_lookup(info->props, "media.role");
-    const char *class = spa_dict_lookup(info->props, "media.class");
+    if (!(info->change_mask & PW_NODE_CHANGE_MASK_PROPS) || !info->props) return;
+    /* Node properties arrive as deltas. Unrelated updates must not erase the
+     * screen role or video class; explicit removals still clear the flags. */
+    if (!n->props) n->props = pw_properties_new(NULL, NULL);
+    if (!n->props) return;
+    pw_properties_update(n->props, info->props);
+    const char *role = pw_properties_get(n->props, "media.role");
+    const char *class = pw_properties_get(n->props, "media.class");
     n->screen = role && !strcmp(role, "Screen");
     n->video = class && (!strcmp(class, "Stream/Input/Video") || !strcmp(class, "Stream/Output/Video") || !strcmp(class, "Video/Source"));
     dirty = 1;
@@ -339,7 +344,7 @@ static void removed(void *data, uint32_t id) {
     struct node **p = &nodes;
     while (*p) {
         struct node *n = *p;
-        if (n->id == id) { *p = n->next; spa_hook_remove(&n->hook); pw_proxy_destroy((struct pw_proxy *)n->proxy); free(n); dirty = 1; return; }
+        if (n->id == id) { *p = n->next; spa_hook_remove(&n->hook); pw_proxy_destroy((struct pw_proxy *)n->proxy); pw_properties_free(n->props); free(n); dirty = 1; return; }
         p = &n->next;
     }
 }
