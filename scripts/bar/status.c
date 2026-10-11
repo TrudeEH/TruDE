@@ -450,6 +450,7 @@ int main(int argc, char **argv) {
     if (!strcmp(mode, "launcher")) {
         pw_init(NULL, NULL); pwloop = pw_main_loop_new(NULL);
         if (!pwloop) return 1;
+        pw_loop_enter(pw_main_loop_get_loop(pwloop));
         context = pw_context_new(pw_main_loop_get_loop(pwloop), NULL, 0);
         connect_pipewire();
         /* Receive the initial registry before producing the first output. */
@@ -508,7 +509,7 @@ int main(int argc, char **argv) {
     if (notify >= 0) close(notify);
     disconnect_pipewire();
     if (context) pw_context_destroy(context);
-    if (pwloop) { pw_main_loop_destroy(pwloop); pw_deinit(); }
+    if (pwloop) { pw_loop_leave(pw_main_loop_get_loop(pwloop)); pw_main_loop_destroy(pwloop); pw_deinit(); }
     sd_bus_flush_close_unref(system_bus); sd_bus_flush_close_unref(session_bus);
     return 0;
 }

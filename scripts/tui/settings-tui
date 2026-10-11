@@ -277,10 +277,18 @@ apply_wallpaper() {
 apply_waybar() {
     if [ "$(preference '.waybar.enabled')" = true ]; then
         systemctl --user reset-failed dotfiles-bar.service >/dev/null 2>&1 || :
-        systemctl --user enable dotfiles-bar.service >/dev/null 2>&1 || :
-        systemctl --user restart dotfiles-bar.service >/dev/null 2>&1 || :
+        # disable removes external unit links; enable from the repository path.
+        bar_unit=$(dirname -- "$(readlink -f -- "$0")")/../../configs/systemd/user/dotfiles-bar.service
+        if ! output=$(systemctl --user enable "$bar_unit" 2>&1) \
+            || ! output=$(systemctl --user restart dotfiles-bar.service 2>&1); then
+            message "Settings were saved, but the bar could not start:\n\n$output"
+            return 1
+        fi
     else
-        systemctl --user disable --now dotfiles-bar.service >/dev/null 2>&1 || :
+        if ! output=$(systemctl --user disable --now dotfiles-bar.service 2>&1); then
+            message "Settings were saved, but the bar could not stop:\n\n$output"
+            return 1
+        fi
     fi
 }
 

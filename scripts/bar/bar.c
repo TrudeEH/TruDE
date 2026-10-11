@@ -565,7 +565,9 @@ int main(int argc,char **argv){
     zwlr_layer_surface_v1_add_listener(layer,&layer_listener,NULL);zwlr_layer_surface_v1_set_size(layer,0,height);
     zwlr_layer_surface_v1_set_anchor(layer,ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT|ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT|(bottom?ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP));
     zwlr_layer_surface_v1_set_exclusive_zone(layer,height);zwlr_layer_surface_v1_set_keyboard_interactivity(layer,0);wl_surface_commit(surface);wl_display_roundtrip(display);
-    connect_buses();init_tray();pw_init(NULL,NULL);pwloop=pw_main_loop_new(NULL);context=pw_context_new(pw_main_loop_get_loop(pwloop),NULL,0);connect_pipewire();init_audio();
+    connect_buses();init_tray();pw_init(NULL,NULL);pwloop=pw_main_loop_new(NULL);
+    /* Embedded loops must enter their dispatch thread before binding new nodes. */
+    pw_loop_enter(pw_main_loop_get_loop(pwloop));context=pw_context_new(pw_main_loop_get_loop(pwloop),NULL,0);connect_pipewire();init_audio();
     int event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;workspaces();statistics();temperatures();watch_maintenance();maintenance();maintenance_dirty=0;
     int64_t last_stats=0,last_temp=0,last_indicator=0,last_power=0,last_second=0,last_retry=0,last_maintenance=0,last_cache=0;
     while(running){
@@ -605,7 +607,7 @@ int main(int argc,char **argv){
         wl_display_dispatch_pending(display);
         short event_ready=fds[4].revents;
         if(fds[5].revents)maintenance_events();
-        drain(&system_bus);drain(&session_bus);pw_loop_iterate(pw_main_loop_get_loop(pwloop),0);pa_mainloop_iterate(audio_loop,0,NULL);
+        drain(&system_bus);drain(&session_bus);if(pw_loop_iterate(pw_main_loop_get_loop(pwloop),0)<0)pw_failed=1;pa_mainloop_iterate(audio_loop,0,NULL);
         if(event_fd>=0&&event_ready){char events[4096];ssize_t n=read(event_fd,events,sizeof events);if(n>0){events[(size_t)n<sizeof events?(size_t)n:sizeof events-1]=0;if(strstr(events,"workspace")||strstr(events,"focusedmon")||strstr(events,"openwindow")||strstr(events,"closewindow")||strstr(events,"movewindow"))workspaces();}else if(n==0){close(event_fd);event_fd=-1;}}
         int64_t now=monotonic_ms()/1000;
         if(refresh_requested){refresh_requested=0;dirty=1;query_generation++;maintenance_dirty=1;last_maintenance=0;last_power=0;}
@@ -629,7 +631,7 @@ int main(int argc,char **argv){
     for(unsigned i=0;i<32;i++)if(text_cache[i].layout)g_object_unref(text_cache[i].layout);
     fprintf(stderr,"dotfiles-bar: %u frames rendered\n",frames);
     if(event_fd>=0)close(event_fd);
-    pa_context_disconnect(audio);pa_context_unref(audio);pa_mainloop_free(audio_loop);disconnect_pipewire();pw_context_destroy(context);pw_main_loop_destroy(pwloop);pw_deinit();
+    pa_context_disconnect(audio);pa_context_unref(audio);pa_mainloop_free(audio_loop);disconnect_pipewire();pw_context_destroy(context);pw_loop_leave(pw_main_loop_get_loop(pwloop));pw_main_loop_destroy(pwloop);pw_deinit();
     for(int i=0;i<2;i++)if(buffers[i].object){wl_buffer_destroy(buffers[i].object);munmap(buffers[i].data,buffers[i].size);}
     zwlr_layer_surface_v1_destroy(layer);wl_surface_destroy(surface);sd_bus_flush_close_unref(system_bus);sd_bus_flush_close_unref(session_bus);wl_display_disconnect(display);return 0;
 }
