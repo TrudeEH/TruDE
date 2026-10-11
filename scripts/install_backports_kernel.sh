@@ -17,4 +17,6 @@ esac
 backports_suite=$VERSION_CODENAME-backports
 
 sudo apt-get update
-sudo apt-get install -y "linux-image-$architecture/$backports_suite" "linux-headers-$architecture/$backports_suite"
+# Select backports for the whole transaction so new kernel dependencies can
+# upgrade from stable when required, not just the kernel metapackages.
+sudo apt-get install -y -t "$backports_suite" "linux-image-$architecture" "linux-headers-$architecture"
