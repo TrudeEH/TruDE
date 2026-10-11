@@ -123,6 +123,6 @@ int task_save(J *, J *, MCP *, const char *), task_delete(const char *), run_tas
     run_due(void), timer_change(int);
 J *task_patch(const char *, J *);
 char *timer_status(void), *export_chat(J *);
-int tui(J *), selftest(void);
+int tui(J *);
 int validate_schema(J *, J *);
 #endif

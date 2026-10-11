@@ -100,17 +100,10 @@ static J *api(const char *method,const char *endpoint,J *payload) {
     struct curl_slist *headers=NULL;headers=curl_slist_append(headers,auth);free(auth);headers=curl_slist_append(headers,"Content-Type: application/json");
     if(request_id){char header[128];snprintf(header,sizeof header,"X-Request-Id: %s",request_id);headers=curl_slist_append(headers,header);}
     char url[8192];snprintf(url,sizeof url,"https://api.todoist.com/api/v1/%s",endpoint);
-#ifdef TASKS_TEST_API
-    const char *test_url=getenv("TASKS_TEST_API_URL");
-    if(test_url)snprintf(url,sizeof url,"%s/%s",test_url,endpoint);
-#endif
     Buffer body={0};char *json=payload?jd(payload,0):NULL;char curl_error[CURL_ERROR_SIZE]={0};
     curl_easy_setopt(curl,CURLOPT_URL,url);curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,method);
     curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,3L);curl_easy_setopt(curl,CURLOPT_TIMEOUT,30L);
     curl_easy_setopt(curl,CURLOPT_NOSIGNAL,1L);curl_easy_setopt(curl,CURLOPT_PROTOCOLS_STR,"https");
-#ifdef TASKS_TEST_API
-    if(test_url)curl_easy_setopt(curl,CURLOPT_PROTOCOLS_STR,"http,https");
-#endif
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,receive);curl_easy_setopt(curl,CURLOPT_WRITEDATA,&body);curl_easy_setopt(curl,CURLOPT_ERRORBUFFER,curl_error);
     if(json)curl_easy_setopt(curl,CURLOPT_POSTFIELDS,json);
     CURLcode code=curl_easy_perform(curl);long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);

@@ -29,13 +29,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     const char *workspace = NULL, *taskid = NULL, *prompt = NULL, *server = NULL;
-    int check = 0, due = 0, test = 0;
+    int check = 0, due = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--help")) {
             puts("Seth — native Debian AI agent\n\nUsage: dotfiles-agent-tui [--workspace DIR]\n   "
                  "    dotfiles-agent-tui --check\n       dotfiles-agent-tui --run-due | --run-task "
-                 "ID\n       dotfiles-agent-tui --prompt TEXT [--workspace DIR]\n       "
-                 "dotfiles-agent-tui --self-test\n\nEnter sends. Shift+Enter adds a line. F6 opens "
+                 "ID\n       dotfiles-agent-tui --prompt TEXT [--workspace DIR]\n"
+                 "\nEnter sends. Shift+Enter adds a line. F6 opens "
                  "chat help.\nSettings and history use the existing dotfiles-agent XDG "
                  "directories.");
             return 0;
@@ -49,8 +49,6 @@ int main(int argc, char **argv) {
             check = 1;
         else if (!strcmp(argv[i], "--run-due"))
             due = 1;
-        else if (!strcmp(argv[i], "--self-test"))
-            test = 1;
         else if (!strcmp(argv[i], "--mcp-filesystem"))
             server = "filesystem";
         else if (!strcmp(argv[i], "--mcp-web"))
@@ -66,8 +64,6 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
-    if (test)
-        return selftest();
     if (store_init()) {
         fprintf(stderr, "%s\n", err);
         return 1;

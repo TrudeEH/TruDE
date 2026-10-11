@@ -393,17 +393,9 @@ Uses XDG directories, defaulting to:
 | `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
 | `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |
 | `build.sh`, `setup.sh` | Native build and compatibility build entry point |
-| `src/tests.c`, `test/native.py`, `test.sh` | Native checks and development-only integration fixtures |
 
 Desktop integration lives in `configs/applications/dotfiles-agent.desktop`, the two
 `configs/systemd/user/dotfiles-agent.*` units, `configs/hypr/hyprland.lua`, and `install.sh`.
-
-Run `scripts/agent/test.sh` to rebuild and verify with a C compiler. The native
-self-tests need no other test runtime. If Python 3 is already available, the script
-also runs standard-library integration tests with isolated model/MCP endpoints and
-pseudo-terminal interactions. Python is only a development test helper; the agent,
-installer, scheduler, and bundled servers never invoke it. Tests use temporary XDG
-directories and do not contact a real model server or change user settings.
 
 To rebuild the local executable, run `scripts/agent/build.sh`. It uses only the
 compiler, standard Linux libc headers, and the linker; no dependency fetch

@@ -75,12 +75,6 @@ UI yet. Do not delete the cache or switch accounts as a substitute for resolving
 such an error. Request IDs reduce duplicate writes after ambiguous timeouts,
 but server deduplication is not a promise of indefinite exactly-once delivery.
 
-Run `python3 scripts/tasks/offline-test.py` for isolated local HTTP-server tests
-of cached reads, offline changes, retries, ID remapping, account isolation,
-corruption safety, and nonblocking cached UI startup. The HTTP endpoint override
-exists only in test builds; production remains HTTPS-only. No live Todoist
-account was used for these tests.
-
 ## Sidebar views
 
 **Tasks** contains All Tasks, Today (including overdue), Upcoming (dates after
@@ -143,40 +137,3 @@ are not implemented. Remote calls run in a background C thread; local filtering
 and navigation run inside the native UI without subprocesses.
 
 API reference: https://developer.todoist.com/api/v1/
-Run `sh scripts/tasks/test.sh` for backend tests and
-`python3 scripts/tasks/ui-test.py` for real-terminal keyboard/mouse UI tests.
-
-## Performance comparison
-
-Run `python3 scripts/tasks/benchmark.py --samples 25 --output scripts/tasks/benchmark-results.json`
-after building. The harness builds old commit `081fa76` separately and compares
-it with the current build using isolated local datasets (0, 100, 1,000 tasks).
-Python is needed only for tests/benchmarks, not the application.
-
-The recorded run used Debian, Ryzen 7 7700, GCC 14.2, `-O2`, 25 measured
-samples per version/dataset, and one discarded warmup. Versions alternate
-order. Both use the same data and a 110×34 pseudo-terminal. CLI times include
-the launcher; UI times end when Ready is rendered. Builds, dataset resets, and
-memory sampling are outside timed sections. Filesystem cache is warm.
-
-| Median, 1,000 tasks | Old C UI + shell backend | Native C application |
-| --- | ---: | ---: |
-| CLI list | 17.24 ms | 10.59 ms |
-| CLI add | 23.76 ms | 11.72 ms |
-| UI startup | 38.06 ms | 11.30 ms |
-| UI refresh | 35.46 ms | 4.21 ms |
-| Idle RSS | 20.80 MiB | 31.57 MiB |
-| Idle PSS | 19.15 MiB | 25.67 MiB |
-| Idle private memory | 19.13 MiB | 24.52 MiB |
-
-The new version is faster here, **not lower in idle RAM**. Linked libcurl and
-its dependencies remain resident; native JSON parsing/serialization also adds
-heap allocations inside the UI. The old backend subprocesses exit before idle
-memory is sampled. This is not a peak-memory comparison. RSS includes shared
-library pages; PSS apportions shared pages, and private memory excludes them.
-Measurements include the application process tree but not a terminal emulator.
-Raw results, p95 latency, and smaller datasets are in `benchmark-results.json`.
-These are local-mode results on this machine, not Todoist/network benchmarks or
-cold-start guarantees. Todoist integration has not been tested against a live
-account during this migration. The recorded benchmark predates the offline-cache/thread
-implementation and is historical, not a measurement of the current build.

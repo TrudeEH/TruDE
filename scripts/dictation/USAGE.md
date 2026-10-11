@@ -46,5 +46,3 @@ removes the runtime when the last model using it is deleted. Other models remain
 on disk, never loaded concurrently. Installers disable pip caching and remove
 staging files on success, failure, or handled signals. Hard kills/power loss can
 leave a setup directory; no unconditional startup deletion is performed.
-
-Run `sh scripts/dictation/test.sh` for isolated controller/lifecycle tests.
