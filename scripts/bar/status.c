@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef DOTFILES_BAR
+#include <stdarg.h>
+#endif
 
 /* No command execution: D-Bus and PipeWire connections survive each update. */
 static sd_bus *system_bus, *session_bus;
@@ -23,13 +26,112 @@ static void stop(int sig) { (void)sig; running = 0; }
 static const char *runtime, *mode, *part;
 static char previous[8192];
 static int dirty = 1;
+#ifdef DOTFILES_BAR
+/* Cache status replies only; never put synchronous method calls on the UI loop.
+ * Slots own pending calls, and replies remain valid until replaced. Signals
+ * invalidate requests; a bounded fallback also covers services without signals. */
+struct status_query {
+    struct status_query *next;
+    sd_bus *bus;
+    char *service, *path, *interface, *method, *property_interface, *key;
+    sd_bus_slot *slot;
+    sd_bus_message *reply;
+    unsigned generation;
+    int64_t requested, used;
+};
+static struct status_query *queries;
+static unsigned query_generation = 1, query_count;
+static int64_t query_seconds(void) {
+    struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec;
+}
+static int status_reply(sd_bus_message *m, void *data, sd_bus_error *error) {
+    (void)error;
+    struct status_query *q = data;
+    q->slot = sd_bus_slot_unref(q->slot);
+    sd_bus_message_unref(q->reply);
+    q->reply = sd_bus_message_is_method_error(m, NULL) ? NULL : sd_bus_message_ref(m);
+    dirty = 1;
+    return 0;
+}
+static void status_cache_clear(sd_bus *bus) {
+    struct status_query **p = &queries;
+    while (*p) {
+        struct status_query *q = *p;
+        if (bus && q->bus != bus) { p = &q->next; continue; }
+        *p = q->next;
+        sd_bus_slot_unref(q->slot); sd_bus_message_unref(q->reply);
+        free(q->service); free(q->path); free(q->interface); free(q->method); free(q->property_interface); free(q->key); free(q);
+        query_count--;
+    }
+}
+static void status_cache_prune(void) {
+    int64_t now = query_seconds();
+    struct status_query **p = &queries;
+    while (*p) {
+        struct status_query *q = *p;
+        if (q->slot || now - q->used < 60) { p = &q->next; continue; }
+        *p = q->next;
+        sd_bus_message_unref(q->reply);
+        free(q->service); free(q->path); free(q->interface); free(q->method);
+        free(q->property_interface); free(q->key); free(q); query_count--;
+    }
+}
+static int status_call(sd_bus *bus, const char *service, const char *path,
+                       const char *interface, const char *method,
+                       sd_bus_error *error, sd_bus_message **reply, const char *types, ...) {
+    (void)error;
+    *reply = NULL;
+    if (!bus) return -ENOTCONN;
+    /* Status methods have either no arguments or Properties.Get's two strings. */
+    const char *iface = "", *key = "";
+    va_list args; va_start(args, types);
+    if (!strcmp(types, "ss")) { iface = va_arg(args, const char *); key = va_arg(args, const char *); }
+    va_end(args);
+    struct status_query *q;
+    for (q = queries; q; q = q->next)
+        if (q->bus == bus && !strcmp(q->service, service) && !strcmp(q->path, path) &&
+            !strcmp(q->interface, interface) && !strcmp(q->method, method) && !strcmp(q->property_interface, iface) && !strcmp(q->key, key)) break;
+    if (!q) {
+        if (query_count >= 256) return -ENOSPC;
+        q = calloc(1, sizeof *q);
+        if (!q) return -ENOMEM;
+        q->service = strdup(service); q->path = strdup(path); q->interface = strdup(interface);
+        q->method = strdup(method); q->property_interface = strdup(iface); q->key = strdup(key);
+        if (!q->service || !q->path || !q->interface || !q->method || !q->property_interface || !q->key) {
+            free(q->service); free(q->path); free(q->interface); free(q->method); free(q->property_interface); free(q->key); free(q); return -ENOMEM;
+        }
+        q->bus = bus; q->next = queries; queries = q; query_count++;
+    }
+    int64_t now = query_seconds();
+    q->used = now;
+    int interval = !strcmp(interface, "fr.emersion.Mako") ? 5 : 30;
+    if (!q->slot && (q->generation != query_generation || now - q->requested >= interval)) {
+        q->generation = query_generation; q->requested = now;
+        if (!strcmp(types, "ss"))
+            sd_bus_call_method_async(bus, &q->slot, service, path, interface, method, status_reply, q, "ss", iface, key);
+        else
+            sd_bus_call_method_async(bus, &q->slot, service, path, interface, method, status_reply, q, "");
+    }
+    if (!q->reply) return -EAGAIN;
+    sd_bus_message_rewind(q->reply, 1);
+    *reply = sd_bus_message_ref(q->reply);
+    return 0;
+}
+#define status_method status_call
+#else
+#define status_method sd_bus_call_method
+#endif
 static int changed(sd_bus_message *m, void *data, sd_bus_error *e) {
-    (void)m; (void)data; (void)e; dirty = 1; return 0;
+    (void)m; (void)data; (void)e;
+#ifdef DOTFILES_BAR
+    query_generation++;
+#endif
+    dirty = 1; return 0;
 }
 static sd_bus_message *property(const char *service, const char *path,
                                const char *iface, const char *key) {
     sd_bus_message *m = NULL;
-    if (!system_bus || sd_bus_call_method(system_bus, service, path,
+    if (!system_bus || status_method(system_bus, service, path,
             "org.freedesktop.DBus.Properties", "Get", NULL, &m, "ss", iface, key) < 0) return NULL;
     /* Get returns a variant; expose its contained basic value to callers. */
     if (sd_bus_message_enter_container(m, 'v', NULL) < 0) {
@@ -107,7 +209,7 @@ static void power(void) {
 }
 static unsigned notifications(const char *method) {
     sd_bus_message *m = NULL; unsigned count = 0;
-    if (session_bus && sd_bus_call_method(session_bus, "org.freedesktop.Notifications", "/fr/emersion/Mako",
+    if (session_bus && status_method(session_bus, "org.freedesktop.Notifications", "/fr/emersion/Mako",
                                          "fr.emersion.Mako", method, NULL, &m, "") >= 0) {
         if (sd_bus_message_enter_container(m, 'a', "a{sv}") > 0)
             while (sd_bus_message_skip(m, "a{sv}") > 0) count++;
@@ -116,7 +218,7 @@ static unsigned notifications(const char *method) {
 }
 static int dnd(void) {
     sd_bus_message *m = NULL; const char *s; int result = 0;
-    if (session_bus && sd_bus_call_method(session_bus, "org.freedesktop.Notifications", "/fr/emersion/Mako",
+    if (session_bus && status_method(session_bus, "org.freedesktop.Notifications", "/fr/emersion/Mako",
                                          "fr.emersion.Mako", "ListModes", NULL, &m, "") >= 0) {
         if (sd_bus_message_enter_container(m, 'a', "s") > 0)
             while (sd_bus_message_read(m, "s", &s) > 0) if (!strcmp(s, "do-not-disturb")) result = 1;
@@ -127,7 +229,7 @@ static void indicators(void) {
     const char *neticon = "󰤭"; char nettip[128] = "Offline";
     sd_bus_message *m = NULL;
     int ethernet = 0, wifi = 0; unsigned strength = 0;
-    if (system_bus && sd_bus_call_method(system_bus, NM, "/org/freedesktop/NetworkManager", NM,
+    if (system_bus && status_method(system_bus, NM, "/org/freedesktop/NetworkManager", NM,
                                         "GetDevices", NULL, &m, "") >= 0) {
         const char *path;
         if (sd_bus_message_enter_container(m, 'a', "o") > 0)
@@ -149,7 +251,7 @@ static void indicators(void) {
         snprintf(nettip, sizeof nettip, "Wi-Fi (%u%%)", strength);
     } else if (ethernet) { neticon = "󰈀"; strcpy(nettip, "Ethernet connected"); }
     unsigned connected = 0; int powered = 0;
-    if (system_bus && sd_bus_call_method(system_bus, "org.bluez", "/", "org.freedesktop.DBus.ObjectManager",
+    if (system_bus && status_method(system_bus, "org.bluez", "/", "org.freedesktop.DBus.ObjectManager",
                                         "GetManagedObjects", NULL, &m, "") >= 0 &&
         sd_bus_message_enter_container(m, 'a', "{oa{sa{sv}}}") > 0) {
         while (sd_bus_message_enter_container(m, 'e', "oa{sa{sv}}") > 0) {
@@ -193,6 +295,8 @@ static void indicators(void) {
     snprintf(tip, sizeof tip, "%s\n%s\n%s", nettip, bttip, ntip);
     emit(text, tip, NULL);
 }
+
+#undef status_method
 
 struct node {
     struct node *next; uint32_t id; struct pw_node *proxy;
@@ -296,11 +400,17 @@ static void launcher(void) {
 static void connect_buses(void) {
     if (!system_bus && sd_bus_open_system(&system_bus) >= 0) {
         sd_bus_set_method_call_timeout(system_bus, 1000000);
+#ifdef DOTFILES_BAR
+        /* The native bar renders both power and connectivity in one process. */
+        {
+#else
         if (!strcmp(mode, "power")) {
+#endif
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='org.freedesktop.UPower',interface='org.freedesktop.DBus.Properties'", changed, NULL);
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='org.freedesktop.UPower.PowerProfiles',interface='org.freedesktop.DBus.Properties'", changed, NULL);
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='net.hadess.PowerProfiles',interface='org.freedesktop.DBus.Properties'", changed, NULL);
-        } else {
+        }
+        if (!strcmp(mode, "indicators")) {
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='org.freedesktop.NetworkManager',interface='org.freedesktop.DBus.Properties'", changed, NULL);
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='org.bluez',interface='org.freedesktop.DBus.Properties'", changed, NULL);
             sd_bus_add_match(system_bus, NULL, "type='signal',sender='org.bluez',interface='org.freedesktop.DBus.ObjectManager'", changed, NULL);
@@ -311,6 +421,9 @@ static void connect_buses(void) {
     if (!strcmp(mode, "indicators") && !session_bus && sd_bus_open_user(&session_bus) >= 0) {
         sd_bus_set_method_call_timeout(session_bus, 1000000);
         sd_bus_add_match(session_bus, NULL, "type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.DBus.Properties'", changed, NULL);
+#ifdef DOTFILES_BAR
+        sd_bus_add_match(session_bus, NULL, "type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.Notifications'", changed, NULL);
+#endif
         sd_bus_add_match(session_bus, NULL, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'", changed, NULL);
         dirty = 1;
     }
@@ -318,7 +431,12 @@ static void connect_buses(void) {
 static void drain(sd_bus **bus) {
     if (!*bus) return;
     int r; while ((r = sd_bus_process(*bus, NULL)) > 0) {}
-    if (r < 0) { *bus = sd_bus_flush_close_unref(*bus); dirty = 1; }
+    if (r < 0) {
+#ifdef DOTFILES_BAR
+        status_cache_clear(*bus);
+#endif
+        *bus = sd_bus_flush_close_unref(*bus); dirty = 1;
+    }
 }
 #ifndef DOTFILES_BAR
 int main(int argc, char **argv) {

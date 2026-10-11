@@ -261,6 +261,28 @@ static void global_registry(void*d,struct wl_registry*r,uint32_t name,const char
     else if(!strcmp(interface,"wl_seat")){seat=wl_registry_bind(r,name,&wl_seat_interface,version<5?version:5);wl_seat_add_listener(seat,&seat_listener,NULL);}}
 static void global_removed(void*d,struct wl_registry*r,uint32_t n){(void)d;(void)r;(void)n;}
 static const struct wl_registry_listener registry_listener={global_registry,global_removed};
+/* Sensor topology rarely changes. Retain paths, not file descriptors, so
+ * hot-unplug remains safe; failed reads trigger discovery on the next sample. */
+static glob_t sensor_paths;
+static int64_t sensor_discovery;
+static void temperatures(void) {
+    int64_t now = monotonic_ms();
+    if (!sensor_discovery || now - sensor_discovery >= 60000) {
+        globfree(&sensor_paths); memset(&sensor_paths, 0, sizeof sensor_paths);
+        glob("/sys/class/hwmon/hwmon*/temp*_input", 0, NULL, &sensor_paths);
+        glob("/sys/class/thermal/thermal_zone*/temp", GLOB_APPEND, NULL, &sensor_paths);
+        sensor_discovery = now;
+    }
+    long max = 0;
+    for (size_t i = 0; i < sensor_paths.gl_pathc; i++) {
+        long temp = 0; FILE *f = fopen(sensor_paths.gl_pathv[i], "r");
+        if (f) { if (fscanf(f, "%ld", &temp) == 1 && temp > max) max = temp; fclose(f); }
+        else sensor_discovery = 0;
+    }
+    char out[128]; snprintf(out, sizeof out, " %ld°C", max / 1000); plain(TEMP, out);
+    snprintf(items[TEMP].tip, sizeof items[TEMP].tip, "Maximum temperature: %ld°C", max / 1000);
+    strcpy(items[TEMP].class, max >= 90000 ? "critical" : "normal");
+}
 static void statistics(void) {
     char out[128];unsigned long long total=0,idle=0,v[10]={0};FILE*f=fopen("/proc/stat","r");
     if(f){char line[256];if(fgets(line,sizeof line,f)){sscanf(line,"cpu %llu %llu %llu %llu %llu %llu %llu %llu",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6],&v[7]);for(int i=0;i<8;i++)total+=v[i];idle=v[3]+v[4];}fclose(f);}
@@ -273,9 +295,30 @@ static void statistics(void) {
         fclose(f);}
     size_t used_tip=strlen(items[MEM].tip);snprintf(items[MEM].tip+used_tip,sizeof items[MEM].tip-used_tip,"\nzRAM: %.1f GiB / %.1f GiB\nSWAP: %.1f GiB / %.1f GiB",zram_used/1048576.,zram_total/1048576.,swap_used/1048576.,swap_total/1048576.);
     strcpy(items[MEM].class,percent>=90?"critical":percent>=75?"warning":"normal");
-    glob_t paths={0};long max=0;glob("/sys/class/hwmon/hwmon*/temp*_input",0,NULL,&paths);glob("/sys/class/thermal/thermal_zone*/temp",GLOB_APPEND,NULL,&paths);
-    for(size_t i=0;i<paths.gl_pathc;i++){long temp=0;f=fopen(paths.gl_pathv[i],"r");if(f){if(fscanf(f,"%ld",&temp)==1&&temp>max)max=temp;fclose(f);}}globfree(&paths);
-    snprintf(out,sizeof out," %ld°C",max/1000);plain(TEMP,out);snprintf(items[TEMP].tip,sizeof items[TEMP].tip,"Maximum temperature: %ld°C",max/1000);strcpy(items[TEMP].class,max>=90000?"critical":"normal");
+}
+static int maintenance_watch = -1;
+static int maintenance_dirty = 1;
+static void watch_maintenance(void) {
+    maintenance_watch = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+    if (maintenance_watch >= 0 && inotify_add_watch(maintenance_watch, runtime,
+            IN_MOVED_TO | IN_CLOSE_WRITE | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF) < 0) {
+        close(maintenance_watch); maintenance_watch = -1;
+    }
+}
+static void maintenance_events(void) {
+    union { struct inotify_event align; char data[4096]; } buf;
+    ssize_t n;
+    while ((n = read(maintenance_watch, buf.data, sizeof buf.data)) > 0) {
+        for (size_t off = 0; off < (size_t)n;) {
+            struct inotify_event *e = (struct inotify_event *)(buf.data + off);
+            if ((e->mask & IN_Q_OVERFLOW) || (e->len && !strcmp(e->name, "dotfiles-bar-maintenance.json")))
+                maintenance_dirty = 1;
+            if (e->mask & (IN_IGNORED | IN_DELETE_SELF | IN_MOVE_SELF)) {
+                close(maintenance_watch); maintenance_watch = -1; maintenance_dirty = 1; return;
+            }
+            off += sizeof *e + e->len;
+        }
+    }
 }
 static void maintenance(void) {char path[PATH_MAX];snprintf(path,sizeof path,"%s/dotfiles-bar-maintenance.json",runtime);struct json_object *o=json_object_from_file(path),*v;
     if(o){if(json_object_object_get_ex(o,"class",&v)){const char *cls=json_object_get_string(v);if(strcmp(items[MAINT].class,cls))redraw=1;snprintf(items[MAINT].class,sizeof items[MAINT].class,"%s",cls);}if(json_object_object_get_ex(o,"text",&v))plain(MAINT,json_object_get_string(v));if(json_object_object_get_ex(o,"tooltip",&v))snprintf(items[MAINT].tip,sizeof items[MAINT].tip,"%s",json_object_get_string(v));json_object_put(o);}}
@@ -523,17 +566,17 @@ int main(int argc,char **argv){
     zwlr_layer_surface_v1_set_anchor(layer,ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT|ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT|(bottom?ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP));
     zwlr_layer_surface_v1_set_exclusive_zone(layer,height);zwlr_layer_surface_v1_set_keyboard_interactivity(layer,0);wl_surface_commit(surface);wl_display_roundtrip(display);
     connect_buses();init_tray();pw_init(NULL,NULL);pwloop=pw_main_loop_new(NULL);context=pw_context_new(pw_main_loop_get_loop(pwloop),NULL,0);connect_pipewire();init_audio();
-    int event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;workspaces();statistics();maintenance();
-    time_t last_stats=0,last_indicator=0,last_power=0,last_second=0,last_retry=0,last_maintenance=0;
+    int event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;workspaces();statistics();temperatures();watch_maintenance();maintenance();maintenance_dirty=0;
+    int64_t last_stats=0,last_temp=0,last_indicator=0,last_power=0,last_second=0,last_retry=0,last_maintenance=0,last_cache=0;
     while(running){
         while(wl_display_prepare_read(display)!=0)if(wl_display_dispatch_pending(display)<0){running=0;break;}
         if(!running)break;
         wl_display_flush(display);
         /* Backend events wake us early; a pending tooltip bounds the status timeout. */
-        if(poll_capacity<5+audio_nfds){
-            struct pollfd *next=realloc(poll_fds,(5+audio_nfds)*sizeof *next);
+        if(poll_capacity<6+audio_nfds){
+            struct pollfd *next=realloc(poll_fds,(6+audio_nfds)*sizeof *next);
             if(!next){wl_display_cancel_read(display);running=0;break;}
-            poll_fds=next;poll_capacity=5+audio_nfds;
+            poll_fds=next;poll_capacity=6+audio_nfds;
         }
         struct pollfd *fds=poll_fds;
         fds[0]=(struct pollfd){wl_display_get_fd(display),POLLIN,0};
@@ -541,26 +584,39 @@ int main(int argc,char **argv){
         fds[2]=(struct pollfd){session_bus?sd_bus_get_fd(session_bus):-1,POLLIN,0};
         fds[3]=(struct pollfd){pw_loop_get_fd(pw_main_loop_get_loop(pwloop)),POLLIN,0};
         fds[4]=(struct pollfd){event_fd,POLLIN,0};
-        for(unsigned i=0;i<audio_nfds;i++)fds[5+i]=audio_fds[i];
+        fds[5]=(struct pollfd){maintenance_watch,POLLIN,0};
+        for(unsigned i=0;i<audio_nfds;i++)fds[6+i]=audio_fds[i];
         int timeout=audio_poll_failed?16:1000;
+        sd_bus *buses[2]={system_bus,session_bus};
+        for(int i=0;i<2;i++)if(buses[i]){
+            fds[1+i].events=sd_bus_get_events(buses[i]);
+            uint64_t deadline;
+            if(sd_bus_get_timeout(buses[i],&deadline)>=0&&deadline!=UINT64_MAX){
+                int64_t remaining=(int64_t)(deadline/1000)-monotonic_ms();
+                if(remaining<timeout)timeout=remaining>0?(int)remaining:0;
+            }
+        }
         if(hover>=0&&hover_deadline){
             int64_t remaining=hover_deadline-monotonic_ms();
             if(remaining<timeout)timeout=remaining>0?(int)remaining:0;
         }
-        poll(fds,5+audio_nfds,timeout);
+        poll(fds,6+audio_nfds,timeout);
         if(fds[0].revents&POLLIN){if(wl_display_read_events(display)<0)running=0;}else wl_display_cancel_read(display);
         wl_display_dispatch_pending(display);
         short event_ready=fds[4].revents;
+        if(fds[5].revents)maintenance_events();
         drain(&system_bus);drain(&session_bus);pw_loop_iterate(pw_main_loop_get_loop(pwloop),0);pa_mainloop_iterate(audio_loop,0,NULL);
         if(event_fd>=0&&event_ready){char events[4096];ssize_t n=read(event_fd,events,sizeof events);if(n>0){events[(size_t)n<sizeof events?(size_t)n:sizeof events-1]=0;if(strstr(events,"workspace")||strstr(events,"focusedmon")||strstr(events,"openwindow")||strstr(events,"closewindow")||strstr(events,"movewindow"))workspaces();}else if(n==0){close(event_fd);event_fd=-1;}}
-        time_t now=time(NULL);
-        if(refresh_requested){refresh_requested=0;dirty=1;last_maintenance=0;last_power=0;}
-        if(dirty||now!=last_second){char out[128];struct tm tm;localtime_r(&now,&tm);strftime(out,sizeof out,"%I:%M %p",&tm);plain(CLOCK,out);strftime(out,sizeof out,"%d %b",&tm);plain(DATE,out);selected_mode=LAUNCH;launcher();last_second=now;}
+        int64_t now=monotonic_ms()/1000;
+        if(refresh_requested){refresh_requested=0;dirty=1;query_generation++;maintenance_dirty=1;last_maintenance=0;last_power=0;}
+        if(dirty||now!=last_second){char out[128];struct tm tm;time_t wall=time(NULL);localtime_r(&wall,&tm);strftime(out,sizeof out,"%I:%M %p",&tm);plain(CLOCK,out);strftime(out,sizeof out,"%d %b",&tm);plain(DATE,out);selected_mode=LAUNCH;launcher();last_second=now;}
         if(now-last_maintenance>=300){spawn("dotfiles-bar-maintenance-status >/dev/null 2>&1");last_maintenance=now;}
-        if(dirty||now-last_stats>=2){statistics();maintenance();last_stats=now;}
-        if(now-last_indicator>=2){selected_mode=INDICATORS;indicators();last_indicator=now;}
-        if((dirty&&now-last_power>=1)||now-last_power>=30){selected_mode=POWER;power();last_power=now;}dirty=0;
-        if(now-last_retry>=5){if(pa_context_get_state(audio)==PA_CONTEXT_FAILED){pa_context_unref(audio);pa_mainloop_free(audio_loop);init_audio();}connect_buses();if(pw_failed)disconnect_pipewire();if(!core)connect_pipewire();if(event_fd<0){event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;}last_retry=now;}
+        if(now-last_stats>=2){statistics();last_stats=now;}
+        if(now-last_temp>=5){temperatures();last_temp=now;}
+        if(maintenance_dirty||now-last_cache>=60){maintenance();maintenance_dirty=0;last_cache=now;}
+        if(dirty||now-last_indicator>=5){selected_mode=INDICATORS;indicators();last_indicator=now;}
+        if(dirty||now-last_power>=30){selected_mode=POWER;power();last_power=now;}dirty=0;
+        if(now-last_retry>=5){status_cache_prune();if(pa_context_get_state(audio)==PA_CONTEXT_FAILED){pa_context_unref(audio);pa_mainloop_free(audio_loop);init_audio();}connect_buses();if(pw_failed)disconnect_pipewire();if(!core)connect_pipewire();if(event_fd<0){event_fd=(int)(intptr_t)hypr(NULL,1);if(!event_fd)event_fd=-1;}if(maintenance_watch<0)watch_maintenance();last_retry=now;}
         render();
         if(hover>=0&&(!hover_deadline||monotonic_ms()>=hover_deadline)){
             hover_deadline=0;show_tooltip();
@@ -568,6 +624,8 @@ int main(int argc,char **argv){
     }
     hide_tooltip();
     free(audio_fds);free(poll_fds);
+    globfree(&sensor_paths);status_cache_clear(NULL);
+    if(maintenance_watch>=0)close(maintenance_watch);
     for(unsigned i=0;i<32;i++)if(text_cache[i].layout)g_object_unref(text_cache[i].layout);
     fprintf(stderr,"dotfiles-bar: %u frames rendered\n",frames);
     if(event_fd>=0)close(event_fd);
