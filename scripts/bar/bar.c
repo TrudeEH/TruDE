@@ -50,7 +50,13 @@ static int64_t monotonic_ms(void){
     return (int64_t)now.tv_sec*1000+now.tv_nsec/1000000;
 }
 static void draw_tray(cairo_t *c);
-static void click_tray(uint32_t button);
+static void click_tray(uint32_t button,uint32_t serial);
+static struct xdg_wm_base *wm_base;
+static struct wl_surface *menu_surface;
+static int menu_pointer;
+static void menu_motion(double y);
+static void menu_activate(uint32_t time);
+static void close_tray_menu(void);
 static void adjust_volume(int steps);
 static int tray_hover = -1;
 static int tray_count;
@@ -213,12 +219,18 @@ static void pointer_enter(void*d,struct wl_pointer*p,uint32_t serial,struct wl_s
             wl_surface_commit(cursor_surface);
         }
     }
+    menu_pointer=s==menu_surface;
+    if(menu_pointer){menu_motion(wl_fixed_to_double(y));return;}
     mouse_x=wl_fixed_to_double(x);hover_at(mouse_x);
 }
-static void pointer_leave(void*d,struct wl_pointer*p,uint32_t serial,struct wl_surface*s){(void)d;(void)p;(void)serial;(void)s;hide_tooltip();hover=-1;tray_hover=-1;workspace_hover=0;redraw=1;}
-static void pointer_motion(void*d,struct wl_pointer*p,uint32_t t,wl_fixed_t x,wl_fixed_t y){(void)d;(void)p;(void)t;(void)y;mouse_x=wl_fixed_to_double(x);hover_at(mouse_x);}
-static void pointer_button(void*d,struct wl_pointer*p,uint32_t serial,uint32_t time,uint32_t button,uint32_t state){(void)d;(void)p;(void)serial;(void)time;if(state!=WL_POINTER_BUTTON_STATE_RELEASED)return;
-    if(tray_hover>=0)click_tray(button);
+static void pointer_leave(void*d,struct wl_pointer*p,uint32_t serial,struct wl_surface*s){(void)d;(void)p;(void)serial;(void)s;menu_pointer=0;hide_tooltip();hover=-1;tray_hover=-1;workspace_hover=0;redraw=1;}
+static void pointer_motion(void*d,struct wl_pointer*p,uint32_t t,wl_fixed_t x,wl_fixed_t y){(void)d;(void)p;(void)t;if(menu_pointer){menu_motion(wl_fixed_to_double(y));return;}mouse_x=wl_fixed_to_double(x);hover_at(mouse_x);}
+static void pointer_button(void*d,struct wl_pointer*p,uint32_t serial,uint32_t time,uint32_t button,uint32_t state){(void)d;(void)p;(void)serial;(void)time;if(state==WL_POINTER_BUTTON_STATE_PRESSED){
+        if(!menu_pointer&&tray_hover>=0&&button==0x111)click_tray(button,serial);
+        return;
+    }
+    if(menu_pointer){if(button==0x110)menu_activate(time);return;}
+    if(tray_hover>=0){if(button!=0x111)click_tray(button,serial);}
     else if(workspace_hover&&button==0x110){char command[64];snprintf(command,sizeof command,"dispatch hl.dsp.focus({ workspace = %d })",workspace_hover);hypr(command,0);workspaces();}
     else if(hover==INDICATORS&&button==0x111)spawn("makoctl mode -t do-not-disturb");
     else if(hover>=0&&button==0x110)spawn(items[hover].command);
@@ -252,8 +264,11 @@ static const struct wl_pointer_listener pointer_listener={.enter=pointer_enter,.
 static void capabilities(void*d,struct wl_seat*s,uint32_t caps){(void)d;if((caps&WL_SEAT_CAPABILITY_POINTER)&&!pointer){pointer=wl_seat_get_pointer(s);wl_pointer_add_listener(pointer,&pointer_listener,NULL);}}
 static void seat_name(void*d,struct wl_seat*s,const char*n){(void)d;(void)s;(void)n;}
 static const struct wl_seat_listener seat_listener={capabilities,seat_name};
+static void wm_ping(void*d,struct xdg_wm_base*w,uint32_t serial){(void)d;xdg_wm_base_pong(w,serial);}
+static const struct xdg_wm_base_listener wm_listener={wm_ping};
 static void global_registry(void*d,struct wl_registry*r,uint32_t name,const char*interface,uint32_t version){(void)d;
     if(!strcmp(interface,"wl_compositor"))compositor=wl_registry_bind(r,name,&wl_compositor_interface,version<4?version:4);
+    else if(!strcmp(interface,"xdg_wm_base")){wm_base=wl_registry_bind(r,name,&xdg_wm_base_interface,1);xdg_wm_base_add_listener(wm_base,&wm_listener,NULL);}
     else if(!strcmp(interface,"wl_subcompositor"))subcompositor=wl_registry_bind(r,name,&wl_subcompositor_interface,1);
     else if(!strcmp(interface,"wl_shm"))shm=wl_registry_bind(r,name,&wl_shm_interface,1);
     else if(!strcmp(interface,"zwlr_layer_shell_v1"))shell=wl_registry_bind(r,name,&zwlr_layer_shell_v1_interface,1);
@@ -435,8 +450,15 @@ static void draw_tray(cairo_t*c){for(int i=0;i<tray_count;i++){double x=17+i*24;
     if(tray_items[i].icon){cairo_save(c);cairo_translate(c,x,7);cairo_scale(c,18./cairo_image_surface_get_width(tray_items[i].icon),18./cairo_image_surface_get_height(tray_items[i].icon));cairo_set_source_surface(c,tray_items[i].icon,0,0);cairo_paint(c);cairo_restore(c);}
     else text(c,"•",x,3,18,12,0xaaaaaa);
 }}
-static void click_tray(uint32_t button){if(tray_hover<0||tray_hover>=tray_count)return;struct tray_item*t=&tray_items[tray_hover];sd_bus_message *m=NULL;
-    sd_bus_call_method(session_bus,t->service,t->path,"org.kde.StatusNotifierItem",button==0x111?"ContextMenu":"Activate",NULL,&m,"ii",(int)mouse_x,16);sd_bus_message_unref(m);
+#include "tray-menu.c"
+static void click_tray(uint32_t button,uint32_t serial){
+    if(tray_hover<0||tray_hover>=tray_count)return;
+    struct tray_item *t=&tray_items[tray_hover];
+    if(button==0x111){open_tray_menu(t,serial);return;}
+    if(button!=0x110&&button!=0x112)return;
+    sd_bus_message *m=NULL;
+    sd_bus_call_method(session_bus,t->service,t->path,"org.kde.StatusNotifierItem",button==0x112?"SecondaryActivate":"Activate",NULL,&m,"ii",(int)mouse_x,16);
+    sd_bus_message_unref(m);
 }
 static void init_items(void) {
     for(int i=0;i<ITEM_COUNT;i++){items[i].bg=bg0;items[i].fg=0xffffff;}
@@ -489,7 +511,7 @@ static void tip_configure(void*d,struct zwlr_layer_surface_v1*l,uint32_t serial,
 static void tip_closed(void*d,struct zwlr_layer_surface_v1*l){(void)d;(void)l;hide_tooltip();}
 static const struct zwlr_layer_surface_v1_listener tip_layer_listener={tip_configure,tip_closed};
 static void show_tooltip(void){
-    if(hover<0)return;
+    if(hover<0||menu_surface)return;
     char content[1024];snprintf(content,sizeof content,"%s",items[hover].tip);
     if(hover==CLOCK||hover==DATE){
         time_t t=time(NULL);struct tm today;localtime_r(&t,&today);
@@ -624,7 +646,7 @@ int main(int argc,char **argv){
             hover_deadline=0;show_tooltip();
         }
     }
-    hide_tooltip();
+    close_tray_menu();hide_tooltip();
     free(audio_fds);free(poll_fds);
     globfree(&sensor_paths);status_cache_clear(NULL);
     if(maintenance_watch>=0)close(maintenance_watch);

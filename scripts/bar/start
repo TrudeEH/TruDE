@@ -2,7 +2,7 @@
 set -eu
 base=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
 if [ ! -x "$base/bin/bar" ] || [ "$base/bar.c" -nt "$base/bin/bar" ] \
-    || [ "$base/status.c" -nt "$base/bin/bar" ] || [ "$base/build.sh" -nt "$base/bin/bar" ] || [ "$base/layer-shell.xml" -nt "$base/bin/bar" ]; then
+    || [ "$base/tray-menu.c" -nt "$base/bin/bar" ] || [ "$base/status.c" -nt "$base/bin/bar" ] || [ "$base/build.sh" -nt "$base/bin/bar" ] || [ "$base/layer-shell.xml" -nt "$base/bin/bar" ]; then
     "$base/build.sh"
 fi
 # Keep the legacy settings key so existing preferences survive the migration.
