@@ -6,7 +6,8 @@ static struct wl_buffer *menu_buffer;
 static void *menu_data;
 static size_t menu_size;
 static int menu_ready, menu_selected=-1, menu_parent, menu_rows[256], menu_count;
-static int menu_width=320, menu_height;
+static int menu_width, menu_height, menu_row_y[256], menu_row_height[256];
+static const char menu_font[]="JetBrainsMono Nerd Font 9";
 static char menu_service[256], menu_path[256];
 struct menu_entry { int id,parent,enabled,visible,separator,toggle,checked,submenu; char label[512]; };
 static struct menu_entry menu_entries[256];
@@ -71,7 +72,27 @@ static void menu_list(int parent){
     if(parent!=0)menu_rows[menu_count++]=-1;
     for(int i=0;i<menu_entries_count;i++)if(menu_entries[i].parent==parent&&menu_entries[i].visible)
         menu_rows[menu_count++]=i;
-    menu_height=16+menu_count*28;
+    /* Match tooltip typography; size to content instead of a fixed wide box. */
+    cairo_surface_t *cs=cairo_image_surface_create(CAIRO_FORMAT_ARGB32,1,1);
+    cairo_t *c=cairo_create(cs);PangoLayout *l=pango_cairo_create_layout(c);
+    PangoFontDescription *font=pango_font_description_from_string(menu_font);
+    pango_layout_set_font_description(l,font);
+    menu_width=80;menu_height=8;
+    for(int i=0;i<menu_count;i++){
+        int index=menu_rows[i];struct menu_entry *e=index<0?NULL:&menu_entries[index];
+        int tw=0,th=0;
+        pango_layout_set_text(l,e?e->label:"Back",-1);pango_layout_get_pixel_size(l,&tw,&th);
+        int inset=e&&e->toggle?24:8;
+        int needed=tw+inset+(e&&e->submenu?24:8);
+        if(needed>menu_width)menu_width=needed;
+        menu_row_y[i]=menu_height;
+        menu_row_height[i]=e&&e->separator?8:th+6;
+        menu_height+=menu_row_height[i];
+    }
+    menu_height+=8;
+    int max_width=width-22;if(max_width>420)max_width=420;
+    if(menu_width>max_width)menu_width=max_width;
+    pango_font_description_free(font);g_object_unref(l);cairo_destroy(c);cairo_surface_destroy(cs);
 }
 static void menu_paint(void){
     if(!menu_surface||!menu_ready)return;
@@ -88,20 +109,22 @@ static void menu_paint(void){
     wl_shm_pool_destroy(pool);close(fd);
     cairo_surface_t *cs=cairo_image_surface_create_for_data(menu_data,CAIRO_FORMAT_ARGB32,w,h,w*4);
     cairo_t *c=cairo_create(cs);cairo_scale(c,scale,scale);rect(c,0,0,menu_width,menu_height,bg0);
-    color(c,bg3);cairo_rectangle(c,.5,.5,menu_width-1,menu_height-1);cairo_stroke(c);
+    color(c,0x77767b);cairo_rectangle(c,.5,.5,menu_width-1,menu_height-1);cairo_stroke(c);
     PangoLayout *l=pango_cairo_create_layout(c);
-    PangoFontDescription *font=pango_font_description_from_string("JetBrainsMono Nerd Font 10");
-    pango_layout_set_font_description(l,font);pango_layout_set_width(l,(menu_width-64)*PANGO_SCALE);
+    PangoFontDescription *font=pango_font_description_from_string(menu_font);
+    pango_layout_set_font_description(l,font);
     pango_layout_set_ellipsize(l,PANGO_ELLIPSIZE_END);
     for(int i=0;i<menu_count;i++){
-        int index=menu_rows[i],y=8+i*28;struct menu_entry *e=index<0?NULL:&menu_entries[index];
-        if(e&&e->separator){rect(c,12,y+13,menu_width-24,1,bg3);continue;}
+        int index=menu_rows[i],y=menu_row_y[i],rh=menu_row_height[i];struct menu_entry *e=index<0?NULL:&menu_entries[index];
+        if(e&&e->separator){rect(c,8,y+rh/2,menu_width-16,1,bg3);continue;}
         int active=i==menu_selected&&(!e||e->enabled);
-        if(active)rect(c,4,y,menu_width-8,28,accent);
+        if(active)rect(c,4,y,menu_width-8,rh,accent);
         unsigned fg=active?bg0:(!e||e->enabled?0xffffff:0xaaaaaa);
-        pango_layout_set_text(l,e?e->label:"Back",-1);color(c,fg);cairo_move_to(c,30,y+5);pango_cairo_show_layout(c,l);
-        if(e&&e->toggle&&e->checked){color(c,fg);cairo_arc(c,16,y+14,3,0,2*M_PI);cairo_fill(c);}
-        if(e&&e->submenu){pango_layout_set_text(l,"›",-1);cairo_move_to(c,menu_width-22,y+5);pango_cairo_show_layout(c,l);}
+        int inset=e&&e->toggle?24:8;
+        pango_layout_set_width(l,(menu_width-inset-(e&&e->submenu?24:8))*PANGO_SCALE);
+        pango_layout_set_text(l,e?e->label:"Back",-1);color(c,fg);cairo_move_to(c,inset,y+3);pango_cairo_show_layout(c,l);
+        if(e&&e->toggle&&e->checked){color(c,fg);cairo_arc(c,14,y+rh/2,3,0,2*M_PI);cairo_fill(c);}
+        if(e&&e->submenu){pango_layout_set_width(l,-1);pango_layout_set_text(l,"›",-1);cairo_move_to(c,menu_width-18,y+3);pango_cairo_show_layout(c,l);}
     }
     pango_font_description_free(font);g_object_unref(l);cairo_destroy(c);cairo_surface_flush(cs);cairo_surface_destroy(cs);
     xdg_surface_set_window_geometry(menu_xdg,0,0,menu_width,menu_height);
@@ -109,7 +132,8 @@ static void menu_paint(void){
     wl_surface_damage_buffer(menu_surface,0,0,w,h);wl_surface_commit(menu_surface);
 }
 static void menu_motion(double y){
-    int selected=y<8?-1:(int)(y-8)/28;if(selected>=menu_count)selected=-1;
+    int selected=-1;
+    for(int i=0;i<menu_count;i++)if(y>=menu_row_y[i]&&y<menu_row_y[i]+menu_row_height[i]){selected=i;break;}
     if(selected!=menu_selected){menu_selected=selected;menu_paint();}
 }
 static void menu_activate(uint32_t time){

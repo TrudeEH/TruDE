@@ -557,7 +557,7 @@ static void show_tooltip(void){
     zwlr_layer_surface_v1_set_margin(tip_layer,bottom?0:height+4,0,bottom?height+4:0,x);
     struct wl_region *empty=wl_compositor_create_region(compositor);wl_surface_set_input_region(tip_surface,empty);wl_region_destroy(empty);
     cairo_surface_t *cs=cairo_image_surface_create_for_data(tip_data,CAIRO_FORMAT_ARGB32,w*scale,h*scale,w*scale*4);cairo_t*c=cairo_create(cs);cairo_scale(c,scale,scale);
-    rect(c,0,0,w,h,bg2);color(c,0x77767b);cairo_rectangle(c,.5,.5,w-1,h-1);cairo_stroke(c);
+    rect(c,0,0,w,h,bg0);color(c,0x77767b);cairo_rectangle(c,.5,.5,w-1,h-1);cairo_stroke(c);
     l=pango_cairo_create_layout(c);f=pango_font_description_from_string("JetBrainsMono Nerd Font 9");pango_layout_set_font_description(l,f);pango_layout_set_text(l,content,-1);pango_layout_set_width(l,(w-16)*PANGO_SCALE);pango_layout_set_wrap(l,PANGO_WRAP_WORD_CHAR);color(c,0xffffff);cairo_move_to(c,8,8);pango_cairo_show_layout(c,l);g_object_unref(l);pango_font_description_free(f);
     cairo_destroy(c);cairo_surface_flush(cs);cairo_surface_destroy(cs);
     /* Initial commit must be bufferless; attach only after configure/ack. */
