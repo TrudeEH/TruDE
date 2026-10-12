@@ -394,8 +394,8 @@ static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio
 
 /* StatusNotifier watcher: clients register their own D-Bus name/object path.
  * IconPixmap works without loading a GTK icon theme; common IconName clients
- * use installed hicolor PNGs. Context menus are delegated to the item through ContextMenu. */
-struct tray_item { char service[256], path[256]; cairo_surface_t *icon; };
+ * use installed hicolor PNGs. Exported menus are rendered by the bar. */
+struct tray_item { char service[256], path[256]; cairo_surface_t *icon; int dirty; };
 static struct tray_item tray_items[16];
 
 static void tray_refresh(struct tray_item *t) {
@@ -419,12 +419,25 @@ static void tray_refresh(struct tray_item *t) {
         }
     }sd_bus_message_unref(m);redraw=1;
 }
+static void tray_update(void){
+    for(int i=0;i<tray_count;i++)if(tray_items[i].dirty){
+        struct tray_item snapshot=tray_items[i];
+        tray_items[i].icon=NULL;tray_items[i].dirty=0;
+        tray_refresh(&snapshot);
+        int found=0;
+        for(int j=0;j<tray_count;j++)if(!strcmp(snapshot.service,tray_items[j].service)&&!strcmp(snapshot.path,tray_items[j].path)){
+            if(tray_items[j].icon)cairo_surface_destroy(tray_items[j].icon);
+            tray_items[j].icon=snapshot.icon;found=1;break;
+        }
+        if(!found&&snapshot.icon)cairo_surface_destroy(snapshot.icon);
+    }
+}
 static int tray_register(sd_bus_message *m,void *data,sd_bus_error *error){(void)data;(void)error;const char *name;
     if(sd_bus_message_read(m,"s",&name)<=0)return -EINVAL;
     const char *service=name[0]=='/'?sd_bus_message_get_sender(m):name,*path=name[0]=='/'?name:"/StatusNotifierItem";
     for(int i=0;i<tray_count;i++)if(!strcmp(service,tray_items[i].service)&&!strcmp(path,tray_items[i].path))return sd_bus_reply_method_return(m,"");
-    if(tray_count<16){struct tray_item *t=&tray_items[tray_count++];snprintf(t->service,sizeof t->service,"%s",service);snprintf(t->path,sizeof t->path,"%s",path);
-        char full[512];snprintf(full,sizeof full,"%s%s",service,path);sd_bus_emit_signal(session_bus,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher","StatusNotifierItemRegistered","s",full);tray_refresh(t);}
+    if(tray_count<16){struct tray_item *t=&tray_items[tray_count++];memset(t,0,sizeof *t);t->dirty=1;snprintf(t->service,sizeof t->service,"%s",service);snprintf(t->path,sizeof t->path,"%s",path);
+        char full[512];snprintf(full,sizeof full,"%s%s",service,path);sd_bus_emit_signal(session_bus,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher","StatusNotifierItemRegistered","s",full);redraw=1;}
     return sd_bus_reply_method_return(m,"");
 }
 static int tray_host(sd_bus_message*m,void*d,sd_bus_error*e){(void)d;(void)e;return sd_bus_reply_method_return(m,"");}
@@ -435,9 +448,36 @@ static int tray_get(sd_bus*b,const char*p,const char*i,const char*k,sd_bus_messa
 }
 static const sd_bus_vtable tray_vtable[]={SD_BUS_VTABLE_START(0),SD_BUS_METHOD("RegisterStatusNotifierItem","s","",tray_register,SD_BUS_VTABLE_UNPRIVILEGED),SD_BUS_METHOD("RegisterStatusNotifierHost","s","",tray_host,SD_BUS_VTABLE_UNPRIVILEGED),SD_BUS_PROPERTY("RegisteredStatusNotifierItems","as",tray_get,0,0),SD_BUS_PROPERTY("IsStatusNotifierHostRegistered","b",tray_get,0,0),SD_BUS_PROPERTY("ProtocolVersion","i",tray_get,0,0),SD_BUS_SIGNAL("StatusNotifierItemRegistered","s",0),SD_BUS_SIGNAL("StatusNotifierItemUnregistered","s",0),SD_BUS_SIGNAL("StatusNotifierHostRegistered","",0),SD_BUS_VTABLE_END};
 static int tray_signal(sd_bus_message*m,void*d,sd_bus_error*e){(void)d;(void)e;const char *sender=sd_bus_message_get_sender(m);const char *member=sd_bus_message_get_member(m);
-    if(member&&!strcmp(member,"NameOwnerChanged")){const char *name,*old,*now;if(sd_bus_message_read(m,"sss",&name,&old,&now)>0&&!*now){for(int i=0;i<tray_count;i++)if(!strcmp(tray_items[i].service,name)){if(tray_items[i].icon)cairo_surface_destroy(tray_items[i].icon);memmove(&tray_items[i],&tray_items[i+1],(tray_count-i-1)*sizeof tray_items[0]);tray_count--;redraw=1;break;}}}
-    else if(sender)for(int i=0;i<tray_count;i++)tray_refresh(&tray_items[i]);
+    if(member&&!strcmp(member,"NameOwnerChanged")){const char *name,*old,*now;if(sd_bus_message_read(m,"sss",&name,&old,&now)>0&&!*now){for(int i=0;i<tray_count;i++)if(!strcmp(tray_items[i].service,name)){if(tray_items[i].icon)cairo_surface_destroy(tray_items[i].icon);memmove(&tray_items[i],&tray_items[i+1],(tray_count-i-1)*sizeof tray_items[0]);tray_count--;memset(&tray_items[tray_count],0,sizeof tray_items[0]);redraw=1;break;}}}
+    else if(sender)for(int i=0;i<tray_count;i++)if(!strcmp(sender,tray_items[i].service))tray_items[i].dirty=1;
     return 0;
+}
+/* Some clients retain their exported item but do not register again when
+ * the watcher restarts. Probe existing connections asynchronously. */
+static int tray_discovered(sd_bus_message *m,void *d,sd_bus_error *e){
+    (void)d;(void)e;
+    if(sd_bus_message_is_method_error(m,NULL))return 0;
+    /* GetAll can succeed with an empty dictionary for a missing interface. */
+    if(sd_bus_message_enter_container(m,'a',"{sv}")<=0||sd_bus_message_at_end(m,0)>0)return 0;
+    const char *service=sd_bus_message_get_sender(m);
+    if(!service)return 0;
+    for(int i=0;i<tray_count;i++)if(!strcmp(service,tray_items[i].service)&&!strcmp(tray_items[i].path,"/StatusNotifierItem"))return 0;
+    if(tray_count>=16)return 0;
+    struct tray_item *t=&tray_items[tray_count++];memset(t,0,sizeof *t);
+    snprintf(t->service,sizeof t->service,"%s",service);
+    snprintf(t->path,sizeof t->path,"/StatusNotifierItem");t->dirty=1;redraw=1;
+    char full[512];snprintf(full,sizeof full,"%s%s",t->service,t->path);
+    sd_bus_emit_signal(session_bus,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher","StatusNotifierItemRegistered","s",full);
+    return 0;
+}
+static void tray_discover(void){
+    char **names=NULL;
+    if(sd_bus_list_names(session_bus,&names,NULL)<0)return;
+    for(char **n=names;n&&*n;n++){
+        if((*n)[0]==':')sd_bus_call_method_async(session_bus,NULL,*n,"/StatusNotifierItem","org.freedesktop.DBus.Properties","GetAll",tray_discovered,NULL,"s","org.kde.StatusNotifierItem");
+        free(*n);
+    }
+    free(names);
 }
 static void init_tray(void){if(!session_bus)return;sd_bus_add_object_vtable(session_bus,NULL,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher",tray_vtable,NULL);
     if(sd_bus_request_name(session_bus,"org.kde.StatusNotifierWatcher",0)<0)return;
@@ -445,6 +485,7 @@ static void init_tray(void){if(!session_bus)return;sd_bus_add_object_vtable(sess
     sd_bus_add_match(session_bus,NULL,"type='signal',interface='org.kde.StatusNotifierItem'",tray_signal,NULL);
     sd_bus_add_match(session_bus,NULL,"type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'",tray_signal,NULL);
     sd_bus_emit_signal(session_bus,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher","StatusNotifierHostRegistered","");
+    tray_discover();
 }
 static void draw_tray(cairo_t*c){for(int i=0;i<tray_count;i++){double x=17+i*24;
     if(tray_items[i].icon){cairo_save(c);cairo_translate(c,x,7);cairo_scale(c,18./cairo_image_surface_get_width(tray_items[i].icon),18./cairo_image_surface_get_height(tray_items[i].icon));cairo_set_source_surface(c,tray_items[i].icon,0,0);cairo_paint(c);cairo_restore(c);}
@@ -629,7 +670,7 @@ int main(int argc,char **argv){
         wl_display_dispatch_pending(display);
         short event_ready=fds[4].revents;
         if(fds[5].revents)maintenance_events();
-        drain(&system_bus);drain(&session_bus);if(pw_loop_iterate(pw_main_loop_get_loop(pwloop),0)<0)pw_failed=1;pa_mainloop_iterate(audio_loop,0,NULL);
+        drain(&system_bus);drain(&session_bus);tray_update();if(pw_loop_iterate(pw_main_loop_get_loop(pwloop),0)<0)pw_failed=1;pa_mainloop_iterate(audio_loop,0,NULL);
         if(event_fd>=0&&event_ready){char events[4096];ssize_t n=read(event_fd,events,sizeof events);if(n>0){events[(size_t)n<sizeof events?(size_t)n:sizeof events-1]=0;if(strstr(events,"workspace")||strstr(events,"focusedmon")||strstr(events,"openwindow")||strstr(events,"closewindow")||strstr(events,"movewindow"))workspaces();}else if(n==0){close(event_fd);event_fd=-1;}}
         int64_t now=monotonic_ms()/1000;
         if(refresh_requested){refresh_requested=0;dirty=1;query_generation++;maintenance_dirty=1;last_maintenance=0;last_power=0;}
