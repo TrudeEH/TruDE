@@ -513,7 +513,7 @@ static void init_items(void) {
     items[CLOCK].command=items[DATE].command="footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui";
     items[INDICATORS].command="footclient --app-id=status-menu --title='Quick Settings' --override=colors.regular0=222226 --window-size-chars=42x10 dotfiles-bar-status-menu";
     items[VOLUME].command="footclient --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer";
-    items[MAINT].command="footclient --app-id=maintenance-tui --title='Debian Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui";
+    items[MAINT].command="footclient --app-id=maintenance-tui --title='System Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui";
     items[POWER].command="footclient --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui";
     items[MENU].command="footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui";
     plain(MENU,"󰐥");plain(MAINT,"");plain(VOLUME,"󰕾 —");

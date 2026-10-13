@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Debian Maintenance
-Comment=Review and apply Debian and Flatpak updates
-Exec=footclient --app-id=maintenance-tui --title="Debian Maintenance" --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui
+Name=System Maintenance
+Comment=Maintain system packages, update Flatpaks and TruDE, and install firmware updates
+Exec=footclient --app-id=maintenance-tui --title="System Maintenance" --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui
 Terminal=false
 Categories=System;

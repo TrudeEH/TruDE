@@ -126,7 +126,7 @@ install_packages() {
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
-        flatpak gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
+        flatpak fwupd gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \

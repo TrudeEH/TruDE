@@ -33,7 +33,7 @@ EOF
 chmod 700 "$askpass_helper"
 
 dialog() {
-    whiptail --title "Debian Maintenance" "$@"
+    whiptail --title "System Maintenance" "$@"
 }
 
 ensure_content() {
@@ -156,14 +156,48 @@ load_backports() {
     ensure_content "$backports_file" "No installed backport packages found."
 }
 
+maintain_apt() {
+    # Stop this sequence on failure; do not remove packages after a failed upgrade.
+    # Keep APT confirmation prompts so users can review repairs and removals.
+    sudo dpkg --configure -a &&
+        sudo apt-get update &&
+        sudo apt-get --fix-broken install &&
+        sudo apt-get dist-upgrade &&
+        sudo apt-get autoremove &&
+        sudo apt-get autoclean &&
+        sudo apt-get check
+}
+
+update_firmware() {
+    command -v fwupdmgr >/dev/null 2>&1 || {
+        dialog --msgbox "Firmware updates require fwupd. Run the TruDE installer or install the Debian fwupd package first." 10 78
+        return
+    }
+    dialog --yesno "Check for and install firmware updates?
+
+Connect AC power and save your work. Firmware flashing must not be interrupted. Only supported devices will be updated; a reboot may be required. Review fwupdmgr's device and reboot prompts before proceeding." 15 86 || return
+
+    clear
+    printf 'Refreshing firmware metadata and updating supported devices…\n\n'
+    # Do not use -y: retain device-specific warnings and reboot consent.
+    if sudo fwupdmgr refresh && sudo fwupdmgr update; then
+        printf '\nFirmware update check completed. Follow any reboot instructions above.\n'
+    else
+        printf '\nFirmware update command did not complete successfully. Review the output above; unsupported devices or no available updates may also be reported.\n'
+    fi
+    printf 'Press Enter to return to maintenance status. '
+    IFS= read -r _ || :
+    collect_status
+}
+
 update_system() {
-    dialog --yesno "Update Debian packages, Flatpaks, and TruDE? TruDE changes will be installed and Hyprland and Waybar reloaded." 11 74 \
+    dialog --yesno "Perform full APT maintenance, update Flatpaks, and update TruDE?\n\nAPT will configure pending packages, repair dependencies, refresh package lists, perform a full upgrade, remove unused dependencies, clean obsolete downloads, and check dependencies. Review APT prompts before upgrades or removals.\n\nTruDE changes will be installed and Hyprland and Waybar reloaded. Firmware updates are a separate action." 18 86 \
         || return
 
     clear
-    printf '󰏗  Updating APT package lists and Debian packages…\n\n'
+    printf '󰏗  Performing full APT maintenance…\n\n'
     update_failed=0
-    sudo apt-get update && sudo apt-get upgrade -y || update_failed=1
+    maintain_apt || update_failed=1
 
     if command -v flatpak >/dev/null 2>&1; then
         printf '\n󰏖  Updating Flatpaks…\n\n'
@@ -212,7 +246,7 @@ while true; do
         "$flatpak_updates" "$flatpak_installed" "$trude_updates" "$held" "$failed" \
         "$reboot" "$apt_updated")
 
-    choice=$(dialog --menu "$prompt" 25 94 10 \
+    choice=$(dialog --menu "$prompt" 26 94 11 \
         "󰏗 packages" "Search, install, or remove packages" \
         "󰋼 summary" "Full summary and update preview" \
         "󰏗 apt" "APT updates ($apt_updates)" \
@@ -220,7 +254,8 @@ while true; do
         "󰒓 backports" "Installed backport packages ($backports_installed)" \
         "󰈇 held" "Held packages ($held)" \
         "󰅙 failed" "Failed systemd units ($failed)" \
-        "󰚰 update" "Update Debian packages, Flatpaks, and TruDE ($trude_updates)" \
+        "󰚰 update" "Full APT maintenance and Flatpak / TruDE updates ($trude_updates)" \
+        "󰒓 firmware" "Update device firmware (fwupd)" \
         "󰑐 refresh" "Refresh displayed information" \
         "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
 
@@ -239,6 +274,7 @@ while true; do
         *" held") show_file "Held Packages" "$held_file" ;;
         *" failed") show_file "Failed systemd Units" "$failed_file" ;;
         *" update") update_system ;;
+        *" firmware") update_firmware ;;
         *" refresh") collect_status ;;
         *" close") exit 0 ;;
     esac
