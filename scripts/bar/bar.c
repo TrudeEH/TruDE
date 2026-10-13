@@ -77,7 +77,7 @@ static void rect(cairo_t *c,double x,double y,double w,double h,unsigned rgb) {c
 struct text_cache { char markup[4096]; int size; PangoLayout *layout; };
 static struct text_cache text_cache[32];
 static unsigned text_cache_next;
-static void text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb) {
+static PangoLayout *text_layout(cairo_t *c,const char *markup,int size) {
     struct text_cache *entry=NULL;
     for(unsigned i=0;i<32;i++)if(text_cache[i].layout&&text_cache[i].size==size&&!strcmp(text_cache[i].markup,markup)){entry=&text_cache[i];break;}
     if(!entry){
@@ -97,8 +97,12 @@ static void text(cairo_t *c,const char *markup,double x,double y,double w,int si
         }else{g_clear_error(&err);pango_layout_set_text(entry->layout,markup,-1);}
     }
     pango_cairo_update_layout(c,entry->layout);
-    int tw,th;pango_layout_get_pixel_size(entry->layout,&tw,&th);
-    color(c,rgb);cairo_move_to(c,x+(w-tw)/2,y+(27-th)/2);pango_cairo_show_layout(c,entry->layout);
+    return entry->layout;
+}
+static void text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb) {
+    PangoLayout *layout=text_layout(c,markup,size);
+    int tw,th;pango_layout_get_pixel_size(layout,&tw,&th);
+    color(c,rgb);cairo_move_to(c,x+(w-tw)/2,y+(27-th)/2);pango_cairo_show_layout(c,layout);
 }
 static void wedge(cairo_t *c,double x,int direction,unsigned rgb) {
     color(c,rgb);cairo_move_to(c,x+(direction>0?0:12),3);cairo_line_to(c,x+(direction>0?12:0),16.5);cairo_line_to(c,x+(direction>0?0:12),30);cairo_close_path(c);cairo_fill(c);
@@ -129,10 +133,12 @@ static void render(void) {
     for(int id=CPU;id>=TEMP;id--){x-=module;items[id].x=x;items[id].w=module;x-=divider;}
     x=center+21+2*divider;
     for(int id=CLOCK;id<=INDICATORS;id++){items[id].x=x;items[id].w=module;x+=items[id].w+divider;}
-    items[MENU].x=width-43;items[MENU].w=40;
-    items[POWER].w=strlen(items[POWER].text)>8?110:74;items[POWER].x=items[MENU].x-12-items[POWER].w;
-    items[MAINT].w=74;items[MAINT].x=items[POWER].x-12-items[MAINT].w;
-    items[VOLUME].w=74;items[VOLUME].x=items[MAINT].x-12-items[VOLUME].w;
+    /* Fit the right modules to their rendered content, keeping the edge anchored. */
+    x=width-3;
+    for(int id=MENU;id>=VOLUME;id--){
+        int tw;pango_layout_get_pixel_size(text_layout(c,items[id].text,id==MENU?16:12),&tw,NULL);
+        items[id].w=fmax(32,tw+24);x-=items[id].w;items[id].x=x;x-=divider;
+    }
     for(int id=0;id<ITEM_COUNT;id++){
         struct item *i=&items[id];if(id>=VOLUME&&id<=POWER&&i->x<items[INDICATORS].x+items[INDICATORS].w+24)continue;unsigned bg=i->bg,fg=i->fg;
         if(id==LAUNCH){bg=launch_bg;fg=bg0;}
