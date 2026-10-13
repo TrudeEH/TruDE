@@ -442,47 +442,29 @@ install_package() {
 create_installed_package_results() {
     results_file=$temporary_dir/installed-package-results
     : > "$results_file"
-    debian_color=$(printf '\033[38;2;255;190;111m')
-    backports_color=$(printf '\033[38;2;255;163;72m')
-    flatpak_color=$(printf '\033[38;2;255;255;255m')
-    package_color=$(printf '\033[38;2;255;255;255m')
-    muted_color=$(printf '\033[38;2;170;170;170m')
-    reset_color=$(printf '\033[0m')
-
     dpkg-query -W -f='${binary:Package}\t${Version}\t${Essential}\t${Status}\n' 2>/dev/null \
-        | awk -F '\t' \
-            -v source_color="$debian_color" \
-            -v backports_color="$backports_color" \
-            -v package_color="$package_color" \
-            -v muted_color="$muted_color" \
-            -v reset_color="$reset_color" '
+        | awk -F '\t' '
             $4 == "install ok installed" {
-                color = source_color
-                source = "󰏗  Debian ·"
+                source = "Debian"
+                icon = "󰏗"
                 if ($2 ~ /~bpo/) {
-                    color = backports_color
-                    source = "󰒓  Backports ·"
+                    source = "Backports"
+                    icon = "󰒓"
                 }
-                label = color source reset_color " " package_color $1 reset_color " " muted_color "— " $2 reset_color
-                if ($3 == "yes") label = label " " color "[essential]" reset_color
-                print "apt\t" $1 "\t" label
+                detail = $2
+                if ($3 == "yes") detail = "[essential] " detail
+                print "apt\t" $1 "\t" $1 "\t" source "\t" detail "\t" icon
             }
         ' >> "$results_file"
 
     if command -v flatpak >/dev/null 2>&1; then
         for scope in user system; do
             flatpak list --"$scope" --app --columns=application,name,version 2>/dev/null \
-                | awk -F '\t' \
-                    -v source="flatpak-"$scope \
-                    -v source_color="$flatpak_color" \
-                    -v package_color="$package_color" \
-                    -v muted_color="$muted_color" \
-                    -v reset_color="$reset_color" '
+                | awk -F '\t' -v source="flatpak-$scope" '
                     NF >= 1 && $1 != "" {
-                        label = source_color "󰏖  Flatpak " substr(source, 9) " ·" reset_color " " package_color $2 reset_color
-                        if ($3 != "") label = label " " muted_color "— " $3 reset_color
-                        label = label " " muted_color "(" $1 ")" reset_color
-                        print source "\t" $1 "\t" label
+                        name = ($2 != "" ? $2 : $1)
+                        if (name != $1) name = name " (" $1 ")"
+                        print source "\t" $1 "\t" name "\tFlatpak " substr(source, 9) "\t" $3 "\t󰏖"
                     }
                 ' >> "$results_file"
         done
@@ -505,6 +487,8 @@ select_installed_package() {
         return 1
     }
 
+    tui_item_columns 24 < "$results_file" > "$temporary_dir/installed-package-columns"
+
     selected=$(tui_fzf \
         --ansi \
         --delimiter='\t' \
@@ -514,14 +498,14 @@ select_installed_package() {
         --pointer='󰜴' \
         --marker='󰄬' \
         --border=sharp \
-        --border-label=" Installed packages: $(wc -l < "$results_file") " \
-        --header='Search package names, Flatpak IDs, or display names' \
+        --border-label=" Installed packages: $(wc -l < "$temporary_dir/installed-package-columns") " \
+        --header='Icon / Source / Name / Version — search names or Flatpak IDs' \
         --info=inline-right \
         --layout=reverse \
         --no-multi \
         --no-hscroll \
         --cycle \
-        < "$results_file") || return 1
+        < "$temporary_dir/installed-package-columns") || return 1
 
     source=$(printf '%s\n' "$selected" | cut -f1)
     identifier=$(printf '%s\n' "$selected" | cut -f2)

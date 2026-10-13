@@ -230,40 +230,8 @@ startup_items() {
     mv "$temp_dir/startup-items.sorted" "$temp_dir/startup-items"
 }
 
-# Pad before adding ANSI colors so escape sequences do not affect alignment.
-# Bound the name column to leave source and startup state visible.
 format_startup_items() {
-    terminal_columns=$(tput cols 2>/dev/null || printf '80')
-    case $terminal_columns in
-        ''|*[!0-9]*) terminal_columns=80 ;;
-    esac
-    awk -F '\t' -v terminal_columns="$terminal_columns" '
-        BEGIN {
-            accent = "\033[38;2;255;190;111m"
-            primary = "\033[38;2;255;255;255m"
-            muted = "\033[38;2;170;170;170m"
-            reset = "\033[0m"
-        }
-        {
-            rows[NR] = $0
-            if (length($3) > name_width) name_width = length($3)
-            if (length($4) > source_width) source_width = length($4)
-            if (length($5) > state_width) state_width = length($5)
-        }
-        END {
-            max_name_width = terminal_columns - source_width - state_width - 14
-            if (max_name_width < 8) max_name_width = 8
-            if (name_width > max_name_width) name_width = max_name_width
-            for (row = 1; row <= NR; row++) {
-                split(rows[row], item, "\t")
-                name = item[3]
-                if (length(name) > name_width) name = substr(name, 1, name_width - 3) "..."
-                printf "%s\t%s\t%s%s  %s%-*s%s\t%s%-*s%s\t%s%s%s\n", \
-                    item[1], item[2], accent, item[6], primary, name_width + 2, name, reset, \
-                    accent, source_width + 2, item[4], reset, muted, item[5], reset
-            }
-        }
-    ' "$temp_dir/startup-items" > "$temp_dir/startup-columns"
+    tui_item_columns < "$temp_dir/startup-items" > "$temp_dir/startup-columns"
 }
 
 manage_startup() (
@@ -284,8 +252,8 @@ Some service lists are unavailable; login apps and available units are shown."
         selected=$(tui_fzf \
             --ansi \
             --delimiter='\t' \
-            --with-nth=3,4,5 \
-            --nth=1,2,3 \
+            --with-nth=3 \
+            --nth=1 \
             --prompt='󰐥  Startup  ' \
             --pointer='󰜴' \
             --marker='󰄬' \
