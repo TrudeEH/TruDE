@@ -102,14 +102,14 @@ create_apt_search_results() {
         # result, and reuse the same search for Debian and Backports.
         cut -f1 "$raw_file" | xargs -r apt-cache policy -- 2>/dev/null | awk -v suite="$debian_suite" '
             function emit() {
-                if (package != "") print package "\t" stable "\t" backports "\t" backport_version
+                if (package != "") print package "\t" stable "\t" backports "\t" backport_version "\t" stable_version
             }
             /^[^[:space:]]+:$/ {
                 emit()
                 package = $0
                 sub(/:$/, "", package)
                 stable = backports = 0
-                version = backport_version = ""
+                version = stable_version = backport_version = ""
                 next
             }
             $1 == "***" { version = $2; next }
@@ -118,7 +118,10 @@ create_apt_search_results() {
                 split($3, repository, "/")
                 release = repository[1]
                 if (release == suite || release == suite "-updates" || release == suite "-security" ||
-                    release == "stable" || release == "stable-updates" || release == "stable-security") stable = 1
+                    release == "stable" || release == "stable-updates" || release == "stable-security") {
+                    stable = 1
+                    if (stable_version == "") stable_version = version
+                }
                 if (release == suite "-backports" || release == "stable-backports") {
                     backports = 1
                     if (backport_version == "") backport_version = version
@@ -131,14 +134,13 @@ create_apt_search_results() {
     awk -F '\t' -v source="$source" '
         FILENAME == ARGV[1] {
             available[$1] = source == "apt" ? $2 : $3
-            versions[$1] = $4
+            versions[$1] = source == "apt" ? $5 : $4
             next
         }
         available[$1] {
             description = $2
             if (length(description) > 86) description = substr(description, 1, 83) "..."
-            if (source == "backports" && versions[$1] != "") description = description " — " versions[$1]
-            print $1 "\t" description
+            print $1 "\t" description "\t" versions[$1]
             if (++count >= 80) exit
         }
     ' "$availability_file" "$raw_file" > "$results_file"
@@ -336,16 +338,16 @@ create_unified_install_results() {
 
     search_progress 5 'Searching Debian packages… Please wait.'
     apt_results=$(create_apt_search_results "$query" apt)
-    while IFS="$(printf '\t')" read -r package description; do
+    while IFS="$(printf '\t')" read -r package description version; do
         [ -n "$package" ] || continue
-        printf 'apt\t%s\t󰏗  Debian · %s\t\t%s\n' "$package" "$description" "$package" >> "$results_file"
+        printf 'apt\t%s\t%s\tDebian\t%s\t󰏗\t\t%s\n' "$package" "$package" "$version" "$description" >> "$results_file"
     done < "$apt_results"
 
     search_progress 40 'Checking Debian Backports… Please wait.'
     backports_results=$(create_apt_search_results "$query" backports)
-    while IFS="$(printf '\t')" read -r package description; do
+    while IFS="$(printf '\t')" read -r package description version; do
         [ -n "$package" ] || continue
-        printf 'backports\t%s\t󰒓  Backports · %s\t\t%s\n' "$package" "$description" "$package" >> "$results_file"
+        printf 'backports\t%s\t%s\tBackports\t%s\t󰒓\t\t%s\n' "$package" "$package" "$version" "$description" >> "$results_file"
     done < "$backports_results"
 
     if command -v flatpak >/dev/null 2>&1; then
@@ -359,22 +361,26 @@ create_unified_install_results() {
             while IFS="$field_separator" read -r application name version remote description; do
                 [ -n "$application" ] || continue
                 label="$name"
-                [ -n "$version" ] && label="$label — $version"
-                [ -n "$description" ] && label="$label — $(compact_text "$description")"
-                printf 'flatpak\t%s\t󰏖  Flatpak · %s · %s\t%s\t%s\n' \
-                    "$application" "$remote" "$label" "$remote" "$name" >> "$results_file"
+                [ "$name" = "$application" ] || label="$name ($application)"
+                printf 'flatpak\t%s\t%s\tFlatpak\t%s\t󰏖\t%s\t%s\n' \
+                    "$application" "$label" "$version" "$remote" "$description" >> "$results_file"
             done < "$flatpak_results.fields"
         fi
     fi
 
     search_progress 90 'Preparing search results… Please wait.'
-    rank_search_results "$query" 2 5 < "$results_file" | cut -f1-4 > "$results_file.sorted"
+    rank_search_results "$query" 2 3 < "$results_file" > "$results_file.sorted"
     mv "$results_file.sorted" "$results_file"
 
     search_progress 100 'Search complete.'
 }
 
 select_install_package() {
+    command -v fzf >/dev/null 2>&1 || {
+        message "fzf is required to search installable packages."
+        return 1
+    }
+
     query=$(dialog --inputbox 'Search Debian packages, Backports, and Flatpaks:' 10 78 "" \
         3>&1 1>&2 2>&3) || return 1
     [ -n "$query" ] || return 1
@@ -391,15 +397,29 @@ select_install_package() {
         return 1
     }
 
-    set --
-    while IFS="$(printf '\t')" read -r source identifier label remote; do
-        [ -n "$identifier" ] || continue
-        set -- "$@" "$source:$identifier" "$label"
-    done < "$results_file"
+    tui_item_columns 24 < "$results_file" > "$temporary_dir/install-package-columns"
 
-    selected=$(dialog --menu "Install results for: $query" 24 112 16 "$@" \
-        3>&1 1>&2 2>&3) || return 1
-    printf '%s\n' "$selected"
+    selected=$(tui_fzf \
+        --ansi \
+        --delimiter='\t' \
+        --with-nth=3 \
+        --nth=1 \
+        --prompt='󰐕  Install package  ' \
+        --pointer='󰜴' \
+        --marker='󰄬' \
+        --border=sharp \
+        --border-label=" Installable packages: $(wc -l < "$temporary_dir/install-package-columns") " \
+        --header='Icon / Source / Name / Version — search names or Flatpak IDs' \
+        --info=inline-right \
+        --layout=reverse \
+        --no-multi \
+        --no-hscroll \
+        --cycle \
+        < "$temporary_dir/install-package-columns") || return 1
+
+    source=$(printf '%s\n' "$selected" | cut -f1)
+    identifier=$(printf '%s\n' "$selected" | cut -f2)
+    printf '%s:%s\n' "$source" "$identifier"
 }
 
 run_flatpak_install() {
@@ -432,7 +452,7 @@ install_package() {
             ;;
         flatpak)
             remote=$(awk -F '\t' -v application="$identifier" \
-                '$1 == "flatpak" && $2 == application { print $4; exit }' "$temporary_dir/install-results")
+                '$1 == "flatpak" && $2 == application { print $7; exit }' "$temporary_dir/install-results")
             [ -n "$remote" ] || remote=flathub
             run_flatpak_install "$identifier" "$remote"
             ;;
