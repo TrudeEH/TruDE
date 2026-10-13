@@ -234,6 +234,65 @@ install_deb_file() {
     pause_after_command
 }
 
+install_flatpak_file() {
+    command -v flatpak >/dev/null 2>&1 || {
+        message 'Flatpak is required to install a local Flatpak file.'
+        return
+    }
+    command -v spf >/dev/null 2>&1 || {
+        message 'Superfile (spf) is required to select a local Flatpak file.'
+        return
+    }
+
+    selection_file=$temporary_dir/superfile-selection
+    : > "$selection_file"
+    start_dir=$HOME
+    [ -d "$HOME/Downloads" ] && start_dir=$HOME/Downloads
+
+    clear
+    printf 'Select a .flatpak or .flatpakref file in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
+    dotfiles-file-manager-tui --chooser-file "$selection_file" "$start_dir"
+    picker_status=$?
+    clear
+    [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return
+
+    # Superfile writes one path without a trailing newline.
+    flatpak_path=$(cat "$selection_file")
+    case $flatpak_path in
+        *.flatpak) install_mode=--bundle ;;
+        *.flatpakref) install_mode=--from ;;
+        *)
+            message 'The selected file must have a .flatpak or .flatpakref extension.'
+            return
+            ;;
+    esac
+
+    case $flatpak_path in
+        /*) ;;
+        *) flatpak_path=$PWD/$flatpak_path ;;
+    esac
+
+    [ -f "$flatpak_path" ] && [ -r "$flatpak_path" ] || {
+        message "Cannot read Flatpak file:\n\n$flatpak_path"
+        return
+    }
+
+    if ! dialog --yesno "Install local Flatpak for the current user?\n\n$flatpak_path\n\nOnly install files from sources you trust. Flatpak may add repositories and download the application or required runtimes." 15 86; then
+        return
+    fi
+
+    clear
+    printf 'Installing local Flatpak: %s\n\n' "$flatpak_path"
+    flatpak install --user -y --or-update "$install_mode" -- "$flatpak_path"
+    status=$?
+    if [ "$status" -eq 0 ]; then
+        printf '\nFlatpak installation completed successfully.\n'
+    else
+        printf '\nFlatpak installation failed.\n'
+    fi
+    pause_after_command
+}
+
 create_flatpak_search_results() {
     query=$1
     raw_file=$temporary_dir/flatpak-search-raw
@@ -567,6 +626,7 @@ while :; do
     choice=$(dialog --menu 'Choose whether to install or uninstall a package.' 18 94 7 \
         '󰐕  install' 'Search and install a Debian package, Backport, or Flatpak' \
         '󰏗  install-deb' 'Install a local .deb package file' \
+        '󰏖  install-flatpak' 'Install a local .flatpak bundle or .flatpakref file' \
         '󰏖  remove' 'Search and uninstall an installed Debian package or Flatpak' \
         '󰑐  refresh' 'Refresh Debian package lists' \
         '󰅖  close' 'Close' \
@@ -575,6 +635,7 @@ while :; do
     case $choice in
         '󰐕  install') install_package ;;
         '󰏗  install-deb') install_deb_file ;;
+        '󰏖  install-flatpak') install_flatpak_file ;;
         '󰏖  remove') remove_package ;;
         '󰑐  refresh') refresh_apt_metadata ;;
         '󰅖  close') exit 0 ;;
