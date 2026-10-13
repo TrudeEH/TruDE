@@ -10,7 +10,7 @@ temp_dir=$(mktemp -d) || exit 1
 trap 'rm -rf "$temp_dir"' 0
 trap 'exit 1' HUP INT TERM
 
-dialog() { whiptail --title "󰐥  Autostart" "$@"; }
+dialog() { whiptail --title "Autostart" "$@"; }
 message() { dialog --msgbox "$1" 16 88; }
 confirm() { dialog --defaultno --yesno "$1" 14 88; }
 
@@ -177,16 +177,11 @@ manage_service() (
     done
 )
 
-# Keep the source and identifier separate from the display label, as in the
-# package manager's combined installed-package picker.
+# Keep routing fields separate from the name, source, state and icon columns.
 startup_items() {
     : > "$temp_dir/startup-items"
     : > "$temp_dir/seen"
     : > "$temp_dir/list-errors"
-    accent=$(printf '\033[38;2;255;190;111m')
-    primary=$(printf '\033[38;2;255;255;255m')
-    muted=$(printf '\033[38;2;170;170;170m')
-    reset=$(printf '\033[0m')
 
     # User entry wins, then the first XDG system directory.
     dirs=$config_home:$config_dirs
@@ -205,10 +200,8 @@ startup_items() {
             [ "$(desktop_value "$file" Type)" = Application ] || continue
             name=$(desktop_value "$file" Name | tr '\t\n' '  ')
             state=$(app_state "$file")
-            if [ "$state" = Enabled ]; then icon='󰄬'; else icon='󰅖'; fi
-            printf 'application\t%s\t%s󰏖  Login app ·%s %s%s%s %s%s %s%s\n' \
-                "$file" "$accent" "$reset" "$primary" "${name:-$base}" "$reset" \
-                "$muted" "$icon" "$state" "$reset" >> "$temp_dir/startup-items"
+            printf 'application\t%s\t%s\tLogin app\t%s\t󰏖\n' \
+                "$file" "${name:-$base}" "$state" >> "$temp_dir/startup-items"
         done
         IFS=:
         set -f
@@ -229,13 +222,48 @@ startup_items() {
                 *.socket) icon='󰒍' ;;
                 *) continue ;;
             esac
-            printf '%s\t%s\t%s%s  %s ·%s %s%s%s %s%s%s\n' \
-                "$scope" "$unit" "$accent" "$icon" "$source" "$reset" \
-                "$primary" "$unit" "$reset" "$muted" "$state" "$reset" >> "$temp_dir/startup-items"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                "$scope" "$unit" "$unit" "$source" "$state" "$icon" >> "$temp_dir/startup-items"
         done < "$temp_dir/units"
     done
     LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$temp_dir/startup-items" > "$temp_dir/startup-items.sorted"
     mv "$temp_dir/startup-items.sorted" "$temp_dir/startup-items"
+}
+
+# Pad before adding ANSI colors so escape sequences do not affect alignment.
+# Bound the name column to leave source and startup state visible.
+format_startup_items() {
+    terminal_columns=$(tput cols 2>/dev/null || printf '80')
+    case $terminal_columns in
+        ''|*[!0-9]*) terminal_columns=80 ;;
+    esac
+    awk -F '\t' -v terminal_columns="$terminal_columns" '
+        BEGIN {
+            accent = "\033[38;2;255;190;111m"
+            primary = "\033[38;2;255;255;255m"
+            muted = "\033[38;2;170;170;170m"
+            reset = "\033[0m"
+        }
+        {
+            rows[NR] = $0
+            if (length($3) > name_width) name_width = length($3)
+            if (length($4) > source_width) source_width = length($4)
+            if (length($5) > state_width) state_width = length($5)
+        }
+        END {
+            max_name_width = terminal_columns - source_width - state_width - 14
+            if (max_name_width < 8) max_name_width = 8
+            if (name_width > max_name_width) name_width = max_name_width
+            for (row = 1; row <= NR; row++) {
+                split(rows[row], item, "\t")
+                name = item[3]
+                if (length(name) > name_width) name = substr(name, 1, name_width - 3) "..."
+                printf "%s\t%s\t%s%s  %s%-*s%s\t%s%-*s%s\t%s%s%s\n", \
+                    item[1], item[2], accent, item[6], primary, name_width + 2, name, reset, \
+                    accent, source_width + 2, item[4], reset, muted, item[5], reset
+            }
+        }
+    ' "$temp_dir/startup-items" > "$temp_dir/startup-columns"
 }
 
 manage_startup() (
@@ -252,23 +280,24 @@ manage_startup() (
         header='Search login apps, user services, and system services. Select to manage.'
         [ ! -s "$temp_dir/list-errors" ] || header="$header
 Some service lists are unavailable; login apps and available units are shown."
+        format_startup_items
         selected=$(tui_fzf \
             --ansi \
             --delimiter='\t' \
-            --with-nth=3 \
-            --nth=1 \
+            --with-nth=3,4,5 \
+            --nth=1,2,3 \
             --prompt='󰐥  Startup  ' \
             --pointer='󰜴' \
             --marker='󰄬' \
             --border=sharp \
-            --border-label=" Startup items: $(wc -l < "$temp_dir/startup-items") " \
+            --border-label=" Startup items: $(wc -l < "$temp_dir/startup-columns") " \
             --header="$header" \
             --info=inline-right \
             --layout=reverse \
             --no-multi \
             --no-hscroll \
             --cycle \
-            < "$temp_dir/startup-items") || return
+            < "$temp_dir/startup-columns") || return
         source=$(printf '%s\n' "$selected" | cut -f1)
         identifier=$(printf '%s\n' "$selected" | cut -f2)
         case $source in
