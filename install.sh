@@ -443,6 +443,7 @@ link_configs() {
     link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
     link_config "$repo_dir/scripts/tui/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
     link_config "$repo_dir/scripts/tui/settings-tui" "$HOME/.local/bin/dotfiles-settings-tui"
+    link_config "$repo_dir/scripts/tui/autostart-tui" "$HOME/.local/bin/dotfiles-autostart-tui"
     link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
     link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/dotfiles-icon-picker-tui"
     link_config "$repo_dir/scripts/tui/agent-tui" "$HOME/.local/bin/dotfiles-agent-tui"
