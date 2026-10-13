@@ -179,12 +179,25 @@ Connect AC power and save your work. Firmware flashing must not be interrupted. 
 
     clear
     printf 'Refreshing firmware metadata and updating supported devices…\n\n'
-    # Do not use -y: retain device-specific warnings and reboot consent.
-    if sudo fwupdmgr refresh && sudo fwupdmgr update; then
-        printf '\nFirmware update check completed. Follow any reboot instructions above.\n'
-    else
-        printf '\nFirmware update command did not complete successfully. Review the output above; unsupported devices or no available updates may also be reported.\n'
-    fi
+    # fwupdmgr uses exit code 2 for successful commands with no action needed.
+    # Current metadata must not prevent checking for device updates.
+    sudo fwupdmgr refresh
+    refresh_status=$?
+    case $refresh_status in
+        0|2)
+            # Do not use -y: retain device-specific warnings and reboot consent.
+            sudo fwupdmgr update
+            firmware_status=$?
+            case $firmware_status in
+                0) printf '\nFirmware update check completed. Follow any reboot instructions above.\n' ;;
+                2) printf '\nNo firmware updates need to be installed. Review any device information above.\n' ;;
+                *) printf '\nFirmware update failed (exit code %s). Review the output above.\n' "$firmware_status" ;;
+            esac
+            ;;
+        *)
+            printf '\nFirmware metadata refresh failed (exit code %s); skipping firmware updates. Review the output above.\n' "$refresh_status"
+            ;;
+    esac
     printf 'Press Enter to return to maintenance status. '
     IFS= read -r _ || :
     collect_status
