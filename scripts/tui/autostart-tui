@@ -10,7 +10,7 @@ temp_dir=$(mktemp -d) || exit 1
 trap 'rm -rf "$temp_dir"' 0
 trap 'exit 1' HUP INT TERM
 
-dialog() { whiptail --title "Autostart" "$@"; }
+dialog() { whiptail --title "󰐥  Autostart" "$@"; }
 message() { dialog --msgbox "$1" 16 88; }
 confirm() { dialog --defaultno --yesno "$1" 14 88; }
 
@@ -74,11 +74,11 @@ manage_app() (
         name=$(desktop_value "$file" Name)
         state=$(app_state "$file")
         action=$(dialog --menu "${name:-$(basename -- "$file")} — $state\nChanges apply at next login; running apps are not stopped." 17 88 5 \
-            toggle "Toggle login autostart" \
-            details "Show entry and desktop restrictions" \
-            back "Back" 3>&1 1>&2 2>&3) || return
+            '󰐥  toggle' "Toggle login autostart" \
+            '󰈙  details' "Show entry and desktop restrictions" \
+            '󰌍  back' "Back" 3>&1 1>&2 2>&3) || return
         case $action in
-            toggle)
+            '󰐥  toggle')
                 if [ "$state" = Enabled ]; then hidden=true; verb=Disable; else hidden=false; verb=Enable; fi
                 confirm "$verb login autostart for ${name:-$file}?\n\nA user override will be saved. Desktop restrictions and TryExec still apply. Existing user entries are backed up as .desktop.backup." || continue
                 if output=$(set_app_state "$file" "$hidden" 2>&1); then
@@ -88,53 +88,29 @@ manage_app() (
                     message "Unable to save autostart entry:\n$output"
                 fi
                 ;;
-            details) dialog --scrolltext --textbox "$file" 24 96 || : ;;
-            back) return ;;
+            '󰈙  details') dialog --scrolltext --textbox "$file" 24 96 || : ;;
+            '󰌍  back') return ;;
         esac
     done
 )
 
-applications() (
-    while :; do
-        : > "$temp_dir/apps"
-        : > "$temp_dir/seen"
-        index=0
-        set --
-        # User entry wins, then the first XDG system directory.
-        dirs=$config_home:$config_dirs
-        old_ifs=$IFS
-        IFS=:
-        set -f
-        for dir in $dirs; do
-            IFS=$old_ifs
-            set +f
-            [ -n "$dir" ] || continue
-            for file in "$dir"/autostart/*.desktop; do
-                [ -f "$file" ] || continue
-                base=$(basename -- "$file")
-                grep -Fqx -e "$base" "$temp_dir/seen" && continue
-                printf '%s\n' "$base" >> "$temp_dir/seen"
-                [ "$(desktop_value "$file" Type)" = Application ] || continue
-                name=$(desktop_value "$file" Name)
-                index=$((index + 1))
-                printf '%s\n' "$file" >> "$temp_dir/apps"
-                set -- "$@" "$index" "$(app_state "$file") — ${name:-$base}"
-            done
-            IFS=:
-            set -f
-        done
-        set +f
-        IFS=$old_ifs
-        [ "$index" -gt 0 ] || { message "No XDG autostart applications found."; return; }
-        choice=$(dialog --menu "Login applications\nEnabled means not disabled here; desktop restrictions may prevent startup." 24 96 15 "$@" 3>&1 1>&2 2>&3) || return
-        file=$(sed -n "${choice}p" "$temp_dir/apps")
-        [ -n "$file" ] && manage_app "$file"
-    done
-)
-
 add_application() (
-    file=$(dialog --inputbox "Absolute path to an existing application .desktop file\nExample: /usr/share/applications/example.desktop" 12 88 3>&1 1>&2 2>&3) || return
-    case $file in /*.desktop) ;; *) message "Enter an absolute path ending in .desktop."; return ;; esac
+    command -v spf >/dev/null 2>&1 || {
+        message "Superfile (spf) is required to select a login application."
+        return
+    }
+    selection_file=$temp_dir/superfile-selection
+    : > "$selection_file"
+    clear
+    printf 'Select an application .desktop file in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
+    dotfiles-file-manager-tui --chooser-file "$selection_file" /usr/share/applications
+    picker_status=$?
+    clear
+    [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return
+    # Superfile writes one path without a trailing newline.
+    file=$(cat "$selection_file")
+    case $file in /*) ;; *) file=$PWD/$file ;; esac
+    case $file in *.desktop) ;; *) message "Select an application .desktop file."; return ;; esac
     if [ ! -f "$file" ] || [ "$(desktop_value "$file" Type)" != Application ] ||
         [ -z "$(desktop_value "$file" Exec)" ]; then
         message "Select an Application .desktop file containing an Exec command."
@@ -169,18 +145,19 @@ manage_service() (
         enabled=$(ctl is-enabled "$unit" 2>/dev/null || :)
         active=$(ctl is-active "$unit" 2>/dev/null || :)
         action=$(dialog --menu "$unit\nStartup: ${enabled:-unknown}    Runtime: ${active:-unknown}\nDisabling does not prevent dependency/socket activation." 20 96 7 \
-            enable "Enable startup (does not start now)" \
-            disable "Disable startup (does not stop now)" \
-            start "Start now only" \
-            stop "Stop now only" \
-            details "Show unit, triggers and memory accounting" \
-            back "Back" 3>&1 1>&2 2>&3) || return
+            '󰄬  enable' "Enable startup (does not start now)" \
+            '󰅖  disable' "Disable startup (does not stop now)" \
+            '󰐊  start' "Start now only" \
+            '󰓛  stop' "Stop now only" \
+            '󰈙  details' "Show unit, triggers and memory accounting" \
+            '󰌍  back' "Back" 3>&1 1>&2 2>&3) || return
         case $action in
-            details)
+            '󰈙  details')
                 { ctl show "$unit" -p Description -p FragmentPath -p UnitFileState -p ActiveState -p MemoryCurrent -p TriggeredBy -p Triggers; ctl cat "$unit"; } > "$temp_dir/unit" 2>&1
                 dialog --scrolltext --textbox "$temp_dir/unit" 24 96 || :
                 ;;
-            enable|disable|start|stop)
+            '󰄬  enable'|'󰅖  disable'|'󰐊  start'|'󰓛  stop')
+                action=${action##* }
                 case $action:$enabled in
                     enable:masked*|enable:static|enable:generated|enable:transient|disable:masked*|disable:static|disable:generated|disable:transient)
                         message "This unit is $enabled. Startup cannot be toggled here. Manage its activating dependency, timer or socket instead. Masked units are never unmasked automatically."
@@ -195,40 +172,120 @@ manage_service() (
                     message "Unable to $action $unit:\n$output"
                 fi
                 ;;
-            back) return ;;
+            '󰌍  back') return ;;
         esac
     done
 )
 
-services() (
-    scope=$1
-    while :; do
+# Keep the source and identifier separate from the display label, as in the
+# package manager's combined installed-package picker.
+startup_items() {
+    : > "$temp_dir/startup-items"
+    : > "$temp_dir/seen"
+    : > "$temp_dir/list-errors"
+    accent=$(printf '\033[38;2;255;190;111m')
+    primary=$(printf '\033[38;2;255;255;255m')
+    muted=$(printf '\033[38;2;170;170;170m')
+    reset=$(printf '\033[0m')
+
+    # User entry wins, then the first XDG system directory.
+    dirs=$config_home:$config_dirs
+    old_ifs=$IFS
+    IFS=:
+    set -f
+    for dir in $dirs; do
+        IFS=$old_ifs
+        set +f
+        [ -n "$dir" ] || continue
+        for file in "$dir"/autostart/*.desktop; do
+            [ -f "$file" ] || continue
+            base=$(basename -- "$file")
+            grep -Fqx -e "$base" "$temp_dir/seen" && continue
+            printf '%s\n' "$base" >> "$temp_dir/seen"
+            [ "$(desktop_value "$file" Type)" = Application ] || continue
+            name=$(desktop_value "$file" Name | tr '\t\n' '  ')
+            state=$(app_state "$file")
+            if [ "$state" = Enabled ]; then icon='󰄬'; else icon='󰅖'; fi
+            printf 'application\t%s\t%s󰏖  Login app ·%s %s%s%s %s%s %s%s\n' \
+                "$file" "$accent" "$reset" "$primary" "${name:-$base}" "$reset" \
+                "$muted" "$icon" "$state" "$reset" >> "$temp_dir/startup-items"
+        done
+        IFS=:
+        set -f
+    done
+    set +f
+    IFS=$old_ifs
+
+    for scope in user system; do
         if ! ctl list-unit-files --type=service --type=timer --type=socket --no-legend --no-pager > "$temp_dir/units" 2> "$temp_dir/error"; then
-            message "Unable to list $scope services:\n$(cat "$temp_dir/error")"
-            return
+            printf '%s: %s\n' "$scope" "$(cat "$temp_dir/error")" >> "$temp_dir/list-errors"
+            continue
         fi
-        set --
+        if [ "$scope" = user ]; then source='User'; else source='System'; fi
         while read -r unit state remainder; do
-            case $unit in *.service|*.timer|*.socket) ;; *) continue ;; esac
-            set -- "$@" "$unit" "$state"
+            case $unit in
+                *.service) icon='󰒓' ;;
+                *.timer) icon='󰥔' ;;
+                *.socket) icon='󰒍' ;;
+                *) continue ;;
+            esac
+            printf '%s\t%s\t%s%s  %s ·%s %s%s%s %s%s%s\n' \
+                "$scope" "$unit" "$accent" "$icon" "$source" "$reset" \
+                "$primary" "$unit" "$reset" "$muted" "$state" "$reset" >> "$temp_dir/startup-items"
         done < "$temp_dir/units"
-        [ "$#" -gt 0 ] || { message "No $scope service units found."; return; }
-        unit=$(dialog --menu "$scope services, timers and sockets\nSelect a unit to inspect or change. Static units start through dependencies." 24 96 15 "$@" 3>&1 1>&2 2>&3) || return
-        manage_service "$unit"
+    done
+    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$temp_dir/startup-items" > "$temp_dir/startup-items.sorted"
+    mv "$temp_dir/startup-items.sorted" "$temp_dir/startup-items"
+}
+
+manage_startup() (
+    command -v fzf >/dev/null 2>&1 || {
+        message "fzf is required to search startup items."
+        return
+    }
+    while :; do
+        startup_items
+        [ -s "$temp_dir/startup-items" ] || {
+            message "No startup items found.\n$(cat "$temp_dir/list-errors")"
+            return
+        }
+        header='Search login apps, user services, and system services. Select to manage.'
+        [ ! -s "$temp_dir/list-errors" ] || header="$header
+Some service lists are unavailable; login apps and available units are shown."
+        selected=$(tui_fzf \
+            --ansi \
+            --delimiter='\t' \
+            --with-nth=3 \
+            --nth=1 \
+            --prompt='󰐥  Startup  ' \
+            --pointer='󰜴' \
+            --marker='󰄬' \
+            --border=sharp \
+            --border-label=" Startup items: $(wc -l < "$temp_dir/startup-items") " \
+            --header="$header" \
+            --info=inline-right \
+            --layout=reverse \
+            --no-multi \
+            --no-hscroll \
+            --cycle \
+            < "$temp_dir/startup-items") || return
+        source=$(printf '%s\n' "$selected" | cut -f1)
+        identifier=$(printf '%s\n' "$selected" | cut -f2)
+        case $source in
+            application) manage_app "$identifier" ;;
+            user|system) scope=$source; manage_service "$identifier" ;;
+        esac
     done
 )
 
 while :; do
-    action=$(dialog --menu "Manage startup without removing software.\nHyprland exec commands are not edited by this tool." 19 88 7 \
-        applications "Login applications — XDG autostart" \
-        add "Add a login application from a desktop file" \
-        user "User services, timers and sockets" \
-        system "System services, timers and sockets — administrator access" \
-        close "Close" 3>&1 1>&2 2>&3) || exit 0
+    action=$(dialog --menu "Manage startup without removing software.\nHyprland exec commands are not edited by this tool." 17 88 5 \
+        '󰐥  startup' "Search all login applications, services, timers and sockets" \
+        '󰐕  add' "Add a login application using Superfile" \
+        '󰅖  close' "Close" 3>&1 1>&2 2>&3) || exit 0
     case $action in
-        applications) applications ;;
-        add) add_application ;;
-        user|system) services "$action" ;;
-        close) exit 0 ;;
+        '󰐥  startup') manage_startup ;;
+        '󰐕  add') add_application ;;
+        '󰅖  close') exit 0 ;;
     esac
 done
