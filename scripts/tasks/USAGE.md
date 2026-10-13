@@ -1,6 +1,6 @@
 # Tasks
 
-Open **Tasks** from the application launcher after installing the dotfiles.
+Open **Tasks** from the application launcher after installing TruDE.
 The first launch offers Local or Todoist; subsequent launches remember your
 choice. Press `b` to switch backends or reconnect Todoist. Select Local or
 Todoist with arrows/Tab and Enter, or click the option; Escape cancels. No

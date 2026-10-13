@@ -48,4 +48,4 @@ The installer supports **Debian 13 (Trixie) and newer Debian releases**. From a 
 curl -fsSL https://raw.githubusercontent.com/TrudeEH/TruDE/master/bootstrap.sh | sh
 ```
 
-The bootstrap installs Git, clones TruDE into `$HOME/dotfiles`, and runs the installer. When it finishes, log out and back in to start the TruDE session.
+The bootstrap installs Git, clones TruDE into `$HOME/TruDE`, and runs the installer. When it finishes, log out and back in to start the TruDE session.

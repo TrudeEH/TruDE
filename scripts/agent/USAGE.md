@@ -7,7 +7,7 @@ OpenAI-compatible server, then select its endpoint and a model that supports too
 ## Start
 
 From this checkout, run `scripts/agent/setup.sh` once, then `scripts/tui/agent-tui`.
-The desktop installer links the application launcher and the `dotfiles-agent-tui`
+The desktop installer links the application launcher and the `TruDE-agent-tui`
 command. Seth is written entirely in C, with POSIX sh launch/build scripts. The
 installer builds the native executable from source on every run, using the
 `build-essential` package already included in the Debian package list. Generated
@@ -244,8 +244,8 @@ redirects during discovery and credential exchanges. Authenticated MCP requests
 also refuse redirects rather than risk forwarding credentials elsewhere.
 
 Tokens are stored atomically with mode `0600` in
-`$XDG_CONFIG_HOME/dotfiles-agent/oauth-<URL hash>.json` (default
-`~/.config/dotfiles-agent/`). Storage is plaintext, protected by filesystem
+`$XDG_CONFIG_HOME/TruDE-agent/oauth-<URL hash>.json` (default
+`~/.config/TruDE-agent/`). Storage is plaintext, protected by filesystem
 permissions, not encryption. Each exact MCP URL has separate tokens and a lock.
 Cached tokens are reused and refresh tokens are exchanged when needed. Scheduled
 runs may reuse or refresh tokens but never start interactive authentication.
@@ -368,11 +368,11 @@ folders are unused; neither startup nor setup reads or downloads them.
 
 Uses XDG directories, defaulting to:
 
-- `~/.config/dotfiles-agent/settings.json`: provider and MCP settings (0600).
-- `~/.local/share/dotfiles-agent/chats/`: complete chat JSON files (0600).
-- `~/.local/share/dotfiles-agent/automations.json`: schedules and last results.
-- `~/.local/state/dotfiles-agent/checkpoints/`: private file restore checkpoints.
-- `~/.local/state/dotfiles-agent/*.lock`: live-process concurrency guards.
+- `~/.config/TruDE-agent/settings.json`: provider and MCP settings (0600).
+- `~/.local/share/TruDE-agent/chats/`: complete chat JSON files (0600).
+- `~/.local/share/TruDE-agent/automations.json`: schedules and last results.
+- `~/.local/state/TruDE-agent/checkpoints/`: private file restore checkpoints.
+- `~/.local/state/TruDE-agent/*.lock`: live-process concurrency guards.
 
 | File | Purpose |
 | --- | --- |
@@ -394,8 +394,8 @@ Uses XDG directories, defaulting to:
 | `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |
 | `build.sh`, `setup.sh` | Native build and compatibility build entry point |
 
-Desktop integration lives in `configs/applications/dotfiles-agent.desktop`, the two
-`configs/systemd/user/dotfiles-agent.*` units, `configs/hypr/hyprland.lua`, and `install.sh`.
+Desktop integration lives in `configs/applications/TruDE-agent.desktop`, the two
+`configs/systemd/user/TruDE-agent.*` units, `configs/hypr/hyprland.lua`, and `install.sh`.
 
 To rebuild the local executable, run `scripts/agent/build.sh`. It uses only the
 compiler, standard Linux libc headers, and the linker; no dependency fetch

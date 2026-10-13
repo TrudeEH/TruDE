@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
 #include <stdarg.h>
 #endif
 
@@ -26,7 +26,7 @@ static void stop(int sig) { (void)sig; running = 0; }
 static const char *runtime, *mode, *part;
 static char previous[8192];
 static int dirty = 1;
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
 /* Cache status replies only; never put synchronous method calls on the UI loop.
  * Slots own pending calls, and replies remain valid until replaced. Signals
  * invalidate requests; a bounded fallback also covers services without signals. */
@@ -123,7 +123,7 @@ static int status_call(sd_bus *bus, const char *service, const char *path,
 #endif
 static int changed(sd_bus_message *m, void *data, sd_bus_error *e) {
     (void)m; (void)data; (void)e;
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
     query_generation++;
 #endif
     dirty = 1; return 0;
@@ -157,11 +157,11 @@ static unsigned number(const char *service, const char *path, const char *iface,
     }
     sd_bus_message_unref(m); return value;
 }
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
 static void bar_status(const char *text, const char *tooltip, const char *class);
 #endif
 static void emit(const char *text, const char *tooltip, const char *class) {
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
     bar_status(text, tooltip, class);
 #else
     struct json_object *o = json_object_new_object();
@@ -368,11 +368,11 @@ static void launcher(void) {
     const char *class = "launcher", *icon = "󰀻", *tip = "";
     for (struct node *n = nodes; n; n = n->next) if (n->screen && n->video) class = "screensharing";
     char path[PATH_MAX], state[64] = "";
-    snprintf(path, sizeof path, "%s/dotfiles-dictation/state", runtime);
+    snprintf(path, sizeof path, "%s/TruDE-dictation/state", runtime);
     FILE *f = fopen(path, "r");
     if (f) { if (fgets(state, sizeof state, f)) state[strcspn(state, "\r\n")] = 0; fclose(f); }
     if (!strcmp(state, "recording") || !strcmp(state, "transcribing")) {
-        snprintf(path, sizeof path, "%s/dotfiles-dictation/worker.lock", runtime);
+        snprintf(path, sizeof path, "%s/TruDE-dictation/worker.lock", runtime);
         int fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd >= 0) { if (flock(fd, LOCK_EX | LOCK_NB) < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)) class = state; close(fd); }
     }
@@ -384,8 +384,8 @@ static void launcher(void) {
     struct json_object *bar = NULL, *custom = NULL;
     if (!strcmp(class, "launcher") && !strcmp(part, "center")) {
         const char *config = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
-        if (config) snprintf(path, sizeof path, "%s/dotfiles/settings.json", config);
-        else snprintf(path, sizeof path, "%s/.config/dotfiles/settings.json", home ? home : "");
+        if (config) snprintf(path, sizeof path, "%s/TruDE/settings.json", config);
+        else snprintf(path, sizeof path, "%s/.config/TruDE/settings.json", home ? home : "");
         struct stat st = {0};
         if (stat(path, &st) < 0) { json_object_put(settings); settings = NULL; memset(&saved, 0, sizeof saved); }
         else if (!settings || st.st_ino != saved.st_ino || st.st_size != saved.st_size ||
@@ -405,7 +405,7 @@ static void launcher(void) {
 static void connect_buses(void) {
     if (!system_bus && sd_bus_open_system(&system_bus) >= 0) {
         sd_bus_set_method_call_timeout(system_bus, 1000000);
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
         /* The native bar renders both power and connectivity in one process. */
         {
 #else
@@ -426,7 +426,7 @@ static void connect_buses(void) {
     if (!strcmp(mode, "indicators") && !session_bus && sd_bus_open_user(&session_bus) >= 0) {
         sd_bus_set_method_call_timeout(session_bus, 1000000);
         sd_bus_add_match(session_bus, NULL, "type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.DBus.Properties'", changed, NULL);
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
         sd_bus_add_match(session_bus, NULL, "type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.Notifications'", changed, NULL);
 #endif
         sd_bus_add_match(session_bus, NULL, "type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged'", changed, NULL);
@@ -437,13 +437,13 @@ static void drain(sd_bus **bus) {
     if (!*bus) return;
     int r; while ((r = sd_bus_process(*bus, NULL)) > 0) {}
     if (r < 0) {
-#ifdef DOTFILES_BAR
+#ifdef TRUDE_BAR
         status_cache_clear(*bus);
 #endif
         *bus = sd_bus_flush_close_unref(*bus); dirty = 1;
     }
 }
-#ifndef DOTFILES_BAR
+#ifndef TRUDE_BAR
 int main(int argc, char **argv) {
     if (argc < 2 || (strcmp(argv[1], "launcher") && strcmp(argv[1], "power") && strcmp(argv[1], "indicators"))) {
         fprintf(stderr, "usage: %s launcher [center|left|right] | power | indicators [--once]\n", argv[0]); return 2;
@@ -469,7 +469,7 @@ int main(int argc, char **argv) {
         if (notify >= 0) {
             inotify_add_watch(notify, runtime, IN_CREATE | IN_MOVED_TO | IN_DELETE);
             char path[PATH_MAX];
-            snprintf(path, sizeof path, "%s/dotfiles-dictation", runtime);
+            snprintf(path, sizeof path, "%s/TruDE-dictation", runtime);
             inotify_add_watch(notify, path, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);
         }
     }
@@ -500,7 +500,7 @@ int main(int argc, char **argv) {
             if (pw_loop_iterate(pw_main_loop_get_loop(pwloop), 0) < 0) disconnect_pipewire();
             if (notify >= 0 && fds[1].revents) {
                 char events[4096]; while (read(notify, events, sizeof events) > 0) {}
-                char path[PATH_MAX]; snprintf(path, sizeof path, "%s/dotfiles-dictation", runtime);
+                char path[PATH_MAX]; snprintf(path, sizeof path, "%s/TruDE-dictation", runtime);
                 inotify_add_watch(notify, path, IN_CLOSE_WRITE | IN_MOVED_TO | IN_DELETE);
                 dirty = 1;
             }

@@ -32,11 +32,11 @@ int main(int argc, char **argv) {
     int check = 0, due = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--help")) {
-            puts("Seth — native Debian AI agent\n\nUsage: dotfiles-agent-tui [--workspace DIR]\n   "
-                 "    dotfiles-agent-tui --check\n       dotfiles-agent-tui --run-due | --run-task "
-                 "ID\n       dotfiles-agent-tui --prompt TEXT [--workspace DIR]\n"
+            puts("Seth — native Debian AI agent\n\nUsage: TruDE-agent-tui [--workspace DIR]\n   "
+                 "    TruDE-agent-tui --check\n       TruDE-agent-tui --run-due | --run-task "
+                 "ID\n       TruDE-agent-tui --prompt TEXT [--workspace DIR]\n"
                  "\nEnter sends. Shift+Enter adds a line. F6 opens "
-                 "chat help.\nSettings and history use the existing dotfiles-agent XDG "
+                 "chat help.\nSettings and history use the existing TruDE-agent XDG "
                  "directories.");
             return 0;
         } else if (!strcmp(argv[i], "--workspace") && i + 1 < argc)

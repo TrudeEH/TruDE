@@ -3,13 +3,13 @@
 export PYTHONDONTWRITEBYTECODE=1
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
-preferences_file=$config_home/dotfiles/settings.json
-model_dir=$data_home/dotfiles/dictation/models
-engine=$data_home/dotfiles/dictation/bin/whisper-cli
-runtime=${XDG_RUNTIME_DIR:?A user runtime directory is required}/dotfiles-dictation
+preferences_file=$config_home/TruDE/settings.json
+model_dir=$data_home/TruDE/dictation/models
+engine=$data_home/TruDE/dictation/bin/whisper-cli
+runtime=${XDG_RUNTIME_DIR:?A user runtime directory is required}/TruDE-dictation
 mkdir -p "$runtime"
 chmod 700 "$runtime"
-dictation_root=$data_home/dotfiles/dictation
+dictation_root=$data_home/TruDE/dictation
 sherpa_python=$dictation_root/backends/sherpa/bin/python
 catalog=$(dirname -- "$(readlink -f -- "$0")")/catalog.json
 # TUI sources this file from a sibling directory.
@@ -21,7 +21,7 @@ model=$(jq -r '.dictation.model // "base"' "$preferences_file" 2>/dev/null || pr
 model_valid "$model" || model=base
 refresh_launcher() {
     # Refresh the original center and both dividers with the same realtime signal.
-    systemctl --user kill --signal=USR1 dotfiles-bar.service 2>/dev/null || :
+    systemctl --user kill --signal=USR1 TruDE-bar.service 2>/dev/null || :
 }
 state() {
     printf '%s\n' "$1" > "$runtime/state.new"

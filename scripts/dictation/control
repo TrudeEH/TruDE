@@ -5,14 +5,14 @@ exec 9>"$runtime/control.lock"
 flock -n 9 || exit 0
 case ${1:-toggle} in
     cancel)
-        systemctl --user stop dotfiles-dictation.service
+        systemctl --user stop TruDE-dictation.service
         rm -f "$runtime/state" "$runtime/error"
         refresh_launcher
         exit 0 ;;
     toggle) ;;
     *) printf 'Usage: %s [toggle|cancel]\n' "$0" >&2; exit 2 ;;
 esac
-if systemctl --user is-active --quiet dotfiles-dictation.service; then
+if systemctl --user is-active --quiet TruDE-dictation.service; then
     if [ "$(cat "$runtime/state" 2>/dev/null || :)" = recording ]; then
         : > "$runtime/stop"
     fi
@@ -31,4 +31,4 @@ fi
 rm -f "$runtime/stop" "$runtime/error"
 # Import the compositor environment from the shortcut, not a stale user manager.
 systemctl --user import-environment WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE
-systemctl --user start dotfiles-dictation.service
+systemctl --user start TruDE-dictation.service

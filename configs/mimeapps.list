@@ -1,14 +1,14 @@
 [Default Applications]
-inode/directory=dotfiles-file-manager.desktop
+inode/directory=TruDE-file-manager.desktop
 x-scheme-handler/codex=chatgpt.desktop
-text/plain=dotfiles-text-editor.desktop
-text/markdown=dotfiles-text-editor.desktop
-application/x-shellscript=dotfiles-text-editor.desktop
-text/x-shellscript=dotfiles-text-editor.desktop
-text/x-python=dotfiles-text-editor.desktop
-text/x-script.python=dotfiles-text-editor.desktop
-text/x-lua=dotfiles-text-editor.desktop
-application/json=dotfiles-text-editor.desktop
-application/toml=dotfiles-text-editor.desktop
-application/yaml=dotfiles-text-editor.desktop
-text/yaml=dotfiles-text-editor.desktop
+text/plain=TruDE-text-editor.desktop
+text/markdown=TruDE-text-editor.desktop
+application/x-shellscript=TruDE-text-editor.desktop
+text/x-shellscript=TruDE-text-editor.desktop
+text/x-python=TruDE-text-editor.desktop
+text/x-script.python=TruDE-text-editor.desktop
+text/x-lua=TruDE-text-editor.desktop
+application/json=TruDE-text-editor.desktop
+application/toml=TruDE-text-editor.desktop
+application/yaml=TruDE-text-editor.desktop
+text/yaml=TruDE-text-editor.desktop

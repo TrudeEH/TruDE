@@ -3,7 +3,7 @@ Description=Run due Seth tasks
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/dotfiles-agent-tui --run-due
+ExecStart=%h/.local/bin/TruDE-agent-tui --run-due
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 UMask=0077
 TimeoutStartSec=30min

@@ -2,6 +2,6 @@
 Type=Application
 Name=USB Devices
 Comment=Mount and safely remove USB storage
-Exec=footclient --app-id=usb-tui --title="USB Devices" --override=colors.regular0=222226 --window-size-chars=92x26 dotfiles-usb-tui
+Exec=footclient --app-id=usb-tui --title="USB Devices" --override=colors.regular0=222226 --window-size-chars=92x26 TruDE-usb-tui
 Terminal=false
 Categories=System;Filesystem;

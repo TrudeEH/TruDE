@@ -7,12 +7,12 @@ set -u
 config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
 settings_dir=$config_home/hypr
 settings_file=$settings_dir/settings.local.lua
-preferences_dir=$config_home/dotfiles
+preferences_dir=$config_home/TruDE
 preferences_file=$preferences_dir/settings.json
-monitor_begin_marker='-- dotfiles-monitor-settings:begin'
-monitor_end_marker='-- dotfiles-monitor-settings:end'
-preferences_begin_marker='-- dotfiles-preferences:begin'
-preferences_end_marker='-- dotfiles-preferences:end'
+monitor_begin_marker='-- TruDE-monitor-settings:begin'
+monitor_end_marker='-- TruDE-monitor-settings:end'
+preferences_begin_marker='-- TruDE-preferences:begin'
+preferences_end_marker='-- TruDE-preferences:end'
 temp_dir=$(mktemp -d) || exit 1
 monitor_state=$temp_dir/monitors.json
 preferences_state=$temp_dir/preferences.json
@@ -93,7 +93,7 @@ load_monitors() {
 
 load_preferences() {
     defaults=$temp_dir/default-preferences.json
-    jq -n --arg wallpaper "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg" '
+    jq -n --arg wallpaper "$HOME/.local/share/backgrounds/TruDE-wallpaper.jpg" '
         {
             input: {
                 keyboard_layout: "us",
@@ -155,7 +155,7 @@ select_file_with_superfile() {
 
     clear
     printf 'Select a file in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
-    dotfiles-file-manager-tui --chooser-file "$selection_file" "$start_dir"
+    TruDE-file-manager-tui --chooser-file "$selection_file" "$start_dir"
     picker_status=$?
     clear
     [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return 1
@@ -233,18 +233,18 @@ write_preferences_block() {
     {
         printf '%s\n' "$preferences_begin_marker"
         jq -r '
-            "dotfilesSettings.wallpaper = " + (.appearance.wallpaper | @json) + "\n" +
-            "dotfilesSettings.animationsEnabled = " + (.appearance.animations | tostring) + "\n" +
-            "dotfilesSettings.blurEnabled = " + (.appearance.blur | tostring) + "\n" +
-            "dotfilesSettings.gapsIn = " + (.appearance.gaps_in | tostring) + "\n" +
-            "dotfilesSettings.gapsOut = " + (.appearance.gaps_out | tostring) + "\n" +
-            "dotfilesSettings.borderSize = " + (.appearance.border_size | tostring) + "\n" +
-            "dotfilesSettings.keyboardLayout = " + (.input.keyboard_layout | @json) + "\n" +
-            "dotfilesSettings.keyboardVariant = " + (.input.keyboard_variant | @json) + "\n" +
-            "dotfilesSettings.naturalScroll = " + (.input.natural_scroll | tostring) + "\n" +
-            "dotfilesSettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
-            "dotfilesSettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
-            "dotfilesSettings.accelProfile = " + (.input.accel_profile | @json)
+            "TruDESettings.wallpaper = " + (.appearance.wallpaper | @json) + "\n" +
+            "TruDESettings.animationsEnabled = " + (.appearance.animations | tostring) + "\n" +
+            "TruDESettings.blurEnabled = " + (.appearance.blur | tostring) + "\n" +
+            "TruDESettings.gapsIn = " + (.appearance.gaps_in | tostring) + "\n" +
+            "TruDESettings.gapsOut = " + (.appearance.gaps_out | tostring) + "\n" +
+            "TruDESettings.borderSize = " + (.appearance.border_size | tostring) + "\n" +
+            "TruDESettings.keyboardLayout = " + (.input.keyboard_layout | @json) + "\n" +
+            "TruDESettings.keyboardVariant = " + (.input.keyboard_variant | @json) + "\n" +
+            "TruDESettings.naturalScroll = " + (.input.natural_scroll | tostring) + "\n" +
+            "TruDESettings.tapToClick = " + (.input.tap_to_click | tostring) + "\n" +
+            "TruDESettings.sensitivity = " + (.input.sensitivity | tostring) + "\n" +
+            "TruDESettings.accelProfile = " + (.input.accel_profile | @json)
         ' "$preferences_state" || return 1
         printf '%s\n' "$preferences_end_marker"
     } > "$preferences_block"
@@ -268,24 +268,24 @@ apply_wallpaper() {
     wallpaper_generation=${wallpaper_generation:-0}
     wallpaper_generation=$((wallpaper_generation + 1))
     if ! systemd-run --user --quiet --collect \
-        --unit="dotfiles-wallpaper-$$-$wallpaper_generation" \
-        "$HOME/.local/bin/dotfiles-set-wallpaper" "$wallpaper" >/dev/null 2>&1; then
+        --unit="TruDE-wallpaper-$$-$wallpaper_generation" \
+        "$HOME/.local/bin/TruDE-set-wallpaper" "$wallpaper" >/dev/null 2>&1; then
         message "Unable to start the wallpaper service."
     fi
 }
 
 apply_waybar() {
     if [ "$(preference '.waybar.enabled')" = true ]; then
-        systemctl --user reset-failed dotfiles-bar.service >/dev/null 2>&1 || :
+        systemctl --user reset-failed TruDE-bar.service >/dev/null 2>&1 || :
         # disable removes external unit links; enable from the repository path.
-        bar_unit=$(dirname -- "$(readlink -f -- "$0")")/../../configs/systemd/user/dotfiles-bar.service
+        bar_unit=$(dirname -- "$(readlink -f -- "$0")")/../../configs/systemd/user/TruDE-bar.service
         if ! output=$(systemctl --user enable "$bar_unit" 2>&1) \
-            || ! output=$(systemctl --user restart dotfiles-bar.service 2>&1); then
+            || ! output=$(systemctl --user restart TruDE-bar.service 2>&1); then
             message "Settings were saved, but the bar could not start:\n\n$output"
             return 1
         fi
     else
-        if ! output=$(systemctl --user disable --now dotfiles-bar.service 2>&1); then
+        if ! output=$(systemctl --user disable --now TruDE-bar.service 2>&1); then
             message "Settings were saved, but the bar could not stop:\n\n$output"
             return 1
         fi
@@ -584,7 +584,7 @@ save_monitor_settings() {
     replace_local_section "$monitor_begin_marker" "$monitor_end_marker" \
         "$monitor_block" || return 1
     if output=$(hyprctl reload 2>&1); then
-        systemctl --user try-restart dotfiles-bar.service >/dev/null 2>&1 || :
+        systemctl --user try-restart TruDE-bar.service >/dev/null 2>&1 || :
         message "Display settings saved and applied."
     else
         message "Settings were saved, but Hyprland could not reload them:\n\n$output"
@@ -831,11 +831,11 @@ waybar_settings() {
                 ;;
             *" primary-only") toggle_preference '.waybar.primary_only' waybar ;;
             *" launcher-icon")
-                if ! command -v dotfiles-icon-picker-tui >/dev/null 2>&1; then
+                if ! command -v TruDE-icon-picker-tui >/dev/null 2>&1; then
                     message "The icon picker command is not installed."
                     continue
                 fi
-                selected_icon=$(dotfiles-icon-picker-tui --print) || continue
+                selected_icon=$(TruDE-icon-picker-tui --print) || continue
                 if [ -n "$selected_icon" ]; then
                     replace_preferences --arg value "$selected_icon" '.waybar.launcher_icon = $value'
                     save_preferences waybar
@@ -856,11 +856,11 @@ apply_lid_behavior() {
         message "pkexec is required to change the system lid-close behavior."
         return 1
     fi
-    logind_file=/etc/systemd/logind.conf.d/90-dotfiles-lid.conf
+    logind_file=/etc/systemd/logind.conf.d/90-TruDE-lid.conf
     if [ "$behavior" = default ]; then
         pkexec /usr/bin/rm -f "$logind_file" || return 1
     else
-        temporary=$temp_dir/90-dotfiles-lid.conf
+        temporary=$temp_dir/90-TruDE-lid.conf
         {
             printf '%s\n' '[Login]'
             printf 'HandleLidSwitch=%s\n' "$behavior"
@@ -923,8 +923,8 @@ while :; do
         *" input") input_settings ;;
         *" appearance") appearance_settings ;;
         *" bar") waybar_settings ;;
-        *" dictation") dotfiles-dictation-tui; load_preferences ;;
-        *" autostart") dotfiles-autostart-tui ;;
+        *" dictation") TruDE-dictation-tui; load_preferences ;;
+        *" autostart") TruDE-autostart-tui ;;
         *" laptop") laptop_settings ;;
         *" close") exit 0 ;;
     esac

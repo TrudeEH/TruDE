@@ -6,11 +6,11 @@ local adwaita = {
     border        = "ffffff1a",
 }
 
-dotfilesSettings = {
+TruDESettings = {
     terminal           = "footclient",
-    fileManager        = "footclient --app-id=superfile --title=Files dotfiles-file-manager-tui",
-    launcher           = "dotfiles-app-launcher-toggle",
-    wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/dotfiles-wallpaper.jpg",
+    fileManager        = "footclient --app-id=superfile --title=Files TruDE-file-manager-tui",
+    launcher           = "TruDE-app-launcher-toggle",
+    wallpaper          = os.getenv("HOME") .. "/.local/share/backgrounds/TruDE-wallpaper.jpg",
     animationsEnabled  = true,
     blurEnabled        = true,
     gapsIn             = 5,
@@ -54,15 +54,15 @@ end
 ---------------------
 
 -- Set programs that you use
-local terminal    = dotfilesSettings.terminal
-local fileManager = dotfilesSettings.fileManager
-local menu        = dotfilesSettings.launcher
+local terminal    = TruDESettings.terminal
+local fileManager = TruDESettings.fileManager
+local menu        = TruDESettings.launcher
 local function shellQuote(value)
     return "'" .. value:gsub("'", "'\\''") .. "'"
 end
 local lock        = "hyprlock --config " .. shellQuote(configHome .. "/hypr/hyprlock.conf")
-local screenshot  = os.getenv("HOME") .. "/.local/bin/dotfiles-screenshot"
-local wallpaper   = dotfilesSettings.wallpaper
+local screenshot  = os.getenv("HOME") .. "/.local/bin/TruDE-screenshot"
+local wallpaper   = TruDESettings.wallpaper
 
 
 -------------------------------
@@ -104,10 +104,10 @@ hl.config({
     },
 
     general = {
-        gaps_in  = dotfilesSettings.gapsIn,
-        gaps_out = dotfilesSettings.gapsOut,
+        gaps_in  = TruDESettings.gapsIn,
+        gaps_out = TruDESettings.gapsOut,
 
-        border_size = dotfilesSettings.borderSize,
+        border_size = TruDESettings.borderSize,
 
         col = {
             -- Adwaita dark palette with the light-orange orange_1 accent.
@@ -140,7 +140,7 @@ hl.config({
         },
 
         blur = {
-            enabled   = dotfilesSettings.blurEnabled,
+            enabled   = TruDESettings.blurEnabled,
             size      = 3,
             passes    = 1,
             vibrancy  = 0.1696,
@@ -148,7 +148,7 @@ hl.config({
     },
 
     animations = {
-        enabled = dotfilesSettings.animationsEnabled,
+        enabled = TruDESettings.animationsEnabled,
     },
 })
 
@@ -204,20 +204,20 @@ hl.config({
 
 hl.config({
     input = {
-        kb_layout  = dotfilesSettings.keyboardLayout,
-        kb_variant = dotfilesSettings.keyboardVariant,
+        kb_layout  = TruDESettings.keyboardLayout,
+        kb_variant = TruDESettings.keyboardVariant,
         kb_model   = "",
         kb_options = "",
         kb_rules   = "",
 
         follow_mouse = 1,
 
-        sensitivity   = dotfilesSettings.sensitivity,
-        accel_profile = dotfilesSettings.accelProfile,
+        sensitivity   = TruDESettings.sensitivity,
+        accel_profile = TruDESettings.accelProfile,
 
         touchpad = {
-            natural_scroll = dotfilesSettings.naturalScroll,
-            tap_to_click    = dotfilesSettings.tapToClick,
+            natural_scroll = TruDESettings.naturalScroll,
+            tap_to_click    = TruDESettings.tapToClick,
         },
     },
 })
@@ -236,17 +236,17 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
 -- Keybindings, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal), { description = "Open terminal" })
-hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("footclient --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-shortcuts-tui"), {
+hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("footclient --app-id=shortcuts-tui --title='Hyprland Shortcuts' --override=colors.regular0=222226 --window-size-chars=94x28 TruDE-shortcuts-tui"), {
     description = "Show Hyprland shortcuts",
 })
-hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("footclient --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 dotfiles-settings-tui"), {
+hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("footclient --app-id=settings-tui --title=Settings --override=colors.regular0=222226 --window-size-chars=108x30 TruDE-settings-tui"), {
     description = "Open settings",
 })
 hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Close window" })
-hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui"), { description = "Open power menu" })
+hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 TruDE-power-menu-tui"), { description = "Open power menu" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Open file manager" })
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd(lock), { description = "Lock screen" })
-hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("dotfiles-dictation"), { description = "Toggle voice dictation" })
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("TruDE-dictation"), { description = "Toggle voice dictation" })
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }), { description = "Toggle floating" })
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu), { description = "Open application launcher" })
 -- Launch on release so Super can still be used as a modifier for other binds.
@@ -379,6 +379,6 @@ hl.on("hyprland.start", function ()
         .. "gsettings set org.gnome.desktop.interface accent-color orange >/dev/null 2>&1; "
         .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
         .. ">/dev/null 2>&1; fi")
-    hl.exec_cmd("dotfiles-set-wallpaper " .. shellQuote(wallpaper))
+    hl.exec_cmd("TruDE-set-wallpaper " .. shellQuote(wallpaper))
     hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)

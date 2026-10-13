@@ -13,7 +13,7 @@ held_file=$temp_dir/held
 failed_file=$temp_dir/failed
 backports_file=$temp_dir/backports
 summary_file=$temp_dir/summary
-trude_repo=$HOME/dotfiles
+trude_repo=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f -- "$0")")/../.." && pwd -P)
 askpass_helper=$temp_dir/git-askpass
 
 cat > "$askpass_helper" <<'EOF'
@@ -227,7 +227,7 @@ update_system() {
                 printf '\nReloading Hyprland…\n\n'
                 hyprctl reload || update_failed=1
                 printf '\nRestarting Waybar…\n\n'
-                systemctl --user restart dotfiles-bar.service || update_failed=1
+                systemctl --user restart TruDE-bar.service || update_failed=1
             else
                 printf '\nThe TruDE installer failed; skipping desktop reload.\n'
                 update_failed=1
@@ -246,8 +246,8 @@ update_system() {
     fi
     printf 'Press Enter to return to maintenance status.'
     IFS= read -r _
-    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-bar-maintenance.json"
-    systemctl --user kill --signal=USR1 dotfiles-bar.service 2>/dev/null || :
+    rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/TruDE-bar-maintenance.json"
+    systemctl --user kill --signal=USR1 TruDE-bar.service 2>/dev/null || :
     collect_status
 }
 
@@ -274,7 +274,7 @@ while true; do
 
     case $choice in
         *" packages")
-            dotfiles-package-manager-tui
+            TruDE-package-manager-tui
             collect_status
             ;;
         *" summary") show_file "Maintenance Summary" "$summary_file" ;;

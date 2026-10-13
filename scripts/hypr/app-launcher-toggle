@@ -21,4 +21,4 @@ exec footclient \
     --title=Applications \
     --override=colors.regular0=222226 \
     --window-size-chars=86x26 \
-    dotfiles-app-launcher-tui
+    TruDE-app-launcher-tui

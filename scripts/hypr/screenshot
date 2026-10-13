@@ -2,7 +2,7 @@
 set -eu
 
 mode=${1:-region}
-lock_dir=${XDG_RUNTIME_DIR:-/tmp}/dotfiles-screenshot.lock
+lock_dir=${XDG_RUNTIME_DIR:-/tmp}/TruDE-screenshot.lock
 
 # slurp keeps the selector open until the user confirms or cancels it. Make
 # that interaction single-instance so repeated PrintScreen presses cannot

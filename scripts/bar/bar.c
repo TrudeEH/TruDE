@@ -1,4 +1,4 @@
-#define DOTFILES_BAR
+#define TRUDE_BAR
 #include "status.c"
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -109,7 +109,7 @@ static struct buffer *getbuffer(void) {
     struct buffer *b=NULL;for(int i=0;i<2;i++)if(!buffers[i].busy){b=&buffers[i];break;}if(!b)return NULL;
     int w=width*scale,h=height*scale;
     if(b->object && (b->w!=w||b->h!=h)){wl_buffer_destroy(b->object);munmap(b->data,b->size);memset(b,0,sizeof *b);}
-    if(!b->object){b->w=w;b->h=h;b->size=(size_t)w*h*4;int fd=memfd_create("dotfiles-bar",MFD_CLOEXEC);if(fd<0||ftruncate(fd,b->size)<0)exit(1);
+    if(!b->object){b->w=w;b->h=h;b->size=(size_t)w*h*4;int fd=memfd_create("TruDE-bar",MFD_CLOEXEC);if(fd<0||ftruncate(fd,b->size)<0)exit(1);
         b->data=mmap(NULL,b->size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);if(b->data==MAP_FAILED)exit(1);
         struct wl_shm_pool *pool=wl_shm_create_pool(shm,fd,b->size);b->object=wl_shm_pool_create_buffer(pool,0,w,h,w*4,WL_SHM_FORMAT_ARGB8888);
         wl_shm_pool_destroy(pool);close(fd);wl_buffer_add_listener(b->object,&buffer_listener,b);}
@@ -326,7 +326,7 @@ static void maintenance_events(void) {
     while ((n = read(maintenance_watch, buf.data, sizeof buf.data)) > 0) {
         for (size_t off = 0; off < (size_t)n;) {
             struct inotify_event *e = (struct inotify_event *)(buf.data + off);
-            if ((e->mask & IN_Q_OVERFLOW) || (e->len && !strcmp(e->name, "dotfiles-bar-maintenance.json")))
+            if ((e->mask & IN_Q_OVERFLOW) || (e->len && !strcmp(e->name, "TruDE-bar-maintenance.json")))
                 maintenance_dirty = 1;
             if (e->mask & (IN_IGNORED | IN_DELETE_SELF | IN_MOVE_SELF)) {
                 close(maintenance_watch); maintenance_watch = -1; maintenance_dirty = 1; return;
@@ -335,7 +335,7 @@ static void maintenance_events(void) {
         }
     }
 }
-static void maintenance(void) {char path[PATH_MAX];snprintf(path,sizeof path,"%s/dotfiles-bar-maintenance.json",runtime);struct json_object *o=json_object_from_file(path),*v;
+static void maintenance(void) {char path[PATH_MAX];snprintf(path,sizeof path,"%s/TruDE-bar-maintenance.json",runtime);struct json_object *o=json_object_from_file(path),*v;
     if(o){if(json_object_object_get_ex(o,"class",&v)){const char *cls=json_object_get_string(v);if(strcmp(items[MAINT].class,cls))redraw=1;snprintf(items[MAINT].class,sizeof items[MAINT].class,"%s",cls);}if(json_object_object_get_ex(o,"text",&v))plain(MAINT,json_object_get_string(v));if(json_object_object_get_ex(o,"tooltip",&v))snprintf(items[MAINT].tip,sizeof items[MAINT].tip,"%s",json_object_get_string(v));json_object_put(o);}}
 #include <pulse/pulseaudio.h>
 static pa_mainloop *audio_loop;
@@ -365,7 +365,7 @@ static int volume_requests;
 static void volume_done(pa_context*c,int success,void*d){
     (void)d;if(volume_requests>0)volume_requests--;
     if(!volume_requests){pa_operation*o=pa_context_get_server_info(c,server_info,NULL);if(o)pa_operation_unref(o);}
-    if(!success)fprintf(stderr,"dotfiles-bar: volume change failed\n");
+    if(!success)fprintf(stderr,"TruDE-bar: volume change failed\n");
 }
 static void adjust_volume(int steps){
     if(!steps||!audio||pa_context_get_state(audio)!=PA_CONTEXT_READY||sink_index==PA_INVALID_INDEX||!pa_cvolume_valid(&sink_volume))return;
@@ -390,7 +390,7 @@ static void sink_info(pa_context *c,const pa_sink_info *info,int eol,void *data)
 static void server_info(pa_context *c,const pa_server_info *info,void *data){(void)data;if(!info)return;snprintf(default_sink,sizeof default_sink,"%s",info->default_sink_name?info->default_sink_name:"");pa_operation *o=pa_context_get_sink_info_by_name(c,default_sink,sink_info,NULL);if(o)pa_operation_unref(o);}
 static void audio_event(pa_context *c,pa_subscription_event_type_t t,uint32_t idx,void *data){(void)t;(void)idx;(void)data;pa_operation *o=pa_context_get_server_info(c,server_info,NULL);if(o)pa_operation_unref(o);}
 static void audio_state(pa_context *c,void *data){(void)data;if(pa_context_get_state(c)==PA_CONTEXT_READY){pa_context_set_subscribe_callback(c,audio_event,NULL);pa_operation *o=pa_context_subscribe(c,PA_SUBSCRIPTION_MASK_SINK|PA_SUBSCRIPTION_MASK_SERVER,NULL,NULL);if(o)pa_operation_unref(o);o=pa_context_get_server_info(c,server_info,NULL);if(o)pa_operation_unref(o);}}
-static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio_loop=pa_mainloop_new();pa_mainloop_set_poll_func(audio_loop,audio_poll,NULL);audio=pa_context_new(pa_mainloop_get_api(audio_loop),"dotfiles-bar");pa_context_set_state_callback(audio,audio_state,NULL);pa_context_connect(audio,NULL,PA_CONTEXT_NOFLAGS,NULL);}
+static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio_loop=pa_mainloop_new();pa_mainloop_set_poll_func(audio_loop,audio_poll,NULL);audio=pa_context_new(pa_mainloop_get_api(audio_loop),"TruDE-bar");pa_context_set_state_callback(audio,audio_state,NULL);pa_context_connect(audio,NULL,PA_CONTEXT_NOFLAGS,NULL);}
 
 /* StatusNotifier watcher: clients register their own D-Bus name/object path.
  * IconPixmap works without loading a GTK icon theme; common IconName clients
@@ -561,19 +561,19 @@ static void init_items(void) {
     items[MEM].bg=items[DATE].bg=items[MAINT].bg=bg2;
     items[CPU].bg=items[CLOCK].bg=items[POWER].bg=bg3;
     items[MENU].fg=accent;
-    items[TEMP].command="footclient --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-temperature-tui";
-    items[MEM].command=items[CPU].command="footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 dotfiles-system-monitor-tui";
-    items[LAUNCH].command="dotfiles-app-launcher-toggle";
-    items[CLOCK].command=items[DATE].command="footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 dotfiles-notification-tui";
-    items[INDICATORS].command="footclient --app-id=status-menu --title='Quick Settings' --override=colors.regular0=222226 --window-size-chars=42x10 dotfiles-bar-status-menu";
+    items[TEMP].command="footclient --app-id=temperature-tui --title='Temperature Monitor' --override=colors.regular0=222226 --window-size-chars=104x32 TruDE-temperature-tui";
+    items[MEM].command=items[CPU].command="footclient --app-id=btop --title='System Monitor' --window-size-chars=120x36 TruDE-system-monitor-tui";
+    items[LAUNCH].command="TruDE-app-launcher-toggle";
+    items[CLOCK].command=items[DATE].command="footclient --app-id=notification-tui --title='Notifications' --override=colors.regular0=222226 --window-size-chars=94x28 TruDE-notification-tui";
+    items[INDICATORS].command="footclient --app-id=status-menu --title='Quick Settings' --override=colors.regular0=222226 --window-size-chars=42x10 TruDE-bar-status-menu";
     items[VOLUME].command="footclient --app-id=pulsemixer --title='Volume Mixer' --window-size-chars=94x28 pulsemixer";
-    items[MAINT].command="footclient --app-id=maintenance-tui --title='System Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui";
-    items[POWER].command="footclient --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 dotfiles-power-profiles-tui";
-    items[MENU].command="footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 dotfiles-power-menu-tui";
+    items[MAINT].command="footclient --app-id=maintenance-tui --title='System Maintenance' --override=colors.regular0=222226 --window-size-chars=104x32 TruDE-maintenance-tui";
+    items[POWER].command="footclient --app-id=power-profiles-tui --title='Power Profile' --override=colors.regular0=222226 --window-size-chars=82x24 TruDE-power-profiles-tui";
+    items[MENU].command="footclient --app-id=power-menu-tui --title='Power' --override=colors.regular0=222226 --window-size-chars=88x23 TruDE-power-menu-tui";
     plain(MENU,"󰐥");plain(MAINT,"");plain(VOLUME,"󰕾 —");
 }
 static void preferences(void) {
-    char path[PATH_MAX];const char *config=getenv("XDG_CONFIG_HOME");if(config)snprintf(path,sizeof path,"%s/dotfiles/settings.json",config);else snprintf(path,sizeof path,"%s/.config/dotfiles/settings.json",getenv("HOME"));
+    char path[PATH_MAX];const char *config=getenv("XDG_CONFIG_HOME");if(config)snprintf(path,sizeof path,"%s/TruDE/settings.json",config);else snprintf(path,sizeof path,"%s/.config/TruDE/settings.json",getenv("HOME"));
     struct json_object *o=json_object_from_file(path),*bar,*v;
     if(o&&json_object_object_get_ex(o,"waybar",&bar)){
         if(json_object_object_get_ex(bar,"enabled",&v)&&!json_object_get_boolean(v)){json_object_put(o);exit(0);}
@@ -643,7 +643,7 @@ static void show_tooltip(void){
     tip_buffer=wl_shm_pool_create_buffer(pool,0,w*scale,h*scale,w*scale*4,WL_SHM_FORMAT_ARGB8888);wl_shm_pool_destroy(pool);close(fd);wl_buffer_add_listener(tip_buffer,&tip_listener,NULL);tip_released=0;
     tip_surface=wl_compositor_create_surface(compositor);tip_width=w;tip_height=h;
     int x=(int)(items[hover].x+items[hover].w/2)-w/2;if(x<3)x=3;if(x+w>width-3)x=width-3-w;
-    tip_layer=zwlr_layer_shell_v1_get_layer_surface(shell,tip_surface,bar_output,ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,"dotfiles-bar-tooltip");
+    tip_layer=zwlr_layer_shell_v1_get_layer_surface(shell,tip_surface,bar_output,ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY,"TruDE-bar-tooltip");
     zwlr_layer_surface_v1_add_listener(tip_layer,&tip_layer_listener,NULL);
     zwlr_layer_surface_v1_set_size(tip_layer,w,h);
     zwlr_layer_surface_v1_set_anchor(tip_layer,ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT|(bottom?ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP));
@@ -678,7 +678,7 @@ int main(int argc,char **argv){
         if(!hand_cursor)hand_cursor=wl_cursor_theme_get_cursor(cursor_theme,"hand2");
         if(hand_cursor)cursor_surface=wl_compositor_create_surface(compositor);
     }
-    bar_output=output;surface=wl_compositor_create_surface(compositor);layer=zwlr_layer_shell_v1_get_layer_surface(shell,surface,output,ZWLR_LAYER_SHELL_V1_LAYER_TOP,"dotfiles-bar");
+    bar_output=output;surface=wl_compositor_create_surface(compositor);layer=zwlr_layer_shell_v1_get_layer_surface(shell,surface,output,ZWLR_LAYER_SHELL_V1_LAYER_TOP,"TruDE-bar");
     zwlr_layer_surface_v1_add_listener(layer,&layer_listener,NULL);zwlr_layer_surface_v1_set_size(layer,0,height);
     zwlr_layer_surface_v1_set_anchor(layer,ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT|ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT|(bottom?ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM:ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP));
     zwlr_layer_surface_v1_set_exclusive_zone(layer,height);zwlr_layer_surface_v1_set_keyboard_interactivity(layer,0);wl_surface_commit(surface);wl_display_roundtrip(display);
@@ -729,7 +729,7 @@ int main(int argc,char **argv){
         int64_t now=monotonic_ms()/1000;
         if(refresh_requested){refresh_requested=0;dirty=1;query_generation++;maintenance_dirty=1;last_maintenance=0;last_power=0;}
         if(dirty||now!=last_second){char out[128];struct tm tm;time_t wall=time(NULL);localtime_r(&wall,&tm);strftime(out,sizeof out,"%I:%M %p",&tm);plain(CLOCK,out);strftime(out,sizeof out,"%d %b",&tm);plain(DATE,out);selected_mode=LAUNCH;launcher();last_second=now;}
-        if(now-last_maintenance>=3600){spawn("dotfiles-bar-maintenance-status >/dev/null 2>&1");last_maintenance=now;}
+        if(now-last_maintenance>=3600){spawn("TruDE-bar-maintenance-status >/dev/null 2>&1");last_maintenance=now;}
         if(now-last_stats>=2){statistics();last_stats=now;}
         if(now-last_temp>=5){temperatures();last_temp=now;}
         if(maintenance_dirty||now-last_cache>=60){maintenance();maintenance_dirty=0;last_cache=now;}
@@ -746,7 +746,7 @@ int main(int argc,char **argv){
     globfree(&sensor_paths);status_cache_clear(NULL);
     if(maintenance_watch>=0)close(maintenance_watch);
     for(unsigned i=0;i<32;i++)if(text_cache[i].layout)g_object_unref(text_cache[i].layout);
-    fprintf(stderr,"dotfiles-bar: %u frames rendered\n",frames);
+    fprintf(stderr,"TruDE-bar: %u frames rendered\n",frames);
     if(event_fd>=0)close(event_fd);
     pa_context_disconnect(audio);pa_context_unref(audio);pa_mainloop_free(audio_loop);disconnect_pipewire();pw_context_destroy(context);pw_loop_leave(pw_main_loop_get_loop(pwloop));pw_main_loop_destroy(pwloop);pw_deinit();
     for(int i=0;i<2;i++)if(buffers[i].object){wl_buffer_destroy(buffers[i].object);munmap(buffers[i].data,buffers[i].size);}

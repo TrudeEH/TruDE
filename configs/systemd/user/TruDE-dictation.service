@@ -5,7 +5,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/dotfiles-dictation-worker
+ExecStart=%h/.local/bin/TruDE-dictation-worker
 KillMode=control-group
 TimeoutStopSec=5
 UMask=0077

@@ -28,7 +28,7 @@ while :; do
     case $action in
         *" toggle")
             if [ "$enabled" = true ]; then
-                enabled=false; save; dotfiles-dictation cancel
+                enabled=false; save; TruDE-dictation cancel
             elif model_ready "$model"; then
                 enabled=true; save
             else
@@ -53,15 +53,15 @@ Actual memory/speed depend on your machine; use Test.' 23 100 9 "$@" \
             fi
             if dialog --yesno "Download $selected if missing and install its shared CPU runtime if needed?\nMissing runtime-specific Debian packages require a separate sudo confirmation. Internet and disk space are required. No audio is uploaded." 12 78; then
                 clear
-                if dotfiles-dictation-setup "$selected"; then model=$selected; save; else message 'Model setup failed. See terminal output.'; fi
+                if TruDE-dictation-setup "$selected"; then model=$selected; save; else message 'Model setup failed. See terminal output.'; fi
                 printf 'Press Enter to continue.'; read -r ignored
             fi ;;
         *" test")
             if ! model_ready "$model"; then message 'Download the selected model before testing.'; continue; fi
-            if systemctl --user is-active --quiet dotfiles-dictation.service; then message 'Stop dictation before testing.'; continue; fi
+            if systemctl --user is-active --quiet TruDE-dictation.service; then message 'Stop dictation before testing.'; continue; fi
             clear
             printf 'Speak now. Recording lasts 5 seconds.\n'
-            if transcript=$(dotfiles-dictation-worker test); then message "Transcript:\n$transcript"; else message 'Test failed. Check the last error.'; fi ;;
+            if transcript=$(TruDE-dictation-worker test); then message "Transcript:\n$transcript"; else message 'Test failed. Check the last error.'; fi ;;
         *" error") message "$(cat "$runtime/error" 2>/dev/null || printf 'No error recorded.')" ;;
         *" remove")
             set --
@@ -73,8 +73,8 @@ Actual memory/speed depend on your machine; use Test.' 23 100 9 "$@" \
             if [ "$#" -eq 0 ]; then message 'No models installed.'; continue; fi
             removal=$(dialog --menu 'Choose an installed model to remove' 20 82 9 "$@" 3>&1 1>&2 2>&3) || continue
             if dialog --yesno "Permanently delete $removal and its runtime if no other models need it?" 10 78; then
-                if [ "$removal" = "$model" ]; then enabled=false; save; dotfiles-dictation cancel; fi
-                if ! dotfiles-dictation-remove "$removal"; then message 'Removal failed. Stop tests or installation and retry.'; fi
+                if [ "$removal" = "$model" ]; then enabled=false; save; TruDE-dictation cancel; fi
+                if ! TruDE-dictation-remove "$removal"; then message 'Removal failed. Stop tests or installation and retry.'; fi
             fi ;;
         *" back") exit 0 ;;
     esac

@@ -1,5 +1,5 @@
 [Unit]
-Description=Native dotfiles Wayland bar
+Description=Native TruDE Wayland bar
 Documentation=man:systemd.service(5)
 After=graphical-session.target
 PartOf=graphical-session.target
@@ -7,7 +7,7 @@ Conflicts=waybar.service
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/dotfiles-bar
+ExecStart=%h/.local/bin/TruDE-bar
 Restart=on-failure
 RestartSec=2
 

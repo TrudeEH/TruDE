@@ -1,16 +1,16 @@
 #!/bin/sh
 set -u
 
-config_root=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dotfiles-btop
+config_root=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/TruDE-btop
 config_dir=$config_root/btop
-theme_source=${XDG_CONFIG_HOME:-"$HOME/.config"}/btop/themes/dotfiles.theme
+theme_source=${XDG_CONFIG_HOME:-"$HOME/.config"}/btop/themes/TruDE.theme
 
 mkdir -p "$config_dir/themes"
-ln -sf "$theme_source" "$config_dir/themes/dotfiles.theme"
+ln -sf "$theme_source" "$config_dir/themes/TruDE.theme"
 
 if [ ! -f "$config_dir/btop.conf" ]; then
     printf '%s\n' \
-        'color_theme = "dotfiles"' \
+        'color_theme = "TruDE"' \
         'theme_background = False' \
         'truecolor = True' \
         'rounded_corners = False' \

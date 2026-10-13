@@ -8,7 +8,7 @@ usage() {
     printf 'Usage: %s\n\n' "${0##*/}"
     printf 'Search the installed Nerd Font glyphs and copy a selected icon.\n'
     printf 'Use --print to write the selected icon to standard output instead.\n'
-    printf 'Set DOTFILES_NERDFONT_FAMILY to choose a specific installed font.\n'
+    printf 'Set TRUDE_NERDFONT_FAMILY to choose a specific installed font.\n'
 }
 
 output_mode=clipboard
@@ -33,7 +33,7 @@ for command in fc-list fc-match fzf od awk sort; do
     fi
 done
 
-font_family=${DOTFILES_NERDFONT_FAMILY:-}
+font_family=${TRUDE_NERDFONT_FAMILY:-}
 if [ -n "$font_family" ]; then
     font_file=$(fc-match -f '%{file}' "$font_family" 2>/dev/null || :)
 else
@@ -43,7 +43,7 @@ fi
 
 if [ -z "$font_file" ] || [ ! -r "$font_file" ]; then
     printf 'icon_picker.sh: no readable Nerd Font was found.\n' >&2
-    printf 'Set DOTFILES_NERDFONT_FAMILY to an installed Nerd Font family.\n' >&2
+    printf 'Set TRUDE_NERDFONT_FAMILY to an installed Nerd Font family.\n' >&2
     exit 1
 fi
 
@@ -221,7 +221,7 @@ EOF
     '
 }
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-icons.XXXXXX") || exit 1
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/TruDE-icons.XXXXXX") || exit 1
 trap 'rm -rf "$temporary_dir"' 0
 trap 'exit 1' HUP INT TERM
 if ! list_font_icons > "$temporary_dir/icons"; then

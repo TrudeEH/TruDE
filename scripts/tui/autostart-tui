@@ -103,7 +103,7 @@ add_application() (
     : > "$selection_file"
     clear
     printf 'Select an application .desktop file in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
-    dotfiles-file-manager-tui --chooser-file "$selection_file" /usr/share/applications
+    TruDE-file-manager-tui --chooser-file "$selection_file" /usr/share/applications
     picker_status=$?
     clear
     [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return

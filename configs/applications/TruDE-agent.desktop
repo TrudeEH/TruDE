@@ -2,7 +2,7 @@
 Type=Application
 Name=Seth Agent
 Comment=Chat with local models, use MCP tools and schedule tasks
-Exec=footclient --app-id=agent-tui --title="Seth" --override=colors.regular0=222226 --window-size-chars=124x38 dotfiles-agent-tui
+Exec=footclient --app-id=agent-tui --title="Seth" --override=colors.regular0=222226 --window-size-chars=124x38 TruDE-agent-tui
 Terminal=false
 Categories=Utility;
 Keywords=AI;Agent;Chat;MCP;Ollama;LMStudio;

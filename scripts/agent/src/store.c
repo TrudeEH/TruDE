@@ -15,9 +15,9 @@ static const char *prompt =
 static void xdg(char *out, const char *env, const char *suffix) {
     const char *p = getenv(env);
     if (p && *p)
-        snprintf(out, PATH_MAX, "%s/dotfiles-agent", p);
+        snprintf(out, PATH_MAX, "%s/TruDE-agent", p);
     else
-        snprintf(out, PATH_MAX, "%s/%s/dotfiles-agent", getenv("HOME") ? getenv("HOME") : "/tmp",
+        snprintf(out, PATH_MAX, "%s/%s/TruDE-agent", getenv("HOME") ? getenv("HOME") : "/tmp",
                  suffix);
 }
 int store_init(void) {

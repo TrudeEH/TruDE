@@ -27,21 +27,21 @@ case $selection in
     'Network settings')
         launch_tui --app-id=nmtui --title='Network Settings' \
             --override=colors.regular0=222226 --window-size-chars=82x24 \
-            dotfiles-network-tui
+            TruDE-network-tui
         ;;
     'Bluetooth settings')
         launch_tui --app-id=bluetooth-tui --title='Bluetooth' \
             --override=colors.regular0=222226 --window-size-chars=82x26 \
-            dotfiles-bluetooth-tui
+            TruDE-bluetooth-tui
         ;;
     'USB devices')
         launch_tui --app-id=usb-tui --title='USB Devices' \
             --override=colors.regular0=222226 --window-size-chars=92x26 \
-            dotfiles-usb-tui
+            TruDE-usb-tui
         ;;
     'Notifications')
         launch_tui --app-id=notification-tui --title='Notifications' \
             --override=colors.regular0=222226 --window-size-chars=94x28 \
-            dotfiles-notification-tui
+            TruDE-notification-tui
         ;;
 esac

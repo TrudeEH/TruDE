@@ -4,7 +4,7 @@ set -u
 # shellcheck source=scripts/lib/ui.sh
 . "$(dirname -- "$(readlink -f -- "$0")")/../lib/ui.sh"
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-package-manager.XXXXXX") || exit 1
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/TruDE-package-manager.XXXXXX") || exit 1
 trap 'rm -rf "$temporary_dir"' 0
 trap 'exit 1' HUP INT TERM
 
@@ -194,7 +194,7 @@ install_deb_file() {
 
     clear
     printf 'Select a .deb package in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
-    dotfiles-file-manager-tui --chooser-file "$selection_file" "$start_dir"
+    TruDE-file-manager-tui --chooser-file "$selection_file" "$start_dir"
     picker_status=$?
     clear
     [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return
@@ -253,7 +253,7 @@ install_flatpak_file() {
 
     clear
     printf 'Select a .flatpak or .flatpakref file in Superfile. Enter chooses a file; q or Esc cancels.\n\n'
-    dotfiles-file-manager-tui --chooser-file "$selection_file" "$start_dir"
+    TruDE-file-manager-tui --chooser-file "$selection_file" "$start_dir"
     picker_status=$?
     clear
     [ "$picker_status" -eq 0 ] && [ -s "$selection_file" ] || return

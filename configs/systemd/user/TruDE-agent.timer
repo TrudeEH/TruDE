@@ -5,7 +5,7 @@ Description=Check Seth schedules every minute
 OnCalendar=*-*-* *:*:00
 Persistent=true
 AccuracySec=1s
-Unit=dotfiles-agent.service
+Unit=TruDE-agent.service
 
 [Install]
 WantedBy=timers.target

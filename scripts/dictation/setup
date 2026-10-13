@@ -15,7 +15,7 @@ for command in curl jq tar; do
 done
 umask 077
 mkdir -p "$model_dir" "$(dirname "$engine")"
-temporary=$(mktemp -d "$data_home/dotfiles/dictation/setup.XXXXXX")
+temporary=$(mktemp -d "$data_home/TruDE/dictation/setup.XXXXXX")
 created_engine=false
 success=false
 cleanup() {

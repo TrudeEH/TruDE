@@ -6,7 +6,7 @@ if [ ! -x "$base/bin/bar" ] || [ "$base/bar.c" -nt "$base/bin/bar" ] \
     "$base/build.sh"
 fi
 # Keep the legacy settings key so existing preferences survive the migration.
-settings=${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/settings.json
+settings=${XDG_CONFIG_HOME:-$HOME/.config}/TruDE/settings.json
 if [ "$#" -eq 0 ] && command -v jq >/dev/null 2>&1 \
     && [ -f "$settings" ] && [ "$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$settings")" = false ]; then
     outputs=$(hyprctl -j monitors | jq -r '.[].name')

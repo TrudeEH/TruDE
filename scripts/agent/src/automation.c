@@ -435,7 +435,7 @@ int run_due(void) {
     return result;
 }
 char *timer_status(void) {
-    char *args[] = {"systemctl", "--user", "show", "dotfiles-agent.timer", "--property=LoadState",
+    char *args[] = {"systemctl", "--user", "show", "TruDE-agent.timer", "--property=LoadState",
                     "--property=ActiveState", "--property=UnitFileState", NULL};
     int code = 0;
     char *s = command(args, NULL, 3, 2000, &code);
@@ -480,8 +480,8 @@ int timer_change(int enabled) {
             free(dir);
             return -1;
         }
-        char *service = fmt("%s/dotfiles-agent.service", dir),
-             *timer = fmt("%s/dotfiles-agent.timer", dir);
+        char *service = fmt("%s/TruDE-agent.service", dir),
+             *timer = fmt("%s/TruDE-agent.timer", dir);
         Buf path = {0};
         for (const char *s = executable; *s; s++) {
             if (*s == '%')
@@ -522,7 +522,7 @@ int timer_change(int enabled) {
         free(s);
     }
     char *args[] = {
-        "systemctl", "--user", enabled ? "enable" : "disable", "--now", "dotfiles-agent.timer",
+        "systemctl", "--user", enabled ? "enable" : "disable", "--now", "TruDE-agent.timer",
         NULL};
     int code = 0;
     char *s = command(args, NULL, 5, 2000, &code);

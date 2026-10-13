@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-backports=/etc/apt/sources.list.d/dotfiles-backports.sources
+backports=/etc/apt/sources.list.d/TruDE-backports.sources
 
 if [ "$(id -u)" -eq 0 ]; then
     echo "Run this script as your normal desktop user, not root." >&2

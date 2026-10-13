@@ -33,11 +33,13 @@ ui_error() {
     printf '%sError:%s %s\n' "$ui_error_color" "$ui_reset" "$1" >&2
 }
 
-repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 config_dir=${XDG_CONFIG_HOME:-"$HOME/.config"}
-backports=/etc/apt/sources.list.d/dotfiles-backports.sources
+backports=/etc/apt/sources.list.d/TruDE-backports.sources
 backports_suite=
-debian_components_sources=/etc/apt/sources.list.d/dotfiles-components.sources
+debian_components_sources=/etc/apt/sources.list.d/TruDE-components.sources
+
+. "$repo_dir/scripts/lib/migrate-trude.sh"
 
 check_platform() {
     if [ "$(id -u)" -eq 0 ]; then
@@ -249,7 +251,7 @@ configure_flatpak() {
 
 configure_lightdm() {
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
-        /etc/lightdm/lightdm.conf.d/50-dotfiles.conf
+        /etc/lightdm/lightdm.conf.d/50-TruDE.conf
     sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
         /etc/lightdm/slick-greeter.conf
     sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
@@ -258,11 +260,11 @@ configure_lightdm() {
 }
 
 configure_zram() {
-    sudo install -D -m 0644 "$repo_dir/configs/systemd/zram-generator.conf.d/60-dotfiles.conf" \
-        /etc/systemd/zram-generator.conf.d/60-dotfiles.conf
-    sudo install -D -m 0644 "$repo_dir/configs/sysctl.d/60-dotfiles-zram.conf" \
-        /etc/sysctl.d/60-dotfiles-zram.conf
-    sudo sysctl -p /etc/sysctl.d/60-dotfiles-zram.conf
+    sudo install -D -m 0644 "$repo_dir/configs/systemd/zram-generator.conf.d/60-TruDE.conf" \
+        /etc/systemd/zram-generator.conf.d/60-TruDE.conf
+    sudo install -D -m 0644 "$repo_dir/configs/sysctl.d/60-TruDE-zram.conf" \
+        /etc/sysctl.d/60-TruDE-zram.conf
+    sudo sysctl -p /etc/sysctl.d/60-TruDE-zram.conf
     sudo systemctl daemon-reload
     # Never swapoff/restart an active device: doing so can exhaust small hosts.
     if awk '$1 == "/dev/zram0" { found=1 } END { exit !found }' /proc/swaps; then
@@ -379,7 +381,7 @@ configure_theme() {
     mkdir -p "$config_dir/qt6ct"
     cat > "$config_dir/qt6ct/qt6ct.conf" <<QT6CT
 [Appearance]
-color_scheme_path=$config_dir/qt6ct/colors/dotfiles.conf
+color_scheme_path=$config_dir/qt6ct/colors/TruDE.conf
 custom_palette=true
 icon_theme=Adwaita
 standard_dialogs=default
@@ -401,12 +403,17 @@ link_config() {
 }
 
 link_configs() {
+    # Keep the standard checkout path available for shells on installations
+    # cloned to a different location before the TruDE rename.
+    if [ "$repo_dir" != "$HOME/TruDE" ] && [ ! -e "$HOME/TruDE" ] && [ ! -L "$HOME/TruDE" ]; then
+        ln -s -- "$repo_dir" "$HOME/TruDE"
+    fi
     # Retire only symlinks created by older versions of this installer.
     # Preserve independently managed configurations and commands.
     for legacy_pair in \
-        "$HOME/.local/bin/dotfiles-hypridle|$repo_dir/scripts/hypr/start-idle" \
+        "$HOME/.local/bin/TruDE-hypridle|$repo_dir/scripts/hypr/start-idle" \
         "$config_dir/hypr/hypridle.conf|$repo_dir/configs/hypr/hypridle.conf" \
-        "$HOME/.local/bin/dotfiles-nnn-open|$repo_dir/scripts/nnn/open" \
+        "$HOME/.local/bin/TruDE-nnn-open|$repo_dir/scripts/nnn/open" \
         "$config_dir/nnn/env|$repo_dir/configs/nnn/env" \
         "$config_dir/nnn/plugins|$repo_dir/configs/nnn/plugins"; do
         legacy_target=${legacy_pair%%|*}
@@ -418,68 +425,69 @@ link_configs() {
 
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
-    link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/dotfiles-wallpaper.jpg"
-    link_config "$repo_dir/scripts/hypr/set-wallpaper" "$HOME/.local/bin/dotfiles-set-wallpaper"
-    link_config "$repo_dir/scripts/dictation/control" "$HOME/.local/bin/dotfiles-dictation"
-    link_config "$repo_dir/scripts/dictation/worker" "$HOME/.local/bin/dotfiles-dictation-worker"
-    link_config "$repo_dir/scripts/dictation/remove" "$HOME/.local/bin/dotfiles-dictation-remove"
-    link_config "$repo_dir/scripts/dictation/setup" "$HOME/.local/bin/dotfiles-dictation-setup"
-    link_config "$repo_dir/scripts/tui/dictation-tui" "$HOME/.local/bin/dotfiles-dictation-tui"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-dictation.service" "$config_dir/systemd/user/dotfiles-dictation.service"
-    link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/dotfiles-screenshot"
-    link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/dotfiles-mako"
-    link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/dotfiles-network-tui"
-    link_config "$repo_dir/scripts/tui/bluetooth-tui" "$HOME/.local/bin/dotfiles-bluetooth-tui"
-    link_config "$repo_dir/scripts/tui/usb-tui" "$HOME/.local/bin/dotfiles-usb-tui"
-    link_config "$repo_dir/scripts/tui/partition-manager-tui" "$HOME/.local/bin/dotfiles-partition-manager-tui"
-    link_config "$repo_dir/scripts/tui/power-profiles-tui" "$HOME/.local/bin/dotfiles-power-profiles-tui"
-    link_config "$repo_dir/scripts/tui/power-menu-tui" "$HOME/.local/bin/dotfiles-power-menu-tui"
-    link_config "$repo_dir/scripts/tui/system-monitor-tui" "$HOME/.local/bin/dotfiles-system-monitor-tui"
-    link_config "$repo_dir/scripts/tui/temperature-tui" "$HOME/.local/bin/dotfiles-temperature-tui"
-    link_config "$repo_dir/scripts/tui/maintenance-tui" "$HOME/.local/bin/dotfiles-maintenance-tui"
-    link_config "$repo_dir/scripts/tui/package-manager-tui" "$HOME/.local/bin/dotfiles-package-manager-tui"
-    link_config "$repo_dir/scripts/tui/app-launcher-tui" "$HOME/.local/bin/dotfiles-app-launcher-tui"
-    link_config "$repo_dir/scripts/hypr/app-launcher-toggle" "$HOME/.local/bin/dotfiles-app-launcher-toggle"
-    link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/dotfiles-notification-tui"
-    link_config "$repo_dir/scripts/tui/shortcuts-tui" "$HOME/.local/bin/dotfiles-shortcuts-tui"
-    link_config "$repo_dir/scripts/tui/settings-tui" "$HOME/.local/bin/dotfiles-settings-tui"
-    link_config "$repo_dir/scripts/tui/autostart-tui" "$HOME/.local/bin/dotfiles-autostart-tui"
-    link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/dotfiles-file-manager-tui"
-    link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/dotfiles-icon-picker-tui"
-    link_config "$repo_dir/scripts/tui/agent-tui" "$HOME/.local/bin/dotfiles-agent-tui"
+    link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/TruDE-wallpaper.jpg"
+    link_config "$repo_dir/scripts/hypr/set-wallpaper" "$HOME/.local/bin/TruDE-set-wallpaper"
+    link_config "$repo_dir/scripts/dictation/control" "$HOME/.local/bin/TruDE-dictation"
+    link_config "$repo_dir/scripts/dictation/worker" "$HOME/.local/bin/TruDE-dictation-worker"
+    link_config "$repo_dir/scripts/dictation/remove" "$HOME/.local/bin/TruDE-dictation-remove"
+    link_config "$repo_dir/scripts/dictation/setup" "$HOME/.local/bin/TruDE-dictation-setup"
+    link_config "$repo_dir/scripts/tui/dictation-tui" "$HOME/.local/bin/TruDE-dictation-tui"
+    link_config "$repo_dir/configs/systemd/user/TruDE-dictation.service" "$config_dir/systemd/user/TruDE-dictation.service"
+    link_config "$repo_dir/scripts/hypr/screenshot" "$HOME/.local/bin/TruDE-screenshot"
+    link_config "$repo_dir/scripts/hypr/start-mako" "$HOME/.local/bin/TruDE-mako"
+    link_config "$repo_dir/scripts/tui/network-tui" "$HOME/.local/bin/TruDE-network-tui"
+    link_config "$repo_dir/scripts/tui/bluetooth-tui" "$HOME/.local/bin/TruDE-bluetooth-tui"
+    link_config "$repo_dir/scripts/tui/usb-tui" "$HOME/.local/bin/TruDE-usb-tui"
+    link_config "$repo_dir/scripts/tui/partition-manager-tui" "$HOME/.local/bin/TruDE-partition-manager-tui"
+    link_config "$repo_dir/scripts/tui/power-profiles-tui" "$HOME/.local/bin/TruDE-power-profiles-tui"
+    link_config "$repo_dir/scripts/tui/power-menu-tui" "$HOME/.local/bin/TruDE-power-menu-tui"
+    link_config "$repo_dir/scripts/tui/system-monitor-tui" "$HOME/.local/bin/TruDE-system-monitor-tui"
+    link_config "$repo_dir/scripts/tui/temperature-tui" "$HOME/.local/bin/TruDE-temperature-tui"
+    link_config "$repo_dir/scripts/tui/maintenance-tui" "$HOME/.local/bin/TruDE-maintenance-tui"
+    link_config "$repo_dir/scripts/tui/package-manager-tui" "$HOME/.local/bin/TruDE-package-manager-tui"
+    link_config "$repo_dir/scripts/tui/app-launcher-tui" "$HOME/.local/bin/TruDE-app-launcher-tui"
+    link_config "$repo_dir/scripts/hypr/app-launcher-toggle" "$HOME/.local/bin/TruDE-app-launcher-toggle"
+    link_config "$repo_dir/scripts/tui/notification-tui" "$HOME/.local/bin/TruDE-notification-tui"
+    link_config "$repo_dir/scripts/tui/shortcuts-tui" "$HOME/.local/bin/TruDE-shortcuts-tui"
+    link_config "$repo_dir/scripts/tui/settings-tui" "$HOME/.local/bin/TruDE-settings-tui"
+    link_config "$repo_dir/scripts/tui/autostart-tui" "$HOME/.local/bin/TruDE-autostart-tui"
+    link_config "$repo_dir/scripts/tui/file-manager-tui" "$HOME/.local/bin/TruDE-file-manager-tui"
+    link_config "$repo_dir/scripts/tui/icon-picker-tui" "$HOME/.local/bin/TruDE-icon-picker-tui"
+    link_config "$repo_dir/scripts/tui/agent-tui" "$HOME/.local/bin/TruDE-agent-tui"
     link_config "$repo_dir/scripts/tui/tasks-tui" "$HOME/.local/bin/tasks"
-    link_config "$repo_dir/scripts/tui/tasks-tui" "$HOME/.local/bin/dotfiles-tasks-tui"
+    link_config "$repo_dir/scripts/tui/tasks-tui" "$HOME/.local/bin/TruDE-tasks-tui"
     for desktop_file in "$repo_dir"/configs/applications/*.desktop; do
         link_config "$desktop_file" "$HOME/.local/share/applications/$(basename "$desktop_file")"
     done
-    link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/dotfiles-superfile-open"
-    link_config "$repo_dir/scripts/bar/status-menu" "$HOME/.local/bin/dotfiles-bar-status-menu"
-    link_config "$repo_dir/scripts/bar/maintenance-status" "$HOME/.local/bin/dotfiles-bar-maintenance-status"
-    link_config "$repo_dir/scripts/bar/start" "$HOME/.local/bin/dotfiles-bar"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-bar.service" "$config_dir/systemd/user/dotfiles-bar.service"
+    link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/TruDE-superfile-open"
+    link_config "$repo_dir/scripts/bar/status-menu" "$HOME/.local/bin/TruDE-bar-status-menu"
+    link_config "$repo_dir/scripts/bar/maintenance-status" "$HOME/.local/bin/TruDE-bar-maintenance-status"
+    link_config "$repo_dir/scripts/bar/start" "$HOME/.local/bin/TruDE-bar"
+    link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/TruDE-bar.service"
+    link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/graphical-session.target.wants/TruDE-bar.service"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
-    link_config "$repo_dir/configs/btop/themes/dotfiles.theme" "$config_dir/btop/themes/dotfiles.theme"
-    link_config "$repo_dir/configs/qt6ct/colors/dotfiles.conf" "$config_dir/qt6ct/colors/dotfiles.conf"
+    link_config "$repo_dir/configs/btop/themes/TruDE.theme" "$config_dir/btop/themes/TruDE.theme"
+    link_config "$repo_dir/configs/qt6ct/colors/TruDE.conf" "$config_dir/qt6ct/colors/TruDE.conf"
     link_config "$repo_dir/configs/systemd/user/hyprpolkitagent.service.d/theme.conf" "$config_dir/systemd/user/hyprpolkitagent.service.d/theme.conf"
     link_config "$repo_dir/configs/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf" "$config_dir/systemd/user/xdg-desktop-portal-hyprland.service.d/theme.conf"
     link_config "$repo_dir/configs/gtk/settings.ini" "$config_dir/gtk-3.0/settings.ini"
     link_config "$repo_dir/configs/foot/foot.ini" "$config_dir/foot/foot.ini"
     link_config "$repo_dir/configs/micro/settings.json" "$config_dir/micro/settings.json"
-    link_config "$repo_dir/configs/micro/colorschemes/dotfiles.micro" "$config_dir/micro/colorschemes/dotfiles.micro"
+    link_config "$repo_dir/configs/micro/colorschemes/TruDE.micro" "$config_dir/micro/colorschemes/TruDE.micro"
     link_config "$repo_dir/configs/micro/syntax/css.yaml" "$config_dir/micro/syntax/css.yaml"
     link_config "$repo_dir/configs/superfile/env" "$config_dir/superfile/env"
     link_config "$repo_dir/configs/superfile/config.toml" "$config_dir/superfile/config.toml"
-    link_config "$repo_dir/configs/superfile/theme/dotfiles.toml" "$config_dir/superfile/theme/dotfiles.toml"
+    link_config "$repo_dir/configs/superfile/theme/TruDE.toml" "$config_dir/superfile/theme/TruDE.toml"
     link_config "$repo_dir/configs/bash/bashrc" "$HOME/.bashrc"
 
 }
 
 configure_agent_timer() {
-    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.service" "$config_dir/systemd/user/dotfiles-agent.service"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/dotfiles-agent.timer"
-    link_config "$repo_dir/configs/systemd/user/dotfiles-agent.timer" "$config_dir/systemd/user/timers.target.wants/dotfiles-agent.timer"
-    if systemctl --user daemon-reload && systemctl --user start dotfiles-agent.timer; then
+    link_config "$repo_dir/configs/systemd/user/TruDE-agent.service" "$config_dir/systemd/user/TruDE-agent.service"
+    link_config "$repo_dir/configs/systemd/user/TruDE-agent.timer" "$config_dir/systemd/user/TruDE-agent.timer"
+    link_config "$repo_dir/configs/systemd/user/TruDE-agent.timer" "$config_dir/systemd/user/timers.target.wants/TruDE-agent.timer"
+    if systemctl --user daemon-reload && systemctl --user start TruDE-agent.timer; then
         ui_success "Seth background timer is running."
     else
         printf '%s\n' 'Seth background timer is enabled for future user sessions; it could not start now.' >&2
@@ -493,6 +501,7 @@ main() {
     check_platform
 
     ui_step "Configuring Debian package sources"
+    migrate_trude_system_paths
     configure_debian_sources
     configure_backports
 
@@ -527,14 +536,15 @@ main() {
     configure_pam
 
     ui_step "Setting up the desktop session and user configuration"
+    migrate_trude_user_paths
     configure_session
     link_configs
-    xdg-mime default dotfiles-file-manager.desktop inode/directory
-    sed -n 's/^MimeType=//p' "$repo_dir/configs/applications/dotfiles-text-editor.desktop" |
+    xdg-mime default TruDE-file-manager.desktop inode/directory
+    sed -n 's/^MimeType=//p' "$repo_dir/configs/applications/TruDE-text-editor.desktop" |
         tr ';' '\n' |
         while IFS= read -r mime_type; do
             [ -n "$mime_type" ] || continue
-            xdg-mime default dotfiles-text-editor.desktop "$mime_type"
+            xdg-mime default TruDE-text-editor.desktop "$mime_type"
         done
     configure_theme
 
@@ -543,7 +553,7 @@ main() {
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
         systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
-        systemctl --user enable --now foot-server.socket dotfiles-bar.service mako.service || :
+        systemctl --user enable --now foot-server.socket TruDE-bar.service mako.service || :
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 

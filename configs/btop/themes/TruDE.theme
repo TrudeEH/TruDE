@@ -1,4 +1,4 @@
-# Dotfiles libadwaita-dark theme. The empty background uses the terminal color.
+# TruDE libadwaita-dark theme. The empty background uses the terminal color.
 theme[main_bg]=""
 theme[main_fg]="#ffffff"
 theme[title]="#ffffff"

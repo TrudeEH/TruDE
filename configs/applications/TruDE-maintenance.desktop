@@ -2,6 +2,6 @@
 Type=Application
 Name=System Maintenance
 Comment=Maintain system packages, update Flatpaks and TruDE, and install firmware updates
-Exec=footclient --app-id=maintenance-tui --title="System Maintenance" --override=colors.regular0=222226 --window-size-chars=104x32 dotfiles-maintenance-tui
+Exec=footclient --app-id=maintenance-tui --title="System Maintenance" --override=colors.regular0=222226 --window-size-chars=104x32 TruDE-maintenance-tui
 Terminal=false
 Categories=System;

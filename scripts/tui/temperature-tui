@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-temperature.XXXXXX") || exit 1
+temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/TruDE-temperature.XXXXXX") || exit 1
 readings_file=$temporary_dir/readings
 old_stty=$(stty -g 2>/dev/null || :)
 escape_key=$(printf '\033')
