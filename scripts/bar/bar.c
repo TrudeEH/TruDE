@@ -394,9 +394,23 @@ static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio
 
 /* StatusNotifier watcher: clients register their own D-Bus name/object path.
  * IconPixmap works without loading a GTK icon theme; common IconName clients
- * use installed hicolor PNGs. Exported menus are rendered by the bar. */
+ * use application-provided paths and installed hicolor PNGs. Exported menus are rendered by the bar. */
 struct tray_item { char service[256], path[256]; cairo_surface_t *icon; int dirty; };
 static struct tray_item tray_items[16];
+
+/* Reject failed PNG surfaces so later search locations can still win. */
+static cairo_surface_t *tray_png(const char *path){
+    cairo_surface_t *icon=cairo_image_surface_create_from_png(path);
+    if(cairo_surface_status(icon)==CAIRO_STATUS_SUCCESS)return icon;
+    cairo_surface_destroy(icon);return NULL;
+}
+static cairo_surface_t *tray_icon_glob(const char *root,const char *name){
+    glob_t paths={0};char pattern[PATH_MAX];cairo_surface_t *icon=NULL;
+    snprintf(pattern,sizeof pattern,"%s/hicolor/*/apps/%s.png",root,name);
+    glob(pattern,0,NULL,&paths);
+    for(size_t i=0;i<paths.gl_pathc&&!icon;i++)icon=tray_png(paths.gl_pathv[i]);
+    globfree(&paths);return icon;
+}
 
 static void tray_refresh(struct tray_item *t) {
     if(t->icon){cairo_surface_destroy(t->icon);t->icon=NULL;}
@@ -413,9 +427,26 @@ static void tray_refresh(struct tray_item *t) {
     }sd_bus_message_unref(m);m=NULL;
     if(!t->icon && sd_bus_call_method(session_bus,t->service,t->path,"org.freedesktop.DBus.Properties","Get",NULL,&m,"ss","org.kde.StatusNotifierItem","IconName")>=0){
         const char *name;if(sd_bus_message_enter_container(m,'v',"s")>0&&sd_bus_message_read(m,"s",&name)>0&&*name){
-            if(name[0]=='/')t->icon=cairo_image_surface_create_from_png(name);
-            else if(!strchr(name,'/')&&!strstr(name,"..")){glob_t paths={0};char pattern[PATH_MAX];snprintf(pattern,sizeof pattern,"/usr/share/icons/hicolor/*/apps/%s.png",name);glob(pattern,0,NULL,&paths);if(paths.gl_pathc)t->icon=cairo_image_surface_create_from_png(paths.gl_pathv[0]);globfree(&paths);}
-            if(t->icon&&cairo_surface_status(t->icon)!=CAIRO_STATUS_SUCCESS){cairo_surface_destroy(t->icon);t->icon=NULL;}
+            if(name[0]=='/')t->icon=tray_png(name);
+            else if(!strchr(name,'/')&&!strstr(name,"..")){
+                /* Ayatana clients such as Steam keep icons outside system themes. */
+                sd_bus_message *theme=NULL;const char *root;char file[PATH_MAX];
+                if(sd_bus_call_method(session_bus,t->service,t->path,"org.freedesktop.DBus.Properties","Get",NULL,&theme,"ss","org.kde.StatusNotifierItem","IconThemePath")>=0&&
+                   sd_bus_message_enter_container(theme,'v',"s")>0&&sd_bus_message_read(theme,"s",&root)>0&&root[0]=='/'){
+                    snprintf(file,sizeof file,"%s/%s.png",root,name);t->icon=tray_png(file);
+                    if(!t->icon)t->icon=tray_icon_glob(root,name);
+                }
+                sd_bus_message_unref(theme);
+                if(!t->icon){
+                    const char *data=getenv("XDG_DATA_HOME"),*home=getenv("HOME");
+                    if(data&&*data)snprintf(file,sizeof file,"%s/icons",data);
+                    else if(home)snprintf(file,sizeof file,"%s/.local/share/icons",home);
+                    else file[0]=0;
+                    if(*file)t->icon=tray_icon_glob(file,name);
+                }
+                if(!t->icon)t->icon=tray_icon_glob("/usr/local/share/icons",name);
+                if(!t->icon)t->icon=tray_icon_glob("/usr/share/icons",name);
+            }
         }
     }sd_bus_message_unref(m);redraw=1;
 }
@@ -455,26 +486,49 @@ static int tray_signal(sd_bus_message*m,void*d,sd_bus_error*e){(void)d;(void)e;c
 /* Some clients retain their exported item but do not register again when
  * the watcher restarts. Probe existing connections asynchronously. */
 static int tray_discovered(sd_bus_message *m,void *d,sd_bus_error *e){
-    (void)d;(void)e;
+    (void)e;char path[256];
+    snprintf(path,sizeof path,"%s",d?(char*)d:"/StatusNotifierItem");free(d);
     if(sd_bus_message_is_method_error(m,NULL))return 0;
     /* GetAll can succeed with an empty dictionary for a missing interface. */
     if(sd_bus_message_enter_container(m,'a',"{sv}")<=0||sd_bus_message_at_end(m,0)>0)return 0;
     const char *service=sd_bus_message_get_sender(m);
     if(!service)return 0;
-    for(int i=0;i<tray_count;i++)if(!strcmp(service,tray_items[i].service)&&!strcmp(tray_items[i].path,"/StatusNotifierItem"))return 0;
+    for(int i=0;i<tray_count;i++)if(!strcmp(service,tray_items[i].service)&&!strcmp(tray_items[i].path,path))return 0;
     if(tray_count>=16)return 0;
     struct tray_item *t=&tray_items[tray_count++];memset(t,0,sizeof *t);
     snprintf(t->service,sizeof t->service,"%s",service);
-    snprintf(t->path,sizeof t->path,"/StatusNotifierItem");t->dirty=1;redraw=1;
+    snprintf(t->path,sizeof t->path,"%s",path);t->dirty=1;redraw=1;
     char full[512];snprintf(full,sizeof full,"%s%s",t->service,t->path);
     sd_bus_emit_signal(session_bus,"/StatusNotifierWatcher","org.kde.StatusNotifierWatcher","StatusNotifierItemRegistered","s",full);
     return 0;
+}
+struct tray_probe { const char *service; };
+static void tray_probe_node(GMarkupParseContext *ctx,const gchar *element,const gchar **keys,const gchar **values,gpointer data,GError **error){
+    (void)ctx;(void)error;struct tray_probe *probe=data;
+    if(strcmp(element,"node"))return;
+    for(int i=0;keys[i];i++)if(!strcmp(keys[i],"name")&&*values[i]&&!strchr(values[i],'/')){
+        char *path=g_strdup_printf("/org/ayatana/NotificationItem/%s",values[i]);
+        if(sd_bus_call_method_async(session_bus,NULL,probe->service,path,"org.freedesktop.DBus.Properties","GetAll",tray_discovered,path,"s","org.kde.StatusNotifierItem")<0)g_free(path);
+    }
+}
+static int tray_ayatana_discovered(sd_bus_message *m,void *d,sd_bus_error *e){
+    (void)d;(void)e;const char *xml;
+    if(sd_bus_message_is_method_error(m,NULL)||sd_bus_message_read(m,"s",&xml)<=0)return 0;
+    struct tray_probe probe={sd_bus_message_get_sender(m)};
+    if(!probe.service)return 0;
+    GMarkupParser parser={.start_element=tray_probe_node};
+    GMarkupParseContext *ctx=g_markup_parse_context_new(&parser,0,&probe,NULL);
+    if(g_markup_parse_context_parse(ctx,xml,strlen(xml),NULL))g_markup_parse_context_end_parse(ctx,NULL);
+    g_markup_parse_context_free(ctx);return 0;
 }
 static void tray_discover(void){
     char **names=NULL;
     if(sd_bus_list_names(session_bus,&names,NULL)<0)return;
     for(char **n=names;n&&*n;n++){
-        if((*n)[0]==':')sd_bus_call_method_async(session_bus,NULL,*n,"/StatusNotifierItem","org.freedesktop.DBus.Properties","GetAll",tray_discovered,NULL,"s","org.kde.StatusNotifierItem");
+        if((*n)[0]==':'){
+            sd_bus_call_method_async(session_bus,NULL,*n,"/StatusNotifierItem","org.freedesktop.DBus.Properties","GetAll",tray_discovered,NULL,"s","org.kde.StatusNotifierItem");
+            sd_bus_call_method_async(session_bus,NULL,*n,"/org/ayatana/NotificationItem","org.freedesktop.DBus.Introspectable","Introspect",tray_ayatana_discovered,NULL,"");
+        }
         free(*n);
     }
     free(names);
