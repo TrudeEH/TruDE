@@ -99,10 +99,18 @@ static PangoLayout *text_layout(cairo_t *c,const char *markup,int size) {
     pango_cairo_update_layout(c,entry->layout);
     return entry->layout;
 }
-static void text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb) {
+static void draw_text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb,int center_ink) {
     PangoLayout *layout=text_layout(c,markup,size);
     int tw,th;pango_layout_get_pixel_size(layout,&tw,&th);
-    color(c,rgb);cairo_move_to(c,x+(w-tw)/2,y+(27-th)/2);pango_cairo_show_layout(c,layout);
+    double tx=x+(w-tw)/2;
+    if(center_ink){
+        PangoRectangle ink;pango_layout_get_pixel_extents(layout,&ink,NULL);
+        tx=x+(w-ink.width)/2-ink.x;
+    }
+    color(c,rgb);cairo_move_to(c,tx,y+(27-th)/2);pango_cairo_show_layout(c,layout);
+}
+static void text(cairo_t *c,const char *markup,double x,double y,double w,int size,unsigned rgb) {
+    draw_text(c,markup,x,y,w,size,rgb,0);
 }
 static void wedge(cairo_t *c,double x,int direction,unsigned rgb) {
     color(c,rgb);cairo_move_to(c,x+(direction>0?0:12),3);cairo_line_to(c,x+(direction>0?12:0),16.5);cairo_line_to(c,x+(direction>0?0:12),30);cairo_close_path(c);cairo_fill(c);
@@ -136,8 +144,8 @@ static void render(void) {
     /* Fit the right modules to their rendered content, keeping the edge anchored. */
     x=width-3;
     for(int id=MENU;id>=VOLUME;id--){
-        int tw;pango_layout_get_pixel_size(text_layout(c,items[id].text,id==MENU?16:12),&tw,NULL);
-        items[id].w=fmax(32,tw+24);x-=items[id].w;items[id].x=x;x-=divider;
+        PangoRectangle ink;pango_layout_get_pixel_extents(text_layout(c,items[id].text,id==MENU?16:12),&ink,NULL);
+        items[id].w=fmax(32,ink.width+24);x-=items[id].w;items[id].x=x;x-=divider;
     }
     for(int id=0;id<ITEM_COUNT;id++){
         struct item *i=&items[id];if(id>=VOLUME&&id<=POWER&&i->x<items[INDICATORS].x+items[INDICATORS].w+24)continue;unsigned bg=i->bg,fg=i->fg;
@@ -151,7 +159,7 @@ static void render(void) {
         if(id==POWER&&!strcmp(i->class,"power-saver"))fg=0x57e389;
         if(id==hover)fg=id==LAUNCH?0x595953:id==MENU?0xffa348:0xbfbfc0;
         rect(c,i->x,3,i->w,27,bg);
-        if(id!=LAUNCH)text(c,i->text,i->x,3,i->w,id==MENU?16:12,fg);
+        if(id!=LAUNCH)draw_text(c,i->text,i->x,3,i->w,id==MENU?16:12,fg,id>=VOLUME);
         if(id>=TEMP&&id<=CPU){rect(c,i->x-12,3,12,27,id==TEMP?bg0:items[id-1].bg);wedge(c,i->x-12,-1,bg);}
         if(id>=CLOCK&&id<=INDICATORS){rect(c,i->x+i->w,3,12,27,id==INDICATORS?bg0:items[id+1].bg);wedge(c,i->x+i->w,1,bg);}
         if(id>=VOLUME&&id<=POWER){rect(c,i->x-12,3,12,27,id==VOLUME?bg0:items[id-1].bg);wedge(c,i->x-12,-1,bg);}
