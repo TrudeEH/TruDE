@@ -4,7 +4,7 @@ set -u
 runtime_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}
 cache_file=$runtime_dir/dotfiles-bar-maintenance.json
 lock_dir=$runtime_dir/dotfiles-bar-maintenance.lock
-cache_lifetime=240
+cache_lifetime=3600
 
 cache_is_fresh() {
     [ -f "$cache_file" ] || return 1

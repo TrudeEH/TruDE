@@ -729,7 +729,7 @@ int main(int argc,char **argv){
         int64_t now=monotonic_ms()/1000;
         if(refresh_requested){refresh_requested=0;dirty=1;query_generation++;maintenance_dirty=1;last_maintenance=0;last_power=0;}
         if(dirty||now!=last_second){char out[128];struct tm tm;time_t wall=time(NULL);localtime_r(&wall,&tm);strftime(out,sizeof out,"%I:%M %p",&tm);plain(CLOCK,out);strftime(out,sizeof out,"%d %b",&tm);plain(DATE,out);selected_mode=LAUNCH;launcher();last_second=now;}
-        if(now-last_maintenance>=300){spawn("dotfiles-bar-maintenance-status >/dev/null 2>&1");last_maintenance=now;}
+        if(now-last_maintenance>=3600){spawn("dotfiles-bar-maintenance-status >/dev/null 2>&1");last_maintenance=now;}
         if(now-last_stats>=2){statistics();last_stats=now;}
         if(now-last_temp>=5){temperatures();last_temp=now;}
         if(maintenance_dirty||now-last_cache>=60){maintenance();maintenance_dirty=0;last_cache=now;}
