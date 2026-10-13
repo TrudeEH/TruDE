@@ -470,7 +470,7 @@ create_installed_package_results() {
         done
     fi
 
-    LC_ALL=C sort -f -t "$(printf '\t')" -k4,4 -k3,3 "$results_file" > "$results_file.sorted"
+    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$results_file" > "$results_file.sorted"
     mv "$results_file.sorted" "$results_file"
 }
 
@@ -499,7 +499,7 @@ select_installed_package() {
         --marker='󰄬' \
         --border=sharp \
         --border-label=" Installed packages: $(wc -l < "$temporary_dir/installed-package-columns") " \
-        --header='Search package names, Flatpak IDs, or display names' \
+        --header='Icon / Source / Name / Version — search names or Flatpak IDs' \
         --info=inline-right \
         --layout=reverse \
         --no-multi \

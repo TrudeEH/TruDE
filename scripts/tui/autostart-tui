@@ -226,7 +226,7 @@ startup_items() {
                 "$scope" "$unit" "$unit" "$source" "$state" "$icon" >> "$temp_dir/startup-items"
         done < "$temp_dir/units"
     done
-    LC_ALL=C sort -f -t "$(printf '\t')" -k4,4 -k3,3 "$temp_dir/startup-items" > "$temp_dir/startup-items.sorted"
+    LC_ALL=C sort -f -t "$(printf '\t')" -k3,3 "$temp_dir/startup-items" > "$temp_dir/startup-items.sorted"
     mv "$temp_dir/startup-items.sorted" "$temp_dir/startup-items"
 }
 

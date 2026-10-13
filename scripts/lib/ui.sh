@@ -51,31 +51,28 @@ tui_item_columns() {
         }
         {
             rows[NR] = $0
-            # Icon and separator have fixed display widths; measure only text.
-            label_width = length($4) + 3 + length($3)
-            if (label_width > first_width) first_width = label_width
+            if (length($3) > name_width) name_width = length($3)
+            if (length($4) > source_width) source_width = length($4)
             if (length($5) > detail_width) detail_width = length($5)
         }
         END {
-            # Reserve border, pointer, icon, column gap and a safety margin.
+            # Reserve border, pointer, icon, column gaps and a safety margin.
             available = columns - 14
             if (detail_limit > 0 && detail_width > detail_limit) detail_width = detail_limit
-            if (detail_width + 8 > available) detail_width = int(available / 3)
+            if (source_width + detail_width + 8 > available) {
+                detail_width = int(available / 3)
+                source_width = int(available / 3)
+            }
             if (detail_width < 1) detail_width = 1
-            max_first_width = available - detail_width
-            if (max_first_width < 1) max_first_width = 1
-            if (first_width > max_first_width) first_width = max_first_width
+            if (source_width < 1) source_width = 1
+            max_name_width = available - source_width - detail_width
+            if (max_name_width < 1) max_name_width = 1
+            if (name_width > max_name_width) name_width = max_name_width
             for (row = 1; row <= NR; row++) {
                 split(rows[row], item, "\t")
-                source = shorten(item[4], first_width - 4)
-                name_width = first_width - length(source) - 3
-                if (name_width < 1) name_width = 1
-                name = shorten(item[3], name_width)
-                # Keep source and name together, padding only at the column edge.
-                padding = first_width - length(source) - 3 - length(name)
-                if (padding < 0) padding = 0
-                printf "%s\t%s\t%s%s  %s · %s%s%s%*s  %s%s%s\n", \
-                    item[1], item[2], accent, item[6], source, primary, name, reset, padding, "", \
+                printf "%s\t%s\t%s%s  %-*s%s  %s%-*s%s  %s%s%s\n", \
+                    item[1], item[2], accent, item[6], source_width, shorten(item[4], source_width), reset, \
+                    primary, name_width, shorten(item[3], name_width), reset, \
                     muted, shorten(item[5], detail_width), reset
             }
         }
