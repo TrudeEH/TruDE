@@ -145,7 +145,8 @@ static void render(void) {
     x=width-3;
     for(int id=MENU;id>=VOLUME;id--){
         PangoRectangle ink;pango_layout_get_pixel_extents(text_layout(c,items[id].text,id==MENU?16:12),&ink,NULL);
-        items[id].w=fmax(32,ink.width+24);x-=items[id].w;items[id].x=x;x-=divider;
+        double padding=(id==MAINT||id==POWER)?40:24;
+        items[id].w=fmax(32,ink.width+padding);x-=items[id].w;items[id].x=x;x-=divider;
     }
     for(int id=0;id<ITEM_COUNT;id++){
         struct item *i=&items[id];if(id>=VOLUME&&id<=POWER&&i->x<items[INDICATORS].x+items[INDICATORS].w+24)continue;unsigned bg=i->bg,fg=i->fg;
