@@ -29,6 +29,10 @@ ui_error() {
 
 repo_url=https://github.com/TrudeEH/TruDE.git
 repo_dir=$HOME/TruDE
+# Support existing checkouts named dotfiles; new installations use TruDE.
+if [ ! -e "$repo_dir" ] && [ ! -L "$repo_dir" ] && [ -d "$HOME/dotfiles/.git" ]; then
+    repo_dir=$HOME/dotfiles
+fi
 
 ui_init
 ui_banner
