@@ -39,8 +39,6 @@ backports=/etc/apt/sources.list.d/TruDE-backports.sources
 backports_suite=
 debian_components_sources=/etc/apt/sources.list.d/TruDE-components.sources
 
-. "$repo_dir/scripts/lib/migrate-trude.sh"
-
 check_platform() {
     if [ "$(id -u)" -eq 0 ]; then
         ui_error "Run this script as your normal desktop user, not root."
@@ -403,8 +401,7 @@ link_config() {
 }
 
 link_configs() {
-    # Keep the standard checkout path available for shells on installations
-    # cloned to a different location before the TruDE rename.
+    # Keep the standard checkout path available when the repository lives elsewhere.
     if [ "$repo_dir" != "$HOME/TruDE" ] && [ ! -e "$HOME/TruDE" ] && [ ! -L "$HOME/TruDE" ]; then
         ln -s -- "$repo_dir" "$HOME/TruDE"
     fi
@@ -501,7 +498,6 @@ main() {
     check_platform
 
     ui_step "Configuring Debian package sources"
-    migrate_trude_system_paths
     configure_debian_sources
     configure_backports
 
@@ -536,7 +532,6 @@ main() {
     configure_pam
 
     ui_step "Setting up the desktop session and user configuration"
-    migrate_trude_user_paths
     configure_session
     link_configs
     xdg-mime default TruDE-file-manager.desktop inode/directory
