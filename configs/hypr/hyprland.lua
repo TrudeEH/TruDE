@@ -349,7 +349,6 @@ local centeredTuiWindows = {
     { name = "temperature-tui",      class = "temperature-tui" },
     { name = "maintenance-tui",      class = "maintenance-tui" },
     { name = "package-manager-tui",  class = "package-manager-tui" },
-    { name = "app-launcher-tui",     class = "app-launcher-tui" },
     { name = "icon-picker-tui",      class = "icon-picker-tui" },
     { name = "shortcuts-tui",        class = "shortcuts-tui" },
     { name = "settings-tui",         class = "settings-tui" },
@@ -368,6 +367,16 @@ for _, window in ipairs(centeredTuiWindows) do
         center = true,
     })
 end
+
+-- Keep the launcher focused despite pointer movement or other apps opening.
+hl.window_rule({
+    name  = "app-launcher-tui",
+    match = { class = "app-launcher-tui" },
+
+    float        = true,
+    center       = true,
+    stay_focused = true,
+})
 
 -- Services such as Waybar and the authentication agent are managed by UWSM.
 hl.on("hyprland.start", function ()
