@@ -15,6 +15,7 @@
 #include <math.h>
 #include <openssl/sha.h>
 #include <pthread.h>
+#include <sys/wait.h>
 
 static char data[4096],config[4096];
 static _Thread_local char error[1024];
@@ -138,6 +139,32 @@ static J *list(const char *backend,const char *kind) {
     int fd=lock_db();if(fd<0)return NULL;J *db=load_db(),*result=db?jc(jg(db,kind)):NULL;
     jf(db);close(fd);return result;
 }
+/* Local recurrence: ISO date/time followed by " every day/week/month/year". */
+static int recurrence(J *task,int advance) {
+    const char *value=gs(task,"due_string"),*rule=strstr(value," every ");
+    if(!rule)return 0;
+    int days=0,months=0;
+    if(!strcmp(rule," every day"))days=1;
+    else if(!strcmp(rule," every week"))days=7;
+    else if(!strcmp(rule," every month"))months=1;
+    else if(!strcmp(rule," every year"))months=12;
+    else return fail("Repeat must be every day, week, month or year");
+    struct tm tm={0};int y,m,d,h=9,min=0;
+    if(sscanf(value,"%d-%d-%d",&y,&m,&d)!=3 || y<1900 || m<1 || m>12 || d<1 || d>31)
+        return fail("Repeating tasks need YYYY-MM-DD [HH:MM] every day/week/month/year");
+    if(value[10]==' ' && isdigit((unsigned char)value[11]))sscanf(value+11,"%d:%d",&h,&min);
+    tm.tm_year=y-1900;tm.tm_mon=m-1;tm.tm_mday=d;tm.tm_hour=h;tm.tm_min=min;tm.tm_isdst=-1;
+    if(!advance)return 0;
+    time_t now=time(NULL),next;
+    do {
+        tm.tm_mday+=days;
+        if(months){int wanted=tm.tm_mday;tm.tm_mday=1;tm.tm_mon+=months;mktime(&tm);int mon=tm.tm_mon;tm.tm_mday=wanted;mktime(&tm);if(tm.tm_mon!=mon){tm.tm_mday=0;}}
+        tm.tm_isdst=-1;next=mktime(&tm);
+    }while(next!=(time_t)-1 && next<=now);
+    char date[64],result[128];strftime(date,sizeof date,"%Y-%m-%d %H:%M",&tm);
+    snprintf(result,sizeof result,"%s%s",date,rule);jset(task,"due_string",js(result));jdel(task,"due");
+    jset(task,"is_completed",jb(0));return 0;
+}
 static int apply(J *db,const char *action,const char *id,J *item,const char *forced) {
     int task=!strncmp(action,"task-",5);
     J *array=jg(db,task?"tasks":"projects"),*existing=find(array,id);int rc=0;
@@ -154,7 +181,7 @@ static int apply(J *db,const char *action,const char *id,J *item,const char *for
         else if(*id && !existing)rc=fail("Project not found");
         else if(existing)jset(existing,"name",js(gs(item,"name")));
         else {char *new=forced?strdup(forced):new_id();if(!new)rc=fail("Cannot create project ID");else {existing=jc(item);jset(existing,"id",js(new));free(new);jadd(array,existing);}}
-    }else if(!strcmp(action,"task-complete")) {if(!existing)rc=fail("Task not found");else jset(existing,"is_completed",jc(item));}
+    }else if(!strcmp(action,"task-complete")) {if(!existing)rc=fail("Task not found");else if(item->n && strstr(gs(existing,"due_string")," every "))rc=recurrence(existing,1);else jset(existing,"is_completed",jc(item));}
     else if(!task && !strcmp(id,"inbox"))rc=fail("Cannot delete Inbox");
     else {
         for(size_t i=0;i<array->len;i++)if(!strcmp(gs(array->v[i],"id"),id)){jremove(array,i);break;}
@@ -167,7 +194,8 @@ static int mutate(const char *backend,const char *action,const char *id,J *item)
     if(!strcmp(action,"task-save") && valid_task(item))return 1;
     if(!strcmp(backend,"todoist"))return queued_mutation(action,id,item);
     int fd=lock_db();if(fd<0)return 1;J *db=load_db();if(!db){close(fd);return 1;}
-    int rc=apply(db,action,id,item,NULL);
+    int rc=(!strcmp(action,"task-save")?recurrence(item,0):0);
+    if(!rc)rc=apply(db,action,id,item,NULL);
     if(!rc){char *s=jd(db,0);rc=atomic_write(data,"local.json",s);free(s);}jf(db);close(fd);return rc;
 }
 static int task_order(const void *left,const void *right) {
@@ -229,4 +257,37 @@ int backend_cli(const char *backend,int argc,char **argv) {
     }
     if(rc)fprintf(stderr,"%s\n",*error?error:"Operation failed");
     return rc;
+}
+
+/* One watcher per session; delivery state survives restarts. */
+int backend_notifications(void) {
+    char *lock=path(data,"notifications.lock");int fd=open(lock,O_CREAT|O_RDWR,0600);free(lock);
+    if(fd<0 || flock(fd,LOCK_EX|LOCK_NB))return 1;
+    char *statepath=path(data,"notifications.json"),*raw=read_file(statepath);free(statepath);
+    J *state=raw?jp(raw,NULL):NULL;free(raw);if(!state || state->type!=JOBJ){jf(state);state=jo();}
+    for(;;) {
+        for(int remote=0;remote<2;remote++) {
+            J *items=list(remote?"todoist":"local","tasks");if(!items)continue;
+            for(size_t i=0;i<items->len;i++) {
+                J *t=items->v[i],*due=jg(t,"due");if(gb(t,"is_completed",0))continue;
+                const char *date=gs(due,"datetime");if(!*date)date=gs(due,"date");if(!*date)date=gs(t,"due_string");
+                int y,m,d,h=9,min=0,sec=0;struct tm tm={0};
+                if(sscanf(date,"%d-%d-%d",&y,&m,&d)!=3 || y<1900 || m<1 || m>12 || d<1 || d>31)continue;
+                if(strlen(date)>10 && (date[10]=='T' || date[10]==' '))sscanf(date+11,"%d:%d:%d",&h,&min,&sec);
+                tm.tm_year=y-1900;tm.tm_mon=m-1;tm.tm_mday=d;tm.tm_hour=h;tm.tm_min=min;tm.tm_sec=sec;tm.tm_isdst=-1;
+                time_t when=mktime(&tm);
+                if(strchr(date,'Z')) {struct tm utc;gmtime_r(&when,&utc);utc.tm_isdst=-1;when+=(time_t)difftime(when,mktime(&utc));}
+                if(when==(time_t)-1 || when>time(NULL))continue;
+                char key[256];snprintf(key,sizeof key,"%s:%s",remote?"todoist":"local",gs(t,"id"));
+                if(!strcmp(gs(state,key),date))continue;
+                pid_t child=fork();
+                if(child==0){execlp("notify-send","notify-send","--app-name=Tasks","--icon=appointment-soon","--","Task due",gs(t,"content"),(char *)NULL);_exit(127);}
+                int status=0;if(child>0 && waitpid(child,&status,0)==child && WIFEXITED(status) && !WEXITSTATUS(status)) {
+                    jset(state,key,js(date));char *saved=jd(state,0);atomic_write(data,"notifications.json",saved);free(saved);
+                }
+            }
+            jf(items);
+        }
+        sleep(30);
+    }
 }

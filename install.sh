@@ -131,7 +131,7 @@ install_packages() {
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
-        wl-clipboard swaybg hyprpolkitagent mako-notifier fzf dex jq \
+        wl-clipboard swaybg hyprpolkitagent mako-notifier libnotify-bin fzf dex jq \
         file fontconfig procps util-linux systemd-zram-generator pipewire-bin xdg-user-dirs xdg-utils \
         </dev/tty
 }
@@ -462,6 +462,7 @@ link_configs() {
     link_config "$repo_dir/scripts/bar/start" "$HOME/.local/bin/TruDE-bar"
     link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/TruDE-bar.service"
     link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/graphical-session.target.wants/TruDE-bar.service"
+    link_config "$repo_dir/configs/autostart/TruDE-task-notifications.desktop" "$config_dir/autostart/TruDE-task-notifications.desktop"
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
     link_config "$repo_dir/configs/btop/themes/TruDE.theme" "$config_dir/btop/themes/TruDE.theme"

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Task reminders
+Exec=tasks --notifications
+Comment=Notify when local and cached Todoist tasks are due

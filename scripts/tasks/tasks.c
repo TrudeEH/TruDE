@@ -272,7 +272,7 @@ static void edit(int existing) {
     snprintf(fields[4],TEXT,"%d",existing?t->priority:4);
     int p=project?project-1:0;for(int i=0;i<np;i++)if(!strcmp(t->project,projects[i].id))p=i;
     snprintf(fields[5],TEXT,"%d",p+1);
-    const char *labels[]={"Title","Description","Due date (Todoist accepts natural language)","Labels (comma-separated)","Priority (1 highest, 4 lowest)","Project number (see list below)"};
+    const char *labels[]={"Title","Description","Due: YYYY-MM-DD HH:MM [every day/week/month/year]","Labels (comma-separated)","Priority (1 highest, 4 lowest)","Project number (see list below)"};
     labels[5]="Project (Left / Right to choose)";
     while(form(existing?"Edit task":"New task",fields,labels,6,0)) {
         int priority=atoi(fields[4]),proj=atoi(fields[5]);
@@ -334,6 +334,7 @@ static void choose_backend(void) {
 }
 int main(int argc,char **argv) {
     if(backend_init())return 1;
+    if(argc==2 && !strcmp(argv[1],"--notifications"))return backend_notifications();
     int first=1;
     const char *mode=getenv("TASKS_BACKEND");
     if(argc>1 && (!strcmp(argv[1],"--local") || !strcmp(argv[1],"--todoist"))) {
