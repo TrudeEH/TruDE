@@ -97,8 +97,8 @@ extern char executable[PATH_MAX], config_dir[PATH_MAX], data_dir[PATH_MAX], stat
 int store_init(void), save_config(J *), validate_config(J *), validate_server(const char *, J *),
     save_chat(J *), lock_store(const char *);
 void unlock_store(const char *), repair_chat(J *);
-J *load_config(void), *new_chat(J *), *chats(void), *load_chat(const char *), *tasks(void);
-int save_tasks(J *), delete_chat(const char *);
+J *load_config(void), *new_chat(J *), *chats(void), *load_chat(const char *);
+int delete_chat(const char *);
 void event(J *, const char *);
 J *profile(J *), *models(J *), *router_env(J *, J *);
 int model_vision(J *);
@@ -107,7 +107,7 @@ int clipboard_copy(const void *, size_t, const char *), clipboard_copy_image(con
 J *image_content(const char *, J *);
 J *completion(J *, J *, J *, int, int, Chunk, void *, J **, char **);
 typedef struct Agent {
-    J *config, *chat, *background, *images, *steering;
+    J *config, *chat, *images, *steering;
     MCP *mcp;
     pthread_mutex_t *mutex;
     int (*approve)(Tool *, J *, void *);
@@ -115,14 +115,9 @@ typedef struct Agent {
     void *opaque;
 } Agent;
 int agent_run(Agent *, const char *, int), agent_compact(Agent *, int);
-J *native_tools(int), *context(Agent *);
+J *context(Agent *);
 size_t estimate(J *);
-char *native_call(const char *, J *, J *, MCP *);
-char *next_run(const char *, const char *, time_t);
-int task_save(J *, J *, MCP *, const char *), task_delete(const char *), run_task(const char *),
-    run_due(void), timer_change(int);
-J *task_patch(const char *, J *);
-char *timer_status(void), *export_chat(J *);
+char *export_chat(J *);
 int tui(J *);
 int validate_schema(J *, J *);
 #endif

@@ -350,24 +350,6 @@ int delete_chat(const char *id) {
     free(p);
     return r ? fail("Delete chat: %s", strerror(errno)) : 0;
 }
-J *tasks(void) {
-    char *p = fmt("%s/automations.json", data_dir);
-    J *d = ja(), *j = readjson(p, d);
-    jf(d);
-    free(p);
-    if (j && j->type != JARR) {
-        jf(j);
-        fail("Invalid schedules file");
-        return NULL;
-    }
-    return j;
-}
-int save_tasks(J *j) {
-    char *p = fmt("%s/automations.json", data_dir);
-    int r = atomic_json(p, j);
-    free(p);
-    return r;
-}
 int lock_store(const char *name) {
     for (const char *s = name; *s; s++)
         if (!isalnum((unsigned char)*s) && *s != '-')
@@ -390,7 +372,7 @@ int lock_store(const char *name) {
         free(s);
         if (pid <= 0 || !kill((pid_t)pid, 0) || errno != ESRCH) {
             free(p);
-            return fail("This chat or scheduler is already running in another agent");
+            return fail("This chat is already running in another agent");
         }
         unlink(p);
     }

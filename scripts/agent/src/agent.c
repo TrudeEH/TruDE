@@ -38,11 +38,7 @@ size_t estimate(J *j) {
     return n;
 }
 static J *definitions(Agent *a) {
-    J *defs = mcp_definitions(a->mcp), *native = native_tools(a->background != NULL);
-    for (size_t i = 0; i < native->len; i++)
-        jadd(defs, jc(native->v[i]));
-    jf(native);
-    return defs;
+    return mcp_definitions(a->mcp);
 }
 J *context(Agent *a) {
     J *messages = ja(), *sys = jo();
@@ -365,15 +361,6 @@ int agent_run(Agent *a, const char *prompt, int resume) {
             J *call = calls->v[i], *f = jg(call, "function");
             const char *name = gs(f, "name");
             Tool *t = mcp_tool(a->mcp, name);
-            int native =
-                (!strcmp(name, "automations_list") || !strcmp(name, "automations_create") ||
-                 !strcmp(name, "automations_update") || !strcmp(name, "automations_delete")) &&
-                (!a->background || !strcmp(name, "automations_list"));
-            Tool nt = {
-                .name = (char *)name, .server = "agent", .safe = !strcmp(name, "automations_list")};
-            strncpy(nt.public, name, 63);
-            if (!t && native)
-                t = &nt;
             J *args = jp(gs(f, "arguments"), NULL);
             char *content = NULL;
             err[0] = 0;
@@ -384,28 +371,20 @@ int agent_run(Agent *a, const char *prompt, int resume) {
                 update(a, "status", toolstatus);
                 free(toolstatus);
                 int permitted = t->safe;
-                if (a->background)
-                    permitted |= contains(jg(a->background, "allowedTools"), t->public);
-                else if (!strcmp(gs(a->config, "permissions"), "auto"))
+                if (!strcmp(gs(a->config, "permissions"), "auto"))
                     permitted = 1;
                 else if (!strcmp(gs(a->config, "permissions"), "ask") && !permitted && a->approve)
                     permitted = a->approve(t, args, a->opaque);
                 if (cancelled)
                     fail("Stopped");
                 else if (!permitted) {
-                    if (a->background)
-                        fail("Scheduled task requires approval for %s. Edit its allowed tools in "
-                             "Automation.",
-                             t->name);
-                    else
-                        content = strdup("Tool denied by the user or permission policy. Do not try "
-                                         "an equivalent action through another tool.");
+                    content = strdup("Tool denied by the user or permission policy. Do not try "
+                                     "an equivalent action through another tool.");
                 } else
-                    content = native ? native_call(name, args, a->config, a->mcp)
-                                     : mcp_call(a->mcp, t->public, args);
+                    content = mcp_call(a->mcp, t->public, args);
             }
             jf(args);
-            if (*err && (cancelled || a->background)) {
+            if (*err && cancelled) {
                 free(content);
                 result = -1;
                 break;
@@ -432,8 +411,6 @@ int agent_run(Agent *a, const char *prompt, int resume) {
             break;
         if (step == max - 1) {
             notice(a, "Reached the step limit. Use /continue to resume.");
-            if (a->background)
-                result = fail("Scheduled task reached the step limit before completing");
         }
     }
 done:

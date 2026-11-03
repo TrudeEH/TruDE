@@ -56,10 +56,6 @@ enum {
     A_MCP_REMOVE,
     A_MCP_LOGIN,
     A_MCP_TOOLS,
-    A_TASK_NEW,
-    A_TASK_EDIT,
-    A_TASK_DELETE,
-    A_TASK_TOOLS,
     A_MEMORY_EDIT,
     A_MEMORY_DELETE,
     A_PROFILE,
@@ -83,15 +79,15 @@ typedef struct Modal {
     struct Modal *parent;
 } Modal;
 typedef struct {
-    J *config, *chat, *history, *tasklist, *expanded, *jobresult, *mcp_config, *memories;
+    J *config, *chat, *history, *expanded, *jobresult, *mcp_config, *memories;
     MCP mcp;
     pthread_mutex_t mutex;
     pthread_cond_t condition;
     pthread_t thread;
-    int busy, job, result, tab, focus, history_sel, server_sel, task_sel, memory_sel, chat_scroll,
+    int busy, job, result, tab, focus, history_sel, server_sel, memory_sel, chat_scroll,
         detail_scroll, following, chat_max_scroll, quit, w, h, paste, memory_reload;
     atomic_int finished, dirty, approval;
-    char *prompt, *notice, *progress, *username, *request_title, *request_text, *timer, *memory_error,
+    char *prompt, *notice, *progress, *username, *request_title, *request_text, *memory_error,
          *memory_target;
     J *request_params, *response, *images, *jobimages, *steering, *jobchat, *jobconfig;
     unsigned image_number;
@@ -836,7 +832,7 @@ static void settings_load(UI *u, int section) {
 }
 static Editor *settings_editor(UI *u) {
     int i = u->focus - 520;
-    return !u->modal && u->tab == 4 && u->settings && i >= 0 && i < u->settings->count &&
+    return !u->modal && u->tab == 3 && u->settings && i >= 0 && i < u->settings->count &&
                    u->settings->fields[i].kind != 4 && u->settings->fields[i].kind != 5
                ? &u->settings->fields[i].e : NULL;
 }
@@ -872,7 +868,7 @@ static void help(UI *u) {
         modal(u, MESSAGE, 999, "Chat help",
               "Enter sends · Shift+Enter adds a line · Ctrl+J adds a line\nCtrl+S sends · Tab / "
               "Shift+Tab move focus · Ctrl+L compose\nEscape stops or closes a dialog · Ctrl+Q "
-              "quits\nF1–F5 views · F6 help · ? help outside text or empty composer\nCtrl+V pastes clipboard images · Ctrl+N "
+              "quits\nF1–F4 views · F5 help · ? help outside text or empty composer\nCtrl+V pastes clipboard images · Ctrl+N "
               "creates a chat · click tool calls to open their details\nMouse wheel / PgUp / PgDn "
               "scroll the conversation\n\n/new        Start a new chat\n/fork       Branch this "
               "conversation\n/continue   Continue the current task\n/retry      Branch before the "
@@ -1125,16 +1121,7 @@ static void *worker(void *opaque) {
         jobresult = models(u->config);
         result = jobresult ? 0 : -1;
         break;
-    case 6:
-        result = run_task(u->prompt);
-        break;
-    case 7:
-        result = timer_change(!strcmp(u->prompt, "enable"));
-        break;
     case 9: {
-        char *status = timer_status();
-        jobresult = js(status);
-        free(status);
         result = mcp_refresh(&u->mcp);
         break;
     }
@@ -1217,7 +1204,6 @@ static void start_job(UI *u, int job, const char *text) {
                          : job == 11 ? "Updating memory…"
                          : job == 4 ? "Connecting MCP servers…"
                          : job == 5 ? "Discovering models…"
-                         : job == 6 ? "Running scheduled task…"
                                     : "Working…");
     if (job == 1 || job == 2) {
         free(u->notice);
@@ -1296,36 +1282,10 @@ static void mcp_form(UI *u, int edit) {
     field_add(m, "oauth", "OAuth JSON: true, false, or {clientId, scope}", oauth, 0, 2);
     free(oauth);
 }
-static void task_form(UI *u, int edit) {
-    J *t = edit ? ji(u->tasklist, (size_t)u->task_sel) : NULL;
-    if (edit && !t)
-        return;
-    Modal *m = modal(u, FORM, edit ? A_TASK_EDIT : A_TASK_NEW,
-                     edit ? "Edit scheduled task" : "Schedule a task", "");
-    if (t)
-        m->id = strdup(gs(t, "id"));
-    m->value = t ? jc(t) : jo();
-    field_add(m, "name", "Name", gs(t, "name"), 0, 0);
-    field_add(m, "prompt", "Task instructions", gs(t, "prompt"), 1, 0);
-    field_add(m, "cron", "Cron: minute hour day month weekday",
-              *gs(t, "cron") ? gs(t, "cron") : "0 9 * * 1-5", 0, 0);
-    char *tz = readfile("/etc/timezone", 512);
-    if (tz)
-        tz[strcspn(tz, "\r\n")] = 0;
-    field_add(m, "timezone", "IANA timezone",
-              *gs(t, "timezone") ? gs(t, "timezone")
-              : tz               ? tz
-                                 : "Etc/UTC",
-              0, 0);
-    free(tz);
-    if (!jg(m->value, "allowedTools"))
-        jset(m->value, "allowedTools", ja());
-}
 static void tool_picker(UI *u, int action, const char *server, J *selected) {
     Modal *m =
         modal(u, CHECKS, action,
-              action == A_MCP_TOOLS ? "Enabled MCP tools" : "Extra tools allowed for this task",
-              "Read tools from bundled servers are always permitted for scheduled tasks.");
+              "Enabled MCP tools", "Select the tools to enable.");
     if (server)
         m->id = strdup(server);
     m->choices = ja();
@@ -1843,18 +1803,6 @@ static void save_modal(UI *u, int yes) {
         reconnect = !r;
         break;
     }
-    case A_TASK_NEW:
-    case A_TASK_EDIT:
-        jset(v, "allowedTools", jc(jg(m->value, "allowedTools")));
-        r = task_save(v, u->config, &u->mcp, m->id);
-        break;
-    case A_TASK_DELETE:
-        r = task_delete(m->id);
-        break;
-    case A_TASK_TOOLS:
-        if (m->parent)
-            jset(m->parent->value, "allowedTools", jc(m->value));
-        break;
     case 700:
         if (m->choices && m->selected < (int)m->choices->len)
             open_chat(u, gs(m->choices->v[m->selected], "id"));
@@ -1875,25 +1823,20 @@ static void save_modal(UI *u, int yes) {
     if (action == A_PROFILE || action == A_MODEL || action == A_PROVIDER)
         settings_load(u, 0);
     refresh_history(u);
-    jf(u->tasklist);
-    u->tasklist = tasks();
-    if (!u->tasklist)
-        u->tasklist = ja();
     if (reconnect)
         start_job(u, 4, "");
     u->dirty = 1;
 }
 static void dispatch(UI *u, int id, int index) {
-    if (id >= 10 && id < 16) {
-        if (id == 15)
+    if (id >= 10 && id < 15) {
+        if (id == 14)
             help(u);
         else if (!u->modal) {
             u->tab = id - 10;
             u->detail_scroll = 0;
-            u->focus = u->tab == 0 ? 100 : u->tab == 1 ? 200 : u->tab == 2 ? 400
-                         : u->tab == 3 ? 600 : 500;
+            u->focus = u->tab == 0 ? 100 : u->tab == 1 ? 200 : u->tab == 2 ? 600 : 500;
             u->dirty = 1;
-            if (u->tab == 3) {
+            if (u->tab == 2) {
                 u->memory_reload = u->busy;
                 if (!u->busy)
                     start_job(u, 10, "");
@@ -1940,28 +1883,6 @@ static void dispatch(UI *u, int id, int index) {
         u->server_sel = index;
         u->detail_scroll = 0;
         u->dirty = 1;
-        return;
-    }
-    if (id == 401) {
-        u->task_sel = index;
-        u->detail_scroll = 0;
-        u->dirty = 1;
-        return;
-    }
-    if (id == 601) {
-        u->memory_sel = index;
-        u->focus = 600;
-        u->detail_scroll = 0;
-        u->dirty = 1;
-        return;
-    }
-    if (id == 100) {
-        u->focus = 100;
-        u->dirty = 1;
-        return;
-    }
-    if (id == 106) {
-        cancelled = 1;
         return;
     }
     /* Navigation and read-only actions remain available during background work. */
@@ -2153,50 +2074,6 @@ static void dispatch(UI *u, int id, int index) {
     case 207:
         start_job(u, 4, "");
         break;
-    case 402:
-        task_form(u, 0);
-        break;
-    case 403:
-        task_form(u, 1);
-        break;
-    case 404: {
-        J *task = ji(u->tasklist, u->task_sel);
-        if (task) {
-            J *p = jo();
-            jset(p, "enabled", jb(!gb(task, "enabled", 1)));
-            J *v = task_patch(gs(task, "id"), p);
-            jf(v);
-            jf(p);
-            jf(u->tasklist);
-            u->tasklist = tasks();
-            u->dirty = 1;
-        }
-        break;
-    }
-    case 405: {
-        J *task = ji(u->tasklist, u->task_sel);
-        if (task)
-            start_job(u, 6, gs(task, "id"));
-        break;
-    }
-    case 406: {
-        J *task = ji(u->tasklist, u->task_sel);
-        if (task && *gs(task, "lastChat"))
-            open_chat(u, gs(task, "lastChat"));
-        break;
-    }
-    case 407: {
-        J *task = ji(u->tasklist, u->task_sel);
-        if (task) {
-            Modal *m =
-                modal(u, CONFIRM, A_TASK_DELETE, "Delete schedule", "Delete this scheduled task?");
-            m->id = strdup(gs(task, "id"));
-        }
-        break;
-    }
-    case 408:
-        start_job(u, 7, u->timer && !strcmp(u->timer, "enabled") ? "disable" : "enable");
-        break;
     case 602:
     case 603:
     case 604: {
@@ -2356,8 +2233,6 @@ static void modal_draw(UI *u) {
         if (server && *gs(server, "url") && gb(server, "oauth", 1) &&
             !jg(jg(server, "headers"), "Authorization"))
             button(u, bx + 26, bottom + 1, "Sign in again", 806);
-        if (m->action == A_TASK_NEW || m->action == A_TASK_EDIT)
-            button(u, bx + 26, bottom + 1, "Allowed tools", 804);
     } else if (m->kind == PICK || m->kind == CHECKS) {
         int top = y + 2, rows = height - 6;
         int count = m->choices ? (int)m->choices->len : 0;
@@ -2530,52 +2405,6 @@ static void draw_mcp(UI *u) {
     int ids[] = {201, 202, 203, 204, 205, 206, 207};
     actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
 }
-static void draw_tasks(UI *u) {
-    int side = u->w * 36 / 100, height = u->h - 7;
-    box(u, 0, 3, side, height, "Scheduled tasks", u->focus == 400);
-    box(u, side, 3, u->w - side, height, "Task details", u->focus == 409);
-    if (u->task_sel >= (int)u->tasklist->len)
-        u->task_sel = u->tasklist->len ? u->tasklist->len - 1 : 0;
-    for (size_t i = 0; i < u->tasklist->len && i < (size_t)(height - 4); i++) {
-        J *v = u->tasklist->v[i];
-        char *text = fmt("%s  %s", gb(v, "enabled", 1) ? "●" : "○", gs(v, "name"));
-        int c = (int)i == u->task_sel ? SELECTED : NORMAL;
-        fill(u, 2, 5 + i, side - 4, 1, c);
-        draw_text(u, 2, 5 + i, side - 4, text, c, 0, 0);
-        free(text);
-        hit(u, 2, 5 + i, side - 4, 1, 401, i);
-    }
-    Lines l = {0};
-    J *t = ji(u->tasklist, u->task_sel);
-    if (t) {
-        line(&l, gs(t, "name"), ACCENT, 1, NULL);
-        text_lines(&l, gs(t, "prompt"), NORMAL, 0);
-        line(&l, "", NORMAL, 0, NULL);
-        const char *keys[] = {"cron",    "timezone", "nextRun",   "lastRun",  "lastStatus",
-                              "profile", "model",    "workspace", "lastError"},
-                   *labels[] = {"Cron",     "Timezone", "Next run",  "Last run", "Status",
-                                "Provider", "Model",    "Workspace", "Error"};
-        for (int i = 0; i < 9; i++) {
-            char *s = fmt("%s: %s", labels[i], *gs(t, keys[i]) ? gs(t, keys[i]) : "—");
-            text_lines(&l, s, i == 4 ? ACCENT : MUTED, 0);
-            free(s);
-        }
-        line(&l, "", NORMAL, 0, NULL);
-        line(&l, "Bundled read tools + these extra permissions:", MUTED, 0, NULL);
-        J *allowed = jg(t, "allowedTools");
-        for (size_t i = 0; allowed && i < allowed->len; i++)
-            line(&l, jstr(allowed->v[i]), MUTED, 0, NULL);
-    } else
-        line(&l, "No scheduled tasks. Use New to add one.", MUTED, 0, NULL);
-    char *timer = fmt("\nBackground timer: %s", u->timer ? u->timer : "checking");
-    text_lines(&l, timer, MUTED, 0);
-    free(timer);
-    view_lines(u, &l, side + 2, 5, u->w - side - 4, height - 4, &u->detail_scroll, 0, 0);
-    lines_free(&l);
-    const char *labels[] = {"New", "Edit", "Pause", "Run", "Result", "Delete", "Timer"};
-    int ids[] = {402, 403, 404, 405, 406, 407, 408};
-    actions(u, 0, u->h - 4, u->w, labels, ids, 7, 2);
-}
 static void draw_memories(UI *u) {
     int side = u->w * 32 / 100, height = u->h - 7;
     if (side < 24)
@@ -2683,22 +2512,22 @@ static void render(UI *u) {
     u->editorcount = 0;
     u->text_regioncount = 0;
     box(u, 0, 0, u->w, 3, "Views", 0);
-    const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Automation", "F4 Memory",
-                         "F5 Settings", "F6 Help (?)"};
-    const char *short_tabs[] = {"F1 Chat", "F2 MCP", "F3 Auto", "F4 Memory", "F5 Settings", "F6 Help"};
+    const char *tabs[] = {"F1 Chat", "F2 MCP servers", "F3 Memory",
+                         "F4 Settings", "F5 Help (?)"};
+    const char *short_tabs[] = {"F1 Chat", "F2 MCP", "F3 Memory", "F4 Settings", "F5 Help"};
     int padding = u->w < 110 ? 1 : 2;
     int x = 2;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 5; i++) {
         const char *label = u->w < 110 ? short_tabs[i] : tabs[i];
         int w = strlen(label) + 2 * padding;
         int color =
-            ((u->modal && u->modal->action == 999) ? i == 5 : u->tab == i) ? SELECTED : SURFACE;
+            ((u->modal && u->modal->action == 999) ? i == 4 : u->tab == i) ? SELECTED : SURFACE;
         fill(u, x, 1, w, 1, color);
         draw_text(u, x + padding, 1, w - 2 * padding, label, color, 0, 0);
         hit(u, x, 1, w, 1, 10 + i, 0);
         x += w + padding;
     }
-    if (u->w < 80 || u->h < (u->tab == 4 ? 20 : 30))
+    if (u->w < 80 || u->h < (u->tab == 3 ? 20 : 30))
         draw_text(u, 2, 5, u->w - 4, "Resize the terminal to at least 80 columns × 30 rows.",
                   ACCENT, 0, 0);
     else if (u->tab == 0)
@@ -2706,8 +2535,6 @@ static void render(UI *u) {
     else if (u->tab == 1)
         draw_mcp(u);
     else if (u->tab == 2)
-        draw_tasks(u);
-    else if (u->tab == 3)
         draw_memories(u);
     else
         draw_settings(u);
@@ -2905,7 +2732,7 @@ static void mouse_click(UI *u, int buttoncode, int x, int y) {
                 m->selected += down ? 1 : -1;
             else
                 m->scroll += down ? 3 : -3;
-        } else if (u->tab == 4 && u->settings) {
+        } else if (u->tab == 3 && u->settings) {
             int i = u->settings->focus + (down ? 1 : -1);
             if (i < 0) i = 0;
             if (i >= u->settings->count) i = u->settings->count - 1;
@@ -2954,8 +2781,7 @@ static void mouse_click(UI *u, int buttoncode, int x, int y) {
                     checkbox(m, h->index);
                 else
                     save_modal(u, 1);
-            } else if (h->id == 804)
-                tool_picker(u, A_TASK_TOOLS, NULL, jg(m->value, "allowedTools"));
+            }
         } else {
             u->focus = h->id;
             dispatch(u, h->id, h->index);
@@ -3032,7 +2858,7 @@ static void cycle_focus(UI *u, int backwards) {
     int ids[256], n = 0;
     for (int i = 0; i < u->hitcount; i++) {
         int id = u->hits[i].id;
-        if (id >= 3000 || id == 301 || id == 401 || id == 601 || id < 100)
+        if (id >= 3000 || id == 301 || id == 601 || id < 100)
             continue;
         int seen = 0;
         for (int k = 0; k < n; k++)
@@ -3056,7 +2882,7 @@ static void key(UI *u, int code, const char *text) {
         cancelled = 1;
         return;
     }
-    if (code == 1021) {
+    if (code == 1020) {
         help(u);
         return;
     }
@@ -3146,11 +2972,11 @@ static void key(UI *u, int code, const char *text) {
             m->scroll += code == 1013 ? 10 : 1;
         return;
     }
-    if (code >= 1016 && code <= 1020) {
+    if (code >= 1016 && code <= 1019) {
         dispatch(u, 10 + code - 1016, 0);
         return;
     }
-    if (u->tab == 4 && u->settings) {
+    if (u->tab == 3 && u->settings) {
         if (code == 1012 || code == 1013) {
             int i = u->settings->focus + (code == 1012 ? -1 : 1);
             if (i < 0) i = 0;
@@ -3246,11 +3072,7 @@ static void key(UI *u, int code, const char *text) {
             int i = u->server_sel + change;
             if (i >= 0 && i < (int)u->mcp.count)
                 u->server_sel = i;
-        } else if (u->tab == 2) {
-            int i = u->task_sel + change;
-            if (i >= 0 && i < (int)u->tasklist->len)
-                u->task_sel = i;
-        } else if (u->tab == 3 && u->focus == 600) {
+        } else if (u->tab == 2 && u->focus == 600) {
             int i = u->memory_sel + change;
             if (i >= 0 && u->memories && i < (int)u->memories->len) {
                 u->memory_sel = i;
@@ -3280,7 +3102,7 @@ static int function_key(const char *seq) {
         return 1016 + final - 'P';
     if (final == '~') {
         const int keys[] = {11, 12, 13, 14, 15, 17};
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 5; i++)
             if (number == keys[i])
                 return 1016 + i;
     }
@@ -3500,10 +3322,7 @@ static void finish_job(UI *u) {
     u->busy = 0;
     u->finished = 0;
     cancelled = 0;
-    if (u->job == 9 && u->jobresult) {
-        free(u->timer);
-        u->timer = strdup(jstr(u->jobresult));
-    } else if (u->job == 10) {
+    if (u->job == 10) {
         free(u->memory_error);
         u->memory_error = strdup(u->result ? u->notice : "");
         if (u->jobresult) {
@@ -3555,15 +3374,7 @@ static void finish_job(UI *u) {
     }
     jf(u->jobresult);
     u->jobresult = NULL;
-    if (u->job == 7) {
-        free(u->timer);
-        u->timer = timer_status();
-    }
     refresh_history(u);
-    jf(u->tasklist);
-    u->tasklist = tasks();
-    if (!u->tasklist)
-        u->tasklist = ja();
     u->dirty = 1;
     J *completed_chat = u->jobchat;
     u->jobchat = NULL;
@@ -3575,7 +3386,7 @@ static void finish_job(UI *u) {
         return;
     }
     if (completed_chat != u->chat) jf(completed_chat);
-    if (u->memory_reload && u->tab == 3 && !u->modal) {
+    if (u->memory_reload && u->tab == 2 && !u->modal) {
         u->memory_reload = 0;
         start_job(u, 10, "");
     }
@@ -3591,7 +3402,7 @@ static void cleanup_terminal(void) {
 int tui(J *config) {
     if (!isatty(0) || !isatty(1))
         return fail(
-            "Seth needs an interactive terminal (use --check or --run-due for headless runs)");
+            "Seth needs an interactive terminal (use --check or --prompt for headless runs)");
     UI u = {0};
     u.steering = ja();
     u.config = jc(config);
@@ -3654,10 +3465,6 @@ int tui(J *config) {
     u.mcp.opaque = &u;
     u.mcp.mutex = &u.mutex;
     refresh_history(&u);
-    u.tasklist = tasks();
-    if (!u.tasklist)
-        u.tasklist = ja();
-    u.timer = timer_status();
     tcgetattr(0, &u.term);
     struct termios raw = u.term;
     cfmakeraw(&raw);
@@ -3704,11 +3511,6 @@ int tui(J *config) {
         if (!u.busy && mono() - refresh > 5) {
             refresh = mono();
             start_job(&u, 9, "");
-            J *list = tasks();
-            if (list) {
-                jf(u.tasklist);
-                u.tasklist = list;
-            }
             u.dirty = 1;
         }
     }
@@ -3728,7 +3530,6 @@ int tui(J *config) {
     jf(u.jobconfig);
     jf(u.chat);
     jf(u.history);
-    jf(u.tasklist);
     jf(u.memories);
     jf(u.expanded);
     jf(u.jobresult);
@@ -3740,7 +3541,6 @@ int tui(J *config) {
     free(u.username);
     free(u.request_title);
     free(u.request_text);
-    free(u.timer);
     free(u.memory_error);
     free(u.memory_target);
     free(u.composer.s);

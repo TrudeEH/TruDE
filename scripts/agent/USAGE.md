@@ -14,17 +14,15 @@ installer builds the native executable from source on every run, using the
 binaries are not shipped in Git. The launcher rebuilds when the executable is
 missing or its sources change. No Node.js, npm, Python, ncurses, or downloaded
 library tree is needed. HTTP/TLS uses `curl` and the system certificate store.
-The installer enables and starts the scheduler timer. When no user service manager
-is running during installation, the timer starts with the next user session.
+The installer removes obsolete scheduler units from earlier installations.
 
-Options: `--workspace DIR`, `--help`, `--check` (connect MCP servers), `--run-due`,
-and `--run-task ID`. `--prompt TEXT` runs a request in the terminal without the TUI
+Options: `--workspace DIR`, `--help`, `--check` (connect MCP servers). `--prompt TEXT` runs a request in the terminal without the TUI
 (using the configured permission policy; Ask declines changes without a dialog).
 Headless runs use the same settings and saved chats.
 
 ## Interface and chat features
 
-- Full-screen keyboard/mouse TUI with Chat, MCP servers, Automation,
+- Full-screen keyboard/mouse TUI with Chat, MCP servers,
   Memory and Settings, and a sixth Help tab that opens the chat help pop-up.
   No permanent header or help panels.
 - Repository dark/orange palette, scrollable conversation, Markdown headings/bold,
@@ -53,8 +51,8 @@ Headless runs use the same settings and saved chats.
 Enter sends a message; Shift+Enter adds a line; Ctrl+S also sends. Multiline paste
 does not send. Foot's enhanced keyboard reporting distinguishes Shift+Enter without
 terminal configuration changes. Ctrl+J is another way to insert a newline.
-Escape stops or dismisses a dialog. F1–F5 select Chat, MCP servers, Automation,
-Memory, and Settings; F6 or the sixth tab opens chat
+Escape stops or dismisses a dialog. F1–F4 select Chat, MCP servers,
+Memory, and Settings; F5 or the fifth tab opens chat
 help. `?` toggles help outside text fields or in an empty composer; inside a message
 it remains a question mark. Tab/Shift+Tab move focus; Ctrl+N creates a chat; Ctrl+L
 focuses the composer; Ctrl+Q exits. Dialogs save with Ctrl+S; Enter adds lines in
@@ -109,7 +107,7 @@ estimating tokens from text. Statistics persist with saved chats.
 
 ## Settings page
 
-F5 opens inline editors grouped into Connection, Agent, and Instructions. Click a
+F4 opens inline editors grouped into Connection, Agent, and Instructions. Click a
 field to edit it directly. The instructions editor fills the available page height.
 Tab and Shift+Tab move between fields; the mouse wheel or PgUp/PgDn reveals fields
 on shorter terminals. Settings supports terminals down to 80 columns × 20 rows.
@@ -326,8 +324,7 @@ reporting sequences. The enhanced keyboard encodings follow the
 [terminal keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
 
 Existing version 1 settings migrate once to version 2, adding memory and the separate
-shell server. A disabled filesystem server or shell tool keeps shell disabled. Explicit
-shell grants in schedules now refer to the shell server's tool; select it in Allowed tools.
+shell server. A disabled filesystem server or shell tool keeps shell disabled.
 
 Shell commands and external MCP processes have the user's OS permissions. Workspace
 checks apply to the bundled file tools; they are not a sandbox for arbitrary programs.
@@ -335,34 +332,11 @@ Sampling is not advertised. Automatic OAuth/browser authorization, binary/image 
 and MCP Apps rendering are not implemented; remote authorization uses configured
 headers/environment variables or explicit user sign-in.
 
-## Automation
-
-Native tools let the model list, create, update, and delete schedules (changes require
-approval). Scheduling belongs to the agent rather than an MCP server.
-
-The Automation tab supports creation/editing, pause/resume, deletion, manual runs,
-opening the latest result chat, and enabling/disabling the background timer. It shows
-instructions, cron, timezone, next/last run, model, workspace, tool permissions, status,
-and errors, and refreshes when the task file changes.
-
-Schedules use five cron fields (`minute hour day month weekday`) and an IANA timezone.
-For example, `0 9 * * 1-5` means 09:00 on weekdays in the selected timezone.
-The Debian systemd user timer checks due tasks each minute. Missed executions coalesce
-into one run. Tasks cannot overlap themselves; each run creates a separate history chat.
-The timer works while the TUI is closed and the user's systemd session is running.
-Running while logged out requires a user manager that remains active (systemd linger).
-
-Tasks remember workspace, provider profile, model, and an explicit allowed-tool list.
-Bundled read tools are allowed by default. Select extra tools in the task editor to
-allow changes or external tools without prompts. Unapproved actions fail visibly;
-background execution never opens an approval dialog or creates more schedules.
-Settings changes take effect at the next run; credentials are not copied into tasks.
-API-key environment variables must also exist in the systemd user service environment.
 
 ## Storage and code layout
 
-The native port reads the existing settings, chat and schedule JSON formats directly.
-It also preserves hashed tool aliases used in old chats and automation permissions.
+The native port reads the existing settings, chat JSON formats directly.
+It also preserves hashed tool aliases used in old chats.
 No migration, history conversion, or fresh setup is needed. Previous npm runtime
 folders are unused; neither startup nor setup reads or downloads them.
 
@@ -370,7 +344,6 @@ Uses XDG directories, defaulting to:
 
 - `~/.config/TruDE-agent/settings.json`: provider and MCP settings (0600).
 - `~/.local/share/TruDE-agent/chats/`: complete chat JSON files (0600).
-- `~/.local/share/TruDE-agent/automations.json`: schedules and last results.
 - `~/.local/state/TruDE-agent/checkpoints/`: private file restore checkpoints.
 - `~/.local/state/TruDE-agent/*.lock`: live-process concurrency guards.
 
@@ -388,7 +361,6 @@ Uses XDG directories, defaulting to:
 | `src/servers/web.c` | Free DuckDuckGo search and source-page text extraction |
 | `src/servers/shell.c` | Independent workspace shell commands |
 | `src/servers/memory.c` | Persistent memory storage, lookup and search |
-| `src/automation.c` | Native cron/timezone handling, schedule tools and background execution |
 | `src/store.c` | Settings, private atomic JSON storage, history and process locks |
 | `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
 | `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |

@@ -28,27 +28,22 @@ int main(int argc, char **argv) {
         fputs("Cannot resolve executable\n", stderr);
         return 1;
     }
-    const char *workspace = NULL, *taskid = NULL, *prompt = NULL, *server = NULL;
-    int check = 0, due = 0;
+    const char *workspace = NULL, *prompt = NULL, *server = NULL;
+    int check = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--help")) {
             puts("Seth — native Debian AI agent\n\nUsage: TruDE-agent-tui [--workspace DIR]\n   "
-                 "    TruDE-agent-tui --check\n       TruDE-agent-tui --run-due | --run-task "
-                 "ID\n       TruDE-agent-tui --prompt TEXT [--workspace DIR]\n"
-                 "\nEnter sends. Shift+Enter adds a line. F6 opens "
+                 "    TruDE-agent-tui --check\n       TruDE-agent-tui --prompt TEXT [--workspace DIR]\n"
+                 "\nEnter sends. Shift+Enter adds a line. F5 opens "
                  "chat help.\nSettings and history use the existing TruDE-agent XDG "
                  "directories.");
             return 0;
         } else if (!strcmp(argv[i], "--workspace") && i + 1 < argc)
             workspace = argv[++i];
-        else if (!strcmp(argv[i], "--run-task") && i + 1 < argc)
-            taskid = argv[++i];
         else if (!strcmp(argv[i], "--prompt") && i + 1 < argc)
             prompt = argv[++i];
         else if (!strcmp(argv[i], "--check"))
             check = 1;
-        else if (!strcmp(argv[i], "--run-due"))
-            due = 1;
         else if (!strcmp(argv[i], "--mcp-filesystem"))
             server = "filesystem";
         else if (!strcmp(argv[i], "--mcp-web"))
@@ -70,12 +65,6 @@ int main(int argc, char **argv) {
     }
     if (server)
         return server_main(server);
-    if (taskid || due) {
-        int r = due ? run_due() : run_task(taskid);
-        if (r && *err)
-            fprintf(stderr, "%s\n", err);
-        return r ? 1 : 0;
-    }
     J *config = load_config();
     if (!config) {
         fprintf(stderr, "%s\n", err);

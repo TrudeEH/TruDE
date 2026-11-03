@@ -481,15 +481,13 @@ link_configs() {
 
 }
 
-configure_agent_timer() {
-    link_config "$repo_dir/configs/systemd/user/TruDE-agent.service" "$config_dir/systemd/user/TruDE-agent.service"
-    link_config "$repo_dir/configs/systemd/user/TruDE-agent.timer" "$config_dir/systemd/user/TruDE-agent.timer"
-    link_config "$repo_dir/configs/systemd/user/TruDE-agent.timer" "$config_dir/systemd/user/timers.target.wants/TruDE-agent.timer"
-    if systemctl --user daemon-reload && systemctl --user start TruDE-agent.timer; then
-        ui_success "Seth background timer is running."
-    else
-        printf '%s\n' 'Seth background timer is enabled for future user sessions; it could not start now.' >&2
-    fi
+remove_agent_timer() {
+    systemctl --user disable --now TruDE-agent.timer 2>/dev/null || :
+    systemctl --user stop TruDE-agent.service 2>/dev/null || :
+    rm -f -- "$config_dir/systemd/user/TruDE-agent.service" \
+        "$config_dir/systemd/user/TruDE-agent.timer" \
+        "$config_dir/systemd/user/timers.target.wants/TruDE-agent.timer"
+    systemctl --user daemon-reload 2>/dev/null || :
 }
 
 main() {
@@ -544,7 +542,7 @@ main() {
         done
     configure_theme
 
-    configure_agent_timer
+    remove_agent_timer
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
