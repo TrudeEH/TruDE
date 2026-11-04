@@ -312,6 +312,7 @@ while true; do
 roottext=$security_color,black" whiptail --title "System Maintenance" \
         --backtitle "Automatic security updates: $security_label" \
         --menu "$prompt" 27 94 12 \
+        "󰚰 update" "Full APT maintenance and Flatpak / TruDE updates ($trude_updates)" \
         "󰏗 packages" "Search, install, or remove packages" \
         "󰋼 summary" "Full summary and update preview" \
         "󰏗 apt" "APT updates ($apt_updates)" \
@@ -319,7 +320,6 @@ roottext=$security_color,black" whiptail --title "System Maintenance" \
         "󰒓 backports" "Installed backport packages ($backports_installed)" \
         "󰈇 held" "Held packages ($held)" \
         "󰅙 failed" "Failed systemd units ($failed)" \
-        "󰚰 update" "Full APT maintenance and Flatpak / TruDE updates ($trude_updates)" \
         "󰒓 firmware" "Update device firmware (fwupd)" \
         "󰒃 security" "Automatic security updates: $security_label (toggle)" \
         "󰑐 refresh" "Refresh displayed information" \
