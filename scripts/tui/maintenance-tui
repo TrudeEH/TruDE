@@ -300,11 +300,18 @@ while true; do
         "$reboot" "$apt_updated")
 
     if security_updates_enabled; then
-        security_label=$(printf '\033[32mEnabled\033[0m')
+        security_label=Enabled
+        security_color=green
     else
-        security_label=$(printf '\033[31mDisabled\033[0m')
+        security_label=Disabled
+        security_color=red
     fi
-    choice=$(printf '%s\t%s\n' \
+    # Whiptail cannot color individual menu rows. Color its status line only,
+    # preserving the original menu, navigation, and selection colors.
+    choice=$(NEWT_COLORS="$NEWT_COLORS
+roottext=$security_color,black" whiptail --title "System Maintenance" \
+        --backtitle "Automatic security updates: $security_label" \
+        --menu "$prompt" 27 94 12 \
         "󰏗 packages" "Search, install, or remove packages" \
         "󰋼 summary" "Full summary and update preview" \
         "󰏗 apt" "APT updates ($apt_updates)" \
@@ -316,11 +323,7 @@ while true; do
         "󰒓 firmware" "Update device firmware (fwupd)" \
         "󰒃 security" "Automatic security updates: $security_label (toggle)" \
         "󰑐 refresh" "Refresh displayed information" \
-        "󰅖 close" "Close" |
-        tui_fzf --ansi --delimiter='\t' --with-nth=2 --header="$prompt" \
-            --prompt='Maintenance > ' --no-sort --layout=reverse --border |
-        cut -f1) || exit 0
-    [ -n "$choice" ] || exit 0
+        "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
 
     case $choice in
         *" packages")
