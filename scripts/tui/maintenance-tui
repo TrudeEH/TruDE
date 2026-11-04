@@ -36,6 +36,46 @@ dialog() {
     whiptail --title "System Maintenance" "$@"
 }
 
+security_updates_enabled() {
+    [ "$(dpkg-query -W -f='${Status}' unattended-upgrades 2>/dev/null)" = 'install ok installed' ] || return 1
+    apt-config dump | awk '
+        $1 == "APT::Periodic::Enable" { enabled=($2 != "\"0\";") }
+        $1 == "APT::Periodic::Update-Package-Lists" { lists=($2 != "\"0\";") }
+        $1 == "APT::Periodic::Unattended-Upgrade" { upgrades=($2 != "\"0\";") }
+        END { exit !(enabled && lists && upgrades) }
+    ' || return 1
+    systemctl is-enabled --quiet apt-daily.timer apt-daily-upgrade.timer &&
+        systemctl is-active --quiet apt-daily.timer apt-daily-upgrade.timer
+}
+
+toggle_security_updates() {
+    if security_updates_enabled; then
+        security_value=0
+        security_action=Disable
+    else
+        security_value=1
+        security_action=Enable
+    fi
+    dialog --yesno "$security_action automatic Debian security updates?" 9 72 || return
+    clear
+    if (
+        set -e
+        if [ "$security_value" = 1 ]; then
+            sudo apt-get install -y unattended-upgrades
+            sudo install -m 0644 "$trude_repo/configs/apt/90TruDE-security" /etc/apt/apt.conf.d/90TruDE-security
+        fi
+        printf 'APT::Periodic::Enable "1";\nAPT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "%s";\n' "$security_value" > "$temp_dir/auto-upgrades"
+        sudo install -m 0644 "$temp_dir/auto-upgrades" /etc/apt/apt.conf.d/99TruDE-auto-upgrades
+        if [ "$security_value" = 1 ]; then
+            sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+        fi
+    ); then
+        dialog --msgbox "Automatic security update setting saved. An update already running will finish normally." 10 78
+    else
+        dialog --msgbox "Could not change automatic security updates. Review the system configuration and try again." 10 78
+    fi
+}
+
 ensure_content() {
     file=$1
     empty_message=$2
@@ -259,7 +299,12 @@ while true; do
         "$flatpak_updates" "$flatpak_installed" "$trude_updates" "$held" "$failed" \
         "$reboot" "$apt_updated")
 
-    choice=$(dialog --menu "$prompt" 26 94 11 \
+    if security_updates_enabled; then
+        security_label=$(printf '\033[32mEnabled\033[0m')
+    else
+        security_label=$(printf '\033[31mDisabled\033[0m')
+    fi
+    choice=$(printf '%s\t%s\n' \
         "󰏗 packages" "Search, install, or remove packages" \
         "󰋼 summary" "Full summary and update preview" \
         "󰏗 apt" "APT updates ($apt_updates)" \
@@ -269,8 +314,13 @@ while true; do
         "󰅙 failed" "Failed systemd units ($failed)" \
         "󰚰 update" "Full APT maintenance and Flatpak / TruDE updates ($trude_updates)" \
         "󰒓 firmware" "Update device firmware (fwupd)" \
+        "󰒃 security" "Automatic security updates: $security_label (toggle)" \
         "󰑐 refresh" "Refresh displayed information" \
-        "󰅖 close" "Close" 3>&1 1>&2 2>&3) || exit 0
+        "󰅖 close" "Close" |
+        tui_fzf --ansi --delimiter='\t' --with-nth=2 --header="$prompt" \
+            --prompt='Maintenance > ' --no-sort --layout=reverse --border |
+        cut -f1) || exit 0
+    [ -n "$choice" ] || exit 0
 
     case $choice in
         *" packages")
@@ -288,6 +338,7 @@ while true; do
         *" failed") show_file "Failed systemd Units" "$failed_file" ;;
         *" update") update_system ;;
         *" firmware") update_firmware ;;
+        *" security") toggle_security_updates ;;
         *" refresh") collect_status ;;
         *" close") exit 0 ;;
     esac

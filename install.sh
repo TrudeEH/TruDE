@@ -126,7 +126,7 @@ install_packages() {
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
-        flatpak fwupd gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
+        unattended-upgrades flatpak fwupd gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
         lightdm slick-greeter brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
@@ -269,6 +269,17 @@ configure_zram() {
         printf '%s\n' 'zRAM is already active; size and compression changes take effect after reboot.'
     else
         sudo systemctl start dev-zram0.swap
+    fi
+}
+
+configure_security_updates() {
+    sudo install -D -m 0644 "$repo_dir/configs/apt/90TruDE-security" \
+        /etc/apt/apt.conf.d/90TruDE-security
+    # Preserve the user's toggle across subsequent installer runs.
+    if [ ! -e /etc/apt/apt.conf.d/99TruDE-auto-upgrades ]; then
+        sudo install -D -m 0644 "$repo_dir/configs/apt/99TruDE-auto-upgrades" \
+            /etc/apt/apt.conf.d/99TruDE-auto-upgrades
+        sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
     fi
 }
 
@@ -502,6 +513,9 @@ main() {
 
     ui_step "Installing desktop packages"
     install_packages
+
+    ui_step "Configuring automatic security updates"
+    configure_security_updates
 
     ui_step "Configuring adaptive zRAM swap"
     configure_zram
