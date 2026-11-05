@@ -324,7 +324,12 @@ static void node_info(void *data, const struct pw_node_info *info) {
     pw_properties_update(n->props, info->props);
     const char *role = pw_properties_get(n->props, "media.role");
     const char *class = pw_properties_get(n->props, "media.class");
-    n->screen = role && !strcmp(role, "Screen");
+    /* The Hyprland portal source has no media.role (including when
+     * consumed by Vesktop), so recognize its screen-capture source too. */
+    const char *name = pw_properties_get(n->props, "node.name");
+    n->screen = (role && !strcmp(role, "Screen")) ||
+        (class && !strcmp(class, "Video/Source") && name &&
+         !strcmp(name, "xdg-desktop-portal-hyprland"));
     n->video = class && (!strcmp(class, "Stream/Input/Video") || !strcmp(class, "Stream/Output/Video") || !strcmp(class, "Video/Source"));
     dirty = 1;
 }
