@@ -4,6 +4,7 @@
 #include <wayland-cursor.h>
 #include <cairo/cairo.h>
 #include <pango/pangocairo.h>
+#include <librsvg/rsvg.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -419,18 +420,45 @@ static void init_audio(void){sink_index=PA_INVALID_INDEX;volume_requests=0;audio
 struct tray_item { char service[256], path[256]; cairo_surface_t *icon; int dirty; };
 static struct tray_item tray_items[16];
 
-/* Reject failed PNG surfaces so later search locations can still win. */
-static cairo_surface_t *tray_png(const char *path){
+/* Reject failed images so later search locations can still win. */
+static cairo_surface_t *tray_image(const char *path){
+    if(g_str_has_suffix(path,".svg")){
+        RsvgHandle *svg=rsvg_handle_new_from_file(path,NULL);
+        if(!svg)return NULL;
+        int size=18*scale;
+        cairo_surface_t *icon=cairo_image_surface_create(CAIRO_FORMAT_ARGB32,size,size);
+        cairo_t *c=cairo_create(icon);
+        RsvgRectangle viewport={0,0,size,size};
+        gboolean ok=rsvg_handle_render_document(svg,c,&viewport,NULL);
+        cairo_status_t status=cairo_status(c);
+        cairo_destroy(c);g_object_unref(svg);
+        if(ok&&status==CAIRO_STATUS_SUCCESS)return icon;
+        cairo_surface_destroy(icon);return NULL;
+    }
     cairo_surface_t *icon=cairo_image_surface_create_from_png(path);
     if(cairo_surface_status(icon)==CAIRO_STATUS_SUCCESS)return icon;
     cairo_surface_destroy(icon);return NULL;
 }
 static cairo_surface_t *tray_icon_glob(const char *root,const char *name){
-    glob_t paths={0};char pattern[PATH_MAX];cairo_surface_t *icon=NULL;
-    snprintf(pattern,sizeof pattern,"%s/hicolor/*/apps/%s.png",root,name);
-    glob(pattern,0,NULL,&paths);
-    for(size_t i=0;i<paths.gl_pathc&&!icon;i++)icon=tray_png(paths.gl_pathv[i]);
-    globfree(&paths);return icon;
+    cairo_surface_t *icon=NULL;
+    const char *extensions[]={"png","svg"};
+    /* Support a client's private directory and themed app/status icons. */
+    const char *layouts[]={"%s/%s.%s","%s/hicolor/*/*/%s.%s","%s/*/*/*/%s.%s"};
+    for(size_t l=0;l<G_N_ELEMENTS(layouts)&&!icon;l++)
+        for(size_t e=0;e<G_N_ELEMENTS(extensions)&&!icon;e++){
+            glob_t paths={0};
+            char *pattern=g_strdup_printf(layouts[l],root,name,extensions[e]);
+            glob(pattern,0,NULL,&paths);g_free(pattern);
+            for(size_t i=0;i<paths.gl_pathc&&!icon;i++)icon=tray_image(paths.gl_pathv[i]);
+            globfree(&paths);
+        }
+    return icon;
+}
+
+static cairo_surface_t *tray_data_icon(const char *data,const char *name){
+    char *root=g_build_filename(data,"icons",NULL);
+    cairo_surface_t *icon=tray_icon_glob(root,name);
+    g_free(root);return icon;
 }
 
 static void tray_refresh(struct tray_item *t) {
@@ -448,25 +476,26 @@ static void tray_refresh(struct tray_item *t) {
     }sd_bus_message_unref(m);m=NULL;
     if(!t->icon && sd_bus_call_method(session_bus,t->service,t->path,"org.freedesktop.DBus.Properties","Get",NULL,&m,"ss","org.kde.StatusNotifierItem","IconName")>=0){
         const char *name;if(sd_bus_message_enter_container(m,'v',"s")>0&&sd_bus_message_read(m,"s",&name)>0&&*name){
-            if(name[0]=='/')t->icon=tray_png(name);
+            if(name[0]=='/')t->icon=tray_image(name);
             else if(!strchr(name,'/')&&!strstr(name,"..")){
                 /* Ayatana clients such as Steam keep icons outside system themes. */
-                sd_bus_message *theme=NULL;const char *root;char file[PATH_MAX];
+                sd_bus_message *theme=NULL;const char *root;
                 if(sd_bus_call_method(session_bus,t->service,t->path,"org.freedesktop.DBus.Properties","Get",NULL,&theme,"ss","org.kde.StatusNotifierItem","IconThemePath")>=0&&
                    sd_bus_message_enter_container(theme,'v',"s")>0&&sd_bus_message_read(theme,"s",&root)>0&&root[0]=='/'){
-                    snprintf(file,sizeof file,"%s/%s.png",root,name);t->icon=tray_png(file);
-                    if(!t->icon)t->icon=tray_icon_glob(root,name);
+                    t->icon=tray_icon_glob(root,name);
                 }
                 sd_bus_message_unref(theme);
                 if(!t->icon){
-                    const char *data=getenv("XDG_DATA_HOME"),*home=getenv("HOME");
-                    if(data&&*data)snprintf(file,sizeof file,"%s/icons",data);
-                    else if(home)snprintf(file,sizeof file,"%s/.local/share/icons",home);
-                    else file[0]=0;
-                    if(*file)t->icon=tray_icon_glob(file,name);
+                    t->icon=tray_data_icon(g_get_user_data_dir(),name);
                 }
-                if(!t->icon)t->icon=tray_icon_glob("/usr/local/share/icons",name);
-                if(!t->icon)t->icon=tray_icon_glob("/usr/share/icons",name);
+                const char *const *dirs=g_get_system_data_dirs();
+                for(int i=0;dirs[i]&&!t->icon;i++)t->icon=tray_data_icon(dirs[i],name);
+                /* Flatpak exports may be absent from the bar's XDG_DATA_DIRS. */
+                if(!t->icon){
+                    char *data=g_build_filename(g_get_home_dir(),".local/share/flatpak/exports/share",NULL);
+                    t->icon=tray_data_icon(data,name);g_free(data);
+                }
+                if(!t->icon)t->icon=tray_data_icon("/var/lib/flatpak/exports/share",name);
             }
         }
     }sd_bus_message_unref(m);redraw=1;

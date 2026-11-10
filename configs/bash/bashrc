@@ -137,3 +137,6 @@ for __TruDE_command in "${PROMPT_COMMAND[@]}"; do
 done
 PROMPT_COMMAND=("${__TruDE_prompt_commands[@]}")
 unset __TruDE_prompt_commands __TruDE_command
+
+# opencode
+export PATH=/home/trude/.opencode/bin:$PATH

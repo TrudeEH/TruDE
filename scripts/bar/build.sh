@@ -9,7 +9,7 @@ scanner=${WAYLAND_SCANNER:-wayland-scanner}
 "$scanner" private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml "$base/bin/xdg-shell.c"
 output=$(mktemp "$base/bin/.bar.XXXXXX")
 trap 'rm -f "$output"' 0 HUP INT TERM
-packages="wayland-client wayland-cursor pangocairo libsystemd libpipewire-0.3 json-c libpulse"
+packages="wayland-client wayland-cursor pangocairo librsvg-2.0 libsystemd libpipewire-0.3 json-c libpulse"
 cflags=$(pkg-config --cflags $packages)
 libs=$(pkg-config --libs $packages)
 ${CC:-cc} -std=gnu11 -O2 -Wall -Wextra -Wno-unused-function -Wno-unused-variable -fstack-protector-strong \
