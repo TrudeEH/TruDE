@@ -36,7 +36,12 @@ static void menu_label(char *out,size_t size,const char *label){
 }
 static int menu_parse(sd_bus_message *m,int parent,int depth){
     if(depth>16||menu_entries_count>=256)return -1;
-    if(sd_bus_message_enter_container(m,'r',"ia{sv}av")<=0)return -1;
+    char type;const char *signature;
+    /* Some clients put child structs directly in arrays, including inside
+     * variants, instead of using the DBusMenu array-of-variants layout. */
+    if(sd_bus_message_peek_type(m,&type,&signature)<=0||type!='r'||
+       !signature||strncmp(signature,"ia{sv}a",7))return -1;
+    if(sd_bus_message_enter_container(m,'r',signature)<=0)return -1;
     struct menu_entry *e=&menu_entries[menu_entries_count++];memset(e,0,sizeof *e);
     e->parent=parent;e->enabled=e->visible=1;
     if(sd_bus_message_read(m,"i",&e->id)<0)return -1;
@@ -60,10 +65,17 @@ static int menu_parse(sd_bus_message *m,int parent,int depth){
         }else if(sd_bus_message_skip(m,signature)<0)return -1;
         if(sd_bus_message_exit_container(m)<0||sd_bus_message_exit_container(m)<0)return -1;
     }
-    if(sd_bus_message_exit_container(m)<0||sd_bus_message_enter_container(m,'a',"v")<0)return -1;
-    while(sd_bus_message_enter_container(m,'v',"(ia{sv}av)")>0){
-        if(menu_parse(m,e->id,depth+1)<0||sd_bus_message_exit_container(m)<0)return -1;
+    if(sd_bus_message_exit_container(m)<0||sd_bus_message_enter_container(m,'a',NULL)<=0)return -1;
+    int next;
+    while((next=sd_bus_message_peek_type(m,&type,&signature))>0){
+        if(type=='v'){
+            if(sd_bus_message_enter_container(m,'v',signature)<=0||
+               menu_parse(m,e->id,depth+1)<0||sd_bus_message_exit_container(m)<0)return -1;
+        }else if(type=='r'){
+            if(menu_parse(m,e->id,depth+1)<0)return -1;
+        }else return -1;
     }
+    if(next<0)return -1;
     if(sd_bus_message_exit_container(m)<0||sd_bus_message_exit_container(m)<0)return -1;
     return 0;
 }
