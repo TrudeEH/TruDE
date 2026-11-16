@@ -2,6 +2,18 @@
 
 Temporary upgrade code to retire once all existing installations have migrated.
 
+## Remove the greetd launch overrides
+
+- Location: `scripts/setup-greetd.sh`, `remove_greetd_launch_overrides()` and its
+  call.
+- Migration: remove the former `/usr/local/bin/TruDE-session` launcher,
+  `/usr/local/share/TruDE/sessions/TruDE.desktop`, and the installer-owned
+  `/etc/systemd/system/greetd.service.d/console.conf`, then remove their parent
+  directories only if empty. Tuigreet now invokes UWSM directly and greetd uses
+  Debian's packaged service on tty7.
+- Retirement: delete the function and its call once all installations use the
+  direct UWSM command. Keep the normal greetd/tuigreet installation.
+
 ## Replace LightDM with greetd + tuigreet
 
 - Location: `scripts/setup-greetd.sh`, `check_lightdm_migration()` and
@@ -13,7 +25,7 @@ Temporary upgrade code to retire once all existing installations have migrated.
   when it contains exactly the old installer-generated session selection.
 - Retirement: delete both functions and their calls after all installations
   have migrated. Keep the greetd/tuigreet setup, PAM keyring integration, console
-  theme, service selection, and UWSM session launcher.
+  theme, and service selection.
 
 ## 2b5a1b31 (04 Nov 2026): Remove Seth automation
 

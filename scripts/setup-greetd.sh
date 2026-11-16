@@ -50,6 +50,19 @@ remove_lightdm() {
     fi
 }
 
+# Temporary migration: use the direct UWSM command and Debian's greetd service.
+remove_greetd_launch_overrides() {
+    sudo rm -f -- /usr/local/bin/TruDE-session \
+        /usr/local/share/TruDE/sessions/TruDE.desktop \
+        /etc/systemd/system/greetd.service.d/console.conf
+    for old_dir in /usr/local/share/TruDE/sessions /usr/local/share/TruDE/xsessions \
+        /etc/systemd/system/greetd.service.d; do
+        if [ -d "$old_dir" ]; then
+            sudo rmdir --ignore-fail-on-non-empty -- "$old_dir"
+        fi
+    done
+}
+
 check_lightdm_migration
 if [ "$activate" = true ]; then
     case $(tty 2>/dev/null || :) in
@@ -78,11 +91,7 @@ fi
 sudo install -d -m 0750 -o trude-greeter -g trude-greeter \
     /var/lib/TruDE-greeter /var/cache/tuigreet
 sudo install -D -m 0755 "$repo_dir/scripts/greetd/greeter" /usr/local/libexec/TruDE-greet
-sudo install -D -m 0755 "$repo_dir/scripts/greetd/session" /usr/local/bin/TruDE-session
-sudo install -D -m 0644 "$repo_dir/configs/greetd/TruDE.desktop" /usr/local/share/TruDE/sessions/TruDE.desktop
-sudo install -d -m 0755 /usr/local/share/TruDE/xsessions
 sudo install -D -m 0644 "$repo_dir/configs/greetd/config.toml" /etc/greetd/config.toml
-sudo install -D -m 0644 "$repo_dir/configs/greetd/console.conf" /etc/systemd/system/greetd.service.d/console.conf
 sudo install -D -m 0644 "$repo_dir/configs/greetd/power.rules" /etc/polkit-1/rules.d/50-TruDE-greeter-power.rules
 
 # Keep the distribution's authentication policy and add keyring integration once.
@@ -101,6 +110,7 @@ if ! grep -Eq '^[[:space:]]*-?session[[:space:]].*pam_gnome_keyring[.]so.*[[:spa
 fi
 
 remove_lightdm
+remove_greetd_launch_overrides
 sudo systemctl daemon-reload
 sudo systemctl unmask --runtime greetd.service
 sudo systemctl enable --force greetd.service

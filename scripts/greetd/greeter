@@ -18,10 +18,9 @@ exec /usr/bin/tuigreet \
     --greeting 'TruDE' \
     --time --time-format '%a, %d %b  %H:%M' \
     --width 64 --container-padding 2 --prompt-padding 1 \
-    --remember --remember-user-session --user-menu --asterisks \
-    --sessions /usr/local/share/TruDE/sessions \
-    --xsessions /usr/local/share/TruDE/xsessions \
-    --cmd /usr/local/bin/TruDE-session \
+    --remember --user-menu --asterisks \
+    --sessions '' --xsessions '' \
+    --cmd '/usr/bin/uwsm start -e -D Hyprland hyprland.desktop' \
     --power-shutdown '/usr/bin/systemctl poweroff' \
     --power-reboot '/usr/bin/systemctl reboot' \
     --theme 'text=white;time=gray;container=black;border=darkgray;title=yellow;greet=yellow;prompt=white;input=white;action=gray;button=lightyellow'

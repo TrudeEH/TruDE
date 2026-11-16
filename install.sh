@@ -131,7 +131,7 @@ install_packages() {
         build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev librsvg2-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         unattended-upgrades flatpak fwupd gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
-        greetd tuigreet libpam-systemd libpam-gnome-keyring brightnessctl \
+        greetd tuigreet libpam-systemd libpam-gnome-keyring dbus-daemon brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
@@ -364,9 +364,15 @@ configure_networking() {
 }
 
 configure_theme() {
-    if command -v gsettings >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-        gsettings set org.gnome.desktop.interface color-scheme prefer-dark || :
-        gsettings set org.gnome.desktop.interface accent-color orange || :
+    # These settings persist in dconf. Set them during installation rather than
+    # resetting them every login. A private bus also works from a minimal TTY.
+    if command -v gsettings >/dev/null 2>&1; then
+        dbus-run-session -- sh <<'SETTINGS' || :
+gsettings reset org.gnome.desktop.interface gtk-theme
+gsettings reset org.gnome.desktop.interface icon-theme
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+gsettings set org.gnome.desktop.interface accent-color orange
+SETTINGS
     fi
 
     mkdir -p "$config_dir/qt6ct"

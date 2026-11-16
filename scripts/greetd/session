@@ -1,9 +1,0 @@
-#!/bin/sh
-set -eu
-
-export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=Hyprland
-export XDG_SESSION_DESKTOP=Hyprland
-export LIBSEAT_BACKEND=logind
-
-exec /usr/bin/uwsm start -e -D Hyprland hyprland.desktop
