@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+# The Linux console has 16 colors. Set this VT's palette to the same Adwaita
+# colors as the desktop, then address them by name in tuigreet's theme.
+if [ "${TERM:-}" = linux ]; then
+    for color in \
+        0222226 1e01b24 257e389 3ffbe6f \
+        462a0ea 5c061cb 699c1f1 7aaaaaa \
+        838383c 9ff7b63 A8ff0a4 Bffa348 \
+        C99c1f1 Ddc8add E93ddc2 Fffffff; do
+        printf '\033]P%s' "$color"
+    done
+    printf '\033[0m\033[2J\033[H'
+fi
+
+exec /usr/bin/tuigreet \
+    --greeting 'TruDE' \
+    --time --time-format '%a, %d %b  %H:%M' \
+    --width 64 --container-padding 2 --prompt-padding 1 \
+    --remember --remember-user-session --user-menu --asterisks \
+    --sessions /usr/local/share/TruDE/sessions \
+    --xsessions /usr/local/share/TruDE/xsessions \
+    --cmd /usr/local/bin/TruDE-session \
+    --power-shutdown '/usr/bin/systemctl poweroff' \
+    --power-reboot '/usr/bin/systemctl reboot' \
+    --theme 'text=white;time=gray;container=black;border=darkgray;title=yellow;greet=yellow;prompt=white;input=white;action=gray;button=lightyellow'

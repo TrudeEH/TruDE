@@ -112,6 +112,10 @@ BACKPORTS
 
 install_packages() {
     sudo apt-get update
+    # Do not let package installation take over the console before setup is ready.
+    if [ "$(dpkg-query -W -f='${Status}' greetd 2>/dev/null || :)" != 'install ok installed' ]; then
+        sudo systemctl mask --runtime greetd.service
+    fi
     # Retire the idle daemon on systems set up by previous installations.
     if [ "$(dpkg-query -W -f='${Status}' hypridle 2>/dev/null || :)" = 'install ok installed' ]; then
         systemctl --user disable --now hypridle.service 2>/dev/null || :
@@ -127,7 +131,7 @@ install_packages() {
         build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev librsvg2-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
         unattended-upgrades flatpak fwupd gnome-keyring pipewire-audio wireplumber network-manager avahi-daemon \
-        lightdm slick-greeter brightnessctl \
+        greetd tuigreet libpam-systemd libpam-gnome-keyring brightnessctl \
         playerctl bluez btop lm-sensors pulsemixer whiptail \
         power-profiles-daemon upower cups system-config-printer ipp-usb gvfs \
         udisks2 qt6-wayland adwaita-qt adwaita-qt6 qt6ct grim slurp \
@@ -247,16 +251,6 @@ configure_flatpak() {
         https://dl.flathub.org/repo/flathub.flatpakrepo
 }
 
-configure_lightdm() {
-    sudo install -D -m 0644 "$repo_dir/configs/lightdm/lightdm.conf" \
-        /etc/lightdm/lightdm.conf.d/50-TruDE.conf
-    sudo install -D -m 0644 "$repo_dir/configs/lightdm/slick-greeter.conf" \
-        /etc/lightdm/slick-greeter.conf
-    sudo install -D -m 0644 -o lightdm -g lightdm "$repo_dir/configs/lightdm/gtk.css" \
-        /var/lib/lightdm/.config/gtk-3.0/gtk.css
-    sudo systemctl enable lightdm.service
-}
-
 configure_zram() {
     sudo install -D -m 0644 "$repo_dir/configs/systemd/zram-generator.conf.d/60-TruDE.conf" \
         /etc/systemd/zram-generator.conf.d/60-TruDE.conf
@@ -284,6 +278,12 @@ configure_security_updates() {
 }
 
 configure_hardware_services() {
+    # Let the compositor open GPU render nodes independently of seat ACL timing.
+    desktop_user=$(id -un)
+    case " $(id -nG "$desktop_user") " in
+        *" render "*) ;;
+        *) sudo usermod -aG render "$desktop_user" ;;
+    esac
     sudo systemctl enable --now bluetooth.service cups.service power-profiles-daemon.service
 }
 
@@ -363,24 +363,6 @@ configure_networking() {
     fi
 }
 
-configure_pam() {
-    pam_file=/etc/pam.d/lightdm
-    if ! grep -Fqx "auth optional pam_gnome_keyring.so" "$pam_file"; then
-        printf '%s\n' "auth optional pam_gnome_keyring.so" | sudo tee -a "$pam_file" >/dev/null
-    fi
-    if ! grep -Fqx "session optional pam_gnome_keyring.so auto_start" "$pam_file"; then
-        printf '%s\n' "session optional pam_gnome_keyring.so auto_start" | sudo tee -a "$pam_file" >/dev/null
-    fi
-}
-
-configure_session() {
-    cat > "$HOME/.dmrc" <<'DMRC'
-[Desktop]
-Session=hyprland-uwsm
-DMRC
-    chmod 644 "$HOME/.dmrc"
-}
-
 configure_theme() {
     if command -v gsettings >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         gsettings set org.gnome.desktop.interface color-scheme prefer-dark || :
@@ -433,6 +415,7 @@ link_configs() {
 
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
+    link_config "$repo_dir/configs/uwsm/env-hyprland" "$config_dir/uwsm/env-hyprland"
     link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/TruDE-wallpaper.jpg"
     link_config "$repo_dir/scripts/hypr/set-wallpaper" "$HOME/.local/bin/TruDE-set-wallpaper"
     link_config "$repo_dir/scripts/dictation/control" "$HOME/.local/bin/TruDE-dictation"
@@ -536,17 +519,14 @@ main() {
     install_font
     configure_flatpak
 
-    ui_step "Setting up the LightDM login screen"
-    configure_lightdm
-
     ui_step "Configuring networking, power, and printing"
     configure_networking
     configure_hardware_services
-    configure_pam
 
     ui_step "Setting up the desktop session and user configuration"
-    configure_session
     link_configs
+    ui_step "Setting up the greetd login screen"
+    sh "$repo_dir/scripts/setup-greetd.sh"
     xdg-mime default TruDE-file-manager.desktop inode/directory
     sed -n 's/^MimeType=//p' "$repo_dir/configs/applications/TruDE-text-editor.desktop" |
         tr ';' '\n' |
@@ -565,7 +545,7 @@ main() {
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 
-    ui_success "Installation complete. Log out and back in to start the TruDE desktop."
+    ui_success "Installation complete. Reboot to start the TruDE desktop."
 }
 
 main "$@"

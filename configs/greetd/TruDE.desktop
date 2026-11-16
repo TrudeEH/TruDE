@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=TruDE
+Comment=Trude's Hyprland desktop
+Exec=/usr/local/bin/TruDE-session
+Type=Application
