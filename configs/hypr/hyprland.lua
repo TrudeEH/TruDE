@@ -378,16 +378,7 @@ hl.window_rule({
     stay_focused = true,
 })
 
--- Services such as Waybar and the authentication agent are managed by UWSM.
+-- Desktop services and the keyring are managed by systemd and PAM.
 hl.on("hyprland.start", function ()
-    -- Libadwaita follows the desktop color-scheme preference. Set it for
-    -- sessions started outside GNOME so GTK4 apps use native Adwaita dark.
-    hl.exec_cmd("if command -v gsettings >/dev/null; then "
-        .. "gsettings reset org.gnome.desktop.interface gtk-theme >/dev/null 2>&1; "
-        .. "gsettings reset org.gnome.desktop.interface icon-theme >/dev/null 2>&1; "
-        .. "gsettings set org.gnome.desktop.interface accent-color orange >/dev/null 2>&1; "
-        .. "gsettings set org.gnome.desktop.interface color-scheme prefer-dark "
-        .. ">/dev/null 2>&1; fi")
     hl.exec_cmd("TruDE-set-wallpaper " .. shellQuote(wallpaper))
-    hl.exec_cmd("gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1")
 end)

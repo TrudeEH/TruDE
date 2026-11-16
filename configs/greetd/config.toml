@@ -1,0 +1,10 @@
+[terminal]
+vt = 7
+
+[general]
+# UWSM loads the desktop profile and prepares its environment once.
+source_profile = false
+
+[default_session]
+command = "/usr/local/libexec/TruDE-greet"
+user = "trude-greeter"

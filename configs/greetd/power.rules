@@ -1,0 +1,14 @@
+// The active local login screen may shut down or reboot, including when a
+// recovery console is logged in. Respect inhibitors; grant no other actions.
+polkit.addRule(function(action, subject) {
+    var actions = [
+        "org.freedesktop.login1.power-off",
+        "org.freedesktop.login1.power-off-multiple-sessions",
+        "org.freedesktop.login1.reboot",
+        "org.freedesktop.login1.reboot-multiple-sessions"
+    ];
+    if (subject.user === "trude-greeter" && subject.local && subject.active &&
+            actions.indexOf(action.id) !== -1) {
+        return polkit.Result.YES;
+    }
+});
