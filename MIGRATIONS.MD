@@ -16,14 +16,13 @@ Temporary upgrade code to retire once all existing installations have migrated.
 
 ## Replace LightDM with greetd + tuigreet
 
-- Location: `install.sh`, `check_lightdm_migration()` and
-  `remove_lightdm()`, plus their calls.
-- Migration: require a text console when replacing an active LightDM session;
-  disable LightDM, purge `lightdm`, `slick-greeter`, and `lightdm-settings`
+- Location: `install.sh`, `remove_lightdm()` and its call.
+- Migration: disable active LightDM for the next boot and defer its cleanup
+  until an installer run after it stops. Then purge `lightdm`, `slick-greeter`, and `lightdm-settings`
   without autoremove, remove
   the former TruDE LightDM override and greeter CSS, and delete `~/.dmrc` only
   when it contains exactly the old installer-generated session selection.
-- Retirement: delete both functions and their calls after all installations
+- Retirement: delete the function and its call after all installations
   have migrated. Keep the greetd/tuigreet setup, PAM keyring integration, console
   theme, and service selection.
 

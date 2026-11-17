@@ -110,18 +110,15 @@ BACKPORTS
     fi
 }
 
-# Temporary migration: check before installing anything that could stop LightDM.
-check_lightdm_migration() {
-    if systemctl is-active --quiet lightdm.service; then
-        case $(tty 2>/dev/null || :) in
-            /dev/tty[0-9]*) ;;
-            *) printf 'Switch to a text console with Ctrl+Alt+F5, log in, and run this script there to replace LightDM.\n' >&2; exit 1 ;;
-        esac
-    fi
-}
-
 # Temporary migration: retire LightDM and only the settings owned by TruDE.
 remove_lightdm() {
+    # Purging an active display manager stops the desktop running the installer.
+    # Select greetd for the next boot and finish package cleanup on a later run.
+    if systemctl is-active --quiet lightdm.service; then
+        sudo systemctl disable lightdm.service
+        printf '%s\n' 'LightDM is still running. Reboot to use greetd; rerun the installer afterward to remove the old LightDM packages.'
+        return
+    fi
     old_packages=
     for package in lightdm slick-greeter lightdm-settings; do
         case $(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || :) in
@@ -578,7 +575,6 @@ main() {
     ui_banner
     ui_step "Checking system requirements"
     check_platform
-    check_lightdm_migration
 
     ui_step "Configuring Debian package sources"
     configure_debian_sources
