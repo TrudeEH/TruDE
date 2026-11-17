@@ -4,7 +4,7 @@ Temporary upgrade code to retire once all existing installations have migrated.
 
 ## Remove the greetd launch overrides
 
-- Location: `scripts/setup-greetd.sh`, `remove_greetd_launch_overrides()` and its
+- Location: `install.sh`, `remove_greetd_launch_overrides()` and its
   call.
 - Migration: remove the former `/usr/local/bin/TruDE-session` launcher,
   `/usr/local/share/TruDE/sessions/TruDE.desktop`, and the installer-owned
@@ -16,7 +16,7 @@ Temporary upgrade code to retire once all existing installations have migrated.
 
 ## Replace LightDM with greetd + tuigreet
 
-- Location: `scripts/setup-greetd.sh`, `check_lightdm_migration()` and
+- Location: `install.sh`, `check_lightdm_migration()` and
   `remove_lightdm()`, plus their calls.
 - Migration: require a text console when replacing an active LightDM session;
   disable LightDM, purge `lightdm`, `slick-greeter`, and `lightdm-settings`
