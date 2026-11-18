@@ -25,6 +25,8 @@ if [ "$(dpkg --print-architecture)" != amd64 ]; then
     exit 1
 fi
 
+# The 64-bit Steam client still requires multilib libraries and graphics drivers.
+# https://github.com/ValveSoftware/steam-for-linux/blob/master/README.beta.md
 if ! dpkg --print-foreign-architectures | grep -qx i386; then
     sudo dpkg --add-architecture i386
 fi
@@ -48,6 +50,7 @@ BACKPORTS
 fi
 
 sudo apt-get update
-sudo apt-get install -y -t "$backports_suite" steam-installer libdrm-dev
+# Steam still needs X11 on Wayland; libdrm-dev is needed for SteamVR.
+sudo apt-get install -y -t "$backports_suite" steam-installer xwayland libdrm-dev
 
-echo "Steam and its 32-bit dependencies are installed."
+echo "Steam is installed. Its 64-bit client still requires 32-bit libraries and graphics drivers."

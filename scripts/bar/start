@@ -5,7 +5,7 @@ if [ ! -x "$base/bin/bar" ] || [ "$base/bar.c" -nt "$base/bin/bar" ] \
     || [ "$base/tray-menu.c" -nt "$base/bin/bar" ] || [ "$base/status.c" -nt "$base/bin/bar" ] || [ "$base/build.sh" -nt "$base/bin/bar" ] || [ "$base/layer-shell.xml" -nt "$base/bin/bar" ]; then
     "$base/build.sh"
 fi
-# Keep the legacy settings key so existing preferences survive the migration.
+# The bar's display preference is stored under the waybar settings key.
 settings=${XDG_CONFIG_HOME:-$HOME/.config}/TruDE/settings.json
 if [ "$#" -eq 0 ] && command -v jq >/dev/null 2>&1 \
     && [ -f "$settings" ] && [ "$(jq -r 'if .waybar.primary_only == null then true else .waybar.primary_only end' "$settings")" = false ]; then

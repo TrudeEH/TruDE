@@ -110,50 +110,6 @@ BACKPORTS
     fi
 }
 
-# Temporary migration: retire LightDM and only the settings owned by TruDE.
-remove_lightdm() {
-    # Purging an active display manager stops the desktop running the installer.
-    # Select greetd for the next boot and finish package cleanup on a later run.
-    if systemctl is-active --quiet lightdm.service; then
-        sudo systemctl disable lightdm.service
-        printf '%s\n' 'LightDM is still running. Reboot to use greetd; rerun the installer afterward to remove the old LightDM packages.'
-        return
-    fi
-    old_packages=
-    for package in lightdm slick-greeter lightdm-settings; do
-        case $(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || :) in
-            'install ok installed'|'deinstall ok config-files') old_packages="$old_packages $package" ;;
-        esac
-    done
-    if [ -n "$old_packages" ]; then
-        if systemctl cat lightdm.service >/dev/null 2>&1; then
-            sudo systemctl disable lightdm.service
-        fi
-        # Keep unrelated automatically installed packages in place.
-        # shellcheck disable=SC2086
-        sudo apt-get purge -y --no-auto-remove -- $old_packages </dev/tty
-    fi
-    sudo rm -f -- /etc/lightdm/lightdm.conf.d/50-TruDE.conf \
-        /var/lib/lightdm/.config/gtk-3.0/gtk.css
-    if [ "$(cat "$HOME/.dmrc" 2>/dev/null || :)" = "$(printf '[Desktop]\nSession=hyprland-uwsm')" ]; then
-        rm -f -- "$HOME/.dmrc"
-    fi
-}
-
-# Temporary migration: use the direct UWSM command and Debian's greetd service.
-remove_greetd_launch_overrides() {
-    sudo rm -f -- /usr/local/bin/TruDE-session \
-        /usr/local/share/TruDE/sessions/TruDE.desktop \
-        /etc/systemd/system/greetd.service.d/console.conf
-    for old_dir in /usr/local/share/TruDE/sessions /usr/local/share/TruDE/xsessions \
-        /etc/systemd/system/greetd.service.d; do
-        if [ -d "$old_dir" ]; then
-            sudo rmdir --ignore-fail-on-non-empty -- "$old_dir"
-        fi
-    done
-}
-
-
 configure_greetd() {
     if ! getent passwd trude-greeter >/dev/null; then
         sudo adduser --system --group --home /var/lib/TruDE-greeter \
@@ -180,8 +136,6 @@ configure_greetd() {
             'session optional pam_gnome_keyring.so auto_start' | sudo tee -a "$pam_file" >/dev/null
     fi
 
-    remove_lightdm
-    remove_greetd_launch_overrides
     sudo systemctl daemon-reload
     sudo systemctl unmask --runtime greetd.service
     sudo systemctl enable --force greetd.service
@@ -195,12 +149,6 @@ install_packages() {
     # Do not let package installation take over the console before setup is ready.
     if [ "$(dpkg-query -W -f='${Status}' greetd 2>/dev/null || :)" != 'install ok installed' ]; then
         sudo systemctl mask --runtime greetd.service
-    fi
-    # Retire the idle daemon on systems set up by previous installations.
-    if [ "$(dpkg-query -W -f='${Status}' hypridle 2>/dev/null || :)" = 'install ok installed' ]; then
-        systemctl --user disable --now hypridle.service 2>/dev/null || :
-        pkill -x hypridle 2>/dev/null || :
-        sudo apt-get remove -y --no-auto-remove -- hypridle </dev/tty
     fi
     # Prefer stable, but allow required backported dependencies and packages
     # that must match their versions in the same transaction (APT 3 / Debian 13).
@@ -484,20 +432,6 @@ link_configs() {
     if [ "$repo_dir" != "$HOME/TruDE" ] && [ ! -e "$HOME/TruDE" ] && [ ! -L "$HOME/TruDE" ]; then
         ln -s -- "$repo_dir" "$HOME/TruDE"
     fi
-    # Retire only symlinks created by older versions of this installer.
-    # Preserve independently managed configurations and commands.
-    for legacy_pair in \
-        "$HOME/.local/bin/TruDE-hypridle|$repo_dir/scripts/hypr/start-idle" \
-        "$config_dir/hypr/hypridle.conf|$repo_dir/configs/hypr/hypridle.conf" \
-        "$HOME/.local/bin/TruDE-nnn-open|$repo_dir/scripts/nnn/open" \
-        "$config_dir/nnn/env|$repo_dir/configs/nnn/env" \
-        "$config_dir/nnn/plugins|$repo_dir/configs/nnn/plugins"; do
-        legacy_target=${legacy_pair%%|*}
-        legacy_source=${legacy_pair#*|}
-        if [ -L "$legacy_target" ] && [ "$(readlink "$legacy_target")" = "$legacy_source" ]; then
-            rm "$legacy_target"
-        fi
-    done
 
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
@@ -561,15 +495,6 @@ link_configs() {
 
 }
 
-remove_agent_timer() {
-    systemctl --user disable --now TruDE-agent.timer 2>/dev/null || :
-    systemctl --user stop TruDE-agent.service 2>/dev/null || :
-    rm -f -- "$config_dir/systemd/user/TruDE-agent.service" \
-        "$config_dir/systemd/user/TruDE-agent.timer" \
-        "$config_dir/systemd/user/timers.target.wants/TruDE-agent.timer"
-    systemctl --user daemon-reload 2>/dev/null || :
-}
-
 main() {
     ui_init
     ui_banner
@@ -622,11 +547,8 @@ main() {
         done
     configure_theme
 
-    remove_agent_timer
-
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
-        systemctl --user disable --now waybar.service >/dev/null 2>&1 || :
         systemctl --user enable --now foot-server.socket TruDE-bar.service mako.service || :
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi

@@ -204,51 +204,7 @@ J *load_config(void) {
     J *c = readjson(path, d);
     free(path);
     jf(d);
-    int migrated = c && gn(c, "version", 1) < 2;
-    if (migrated) {
-        J *servers = jg(c, "mcpServers");
-        if (servers && servers->type == JOBJ) {
-            int shell_enabled = 0;
-            for (size_t i = 0; i < servers->len; i++) {
-                J *server = servers->v[i];
-                if (!strcmp(gs(server, "builtin"), "filesystem") && gb(server, "enabled", 1) &&
-                    !contains(jg(server, "disabledTools"), "shell"))
-                    shell_enabled = 1;
-            }
-            add_bundled(servers, "shell", shell_enabled);
-            add_bundled(servers, "memory", 1);
-            jset(c, "version", jnum(2));
-        }
-    }
-    if (c && !strncmp(gs(c, "systemPrompt"), "You are a local Debian AI agent.", 31)) {
-        char *v = fmt("You are Seth, a local Debian AI agent.%s", gs(c, "systemPrompt") + 31);
-        jset(c, "systemPrompt", js(v));
-        free(v);
-    }
-    /* Upgrade only the previous stock prompt; never rewrite custom instructions. */
-    if (c) {
-        const char *exception = " unless the user requests otherwise";
-        const char *at = strstr(prompt, exception);
-        char *previous = fmt("%.*s%s", (int)(at - prompt), prompt, at + strlen(exception));
-        if (!strcmp(gs(c, "systemPrompt"), previous)) {
-            jset(c, "systemPrompt", js(prompt));
-            migrated = 1;
-        }
-        free(previous);
-    }
-    /* Add new optional servers without resetting existing configuration or enabled state. */
-    J *servers = jg(c, "mcpServers");
-    if (servers && servers->type == JOBJ) {
-        size_t count = servers->len;
-        add_bundled(servers, "9router", 0);
-        if (servers->len != count)
-            migrated = 1;
-    }
     if (c && validate_config(c)) {
-        jf(c);
-        return NULL;
-    }
-    if (migrated && save_config(c)) {
         jf(c);
         return NULL;
     }

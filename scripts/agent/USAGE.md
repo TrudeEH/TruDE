@@ -6,7 +6,7 @@ OpenAI-compatible server, then select its endpoint and a model that supports too
 
 ## Start
 
-From this checkout, run `scripts/agent/setup.sh` once, then `scripts/tui/agent-tui`.
+From this checkout, run `scripts/tui/agent-tui`.
 The desktop installer links the application launcher and the `TruDE-agent-tui`
 command. Seth is written entirely in C, with POSIX sh launch/build scripts. The
 installer builds the native executable from source on every run, using the
@@ -14,7 +14,6 @@ installer builds the native executable from source on every run, using the
 binaries are not shipped in Git. The launcher rebuilds when the executable is
 missing or its sources change. No Node.js, npm, Python, ncurses, or downloaded
 library tree is needed. HTTP/TLS uses `curl` and the system certificate store.
-The installer removes obsolete scheduler units from earlier installations.
 
 Options: `--workspace DIR`, `--help`, `--check` (connect MCP servers). `--prompt TEXT` runs a request in the terminal without the TUI
 (using the configured permission policy; Ask declines changes without a dialog).
@@ -323,9 +322,6 @@ Function-key navigation accepts legacy SS3, CSI, Linux console, and modern keybo
 reporting sequences. The enhanced keyboard encodings follow the
 [terminal keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
 
-Existing version 1 settings migrate once to version 2, adding memory and the separate
-shell server. A disabled filesystem server or shell tool keeps shell disabled.
-
 Shell commands and external MCP processes have the user's OS permissions. Workspace
 checks apply to the bundled file tools; they are not a sandbox for arbitrary programs.
 Sampling is not advertised. Automatic OAuth/browser authorization, binary/image input,
@@ -335,10 +331,9 @@ headers/environment variables or explicit user sign-in.
 
 ## Storage and code layout
 
-The native port reads the existing settings, chat JSON formats directly.
-It also preserves hashed tool aliases used in old chats.
-No migration, history conversion, or fresh setup is needed. Previous npm runtime
-folders are unused; neither startup nor setup reads or downloads them.
+Seth reads settings and chat JSON files directly and preserves stable hashed tool
+aliases in saved chats. Loading settings validates them without rewriting them.
+New configurations include the bundled servers and current defaults.
 
 Uses XDG directories, defaulting to:
 
@@ -364,10 +359,10 @@ Uses XDG directories, defaulting to:
 | `src/store.c` | Settings, private atomic JSON storage, history and process locks |
 | `src/net.c`, `src/util.c` | Bounded curl/process pipes, paths, UUIDs and stable SHA-256 aliases |
 | `src/json.c`, `src/schema.c` | Bounded JSON parser and bundled tool/form validation |
-| `build.sh`, `setup.sh` | Native build and compatibility build entry point |
+| `build.sh` | Native build entry point |
 
-Desktop integration lives in `configs/applications/TruDE-agent.desktop`, the two
-`configs/systemd/user/TruDE-agent.*` units, `configs/hypr/hyprland.lua`, and `install.sh`.
+Desktop integration lives in `configs/applications/TruDE-agent.desktop`,
+`configs/hypr/hyprland.lua`, and `install.sh`.
 
 To rebuild the local executable, run `scripts/agent/build.sh`. It uses only the
 compiler, standard Linux libc headers, and the linker; no dependency fetch

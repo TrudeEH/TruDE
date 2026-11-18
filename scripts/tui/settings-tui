@@ -124,8 +124,7 @@ load_preferences() {
     ' > "$defaults"
 
     if [ -f "$preferences_file" ] && jq -e 'type == "object"' "$preferences_file" >/dev/null 2>&1; then
-        jq -s '.[0] * .[1] | del(.defaults, .workspaces, .waybar.auto_hide,
-            .laptop.idle_timeout, .laptop.screen_off_timeout, .laptop.suspend_timeout)' \
+        jq -s '.[0] * .[1]' \
             "$defaults" "$preferences_file" > "$preferences_state"
     else
         cp "$defaults" "$preferences_state"
