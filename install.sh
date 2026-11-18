@@ -51,8 +51,8 @@ check_platform() {
     case $debian_major in
         ''|*[!0-9]*) debian_major=0 ;;
     esac
-    if [ "${ID:-}" != debian ] || [ "$debian_major" -lt 13 ] || [ -z "${VERSION_CODENAME:-}" ]; then
-        ui_error "This installer supports Debian 13 (trixie) and newer Debian releases."
+    if [ "${ID:-}" != debian ] || [ "$debian_major" -ne 13 ] || [ "${VERSION_CODENAME:-}" != trixie ]; then
+        ui_error "This installer supports Debian 13 (trixie) only."
         exit 1
     fi
     # Two independent managers must not configure the same zRAM device.

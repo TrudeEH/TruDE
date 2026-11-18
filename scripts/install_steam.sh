@@ -14,8 +14,8 @@ debian_major=${debian_major%%.*}
 case $debian_major in
     ''|*[!0-9]*) debian_major=0 ;;
 esac
-if [ "${ID:-}" != debian ] || [ "$debian_major" -lt 13 ] || [ -z "${VERSION_CODENAME:-}" ]; then
-    echo "This installer supports Debian 13 (trixie) and newer Debian releases." >&2
+if [ "${ID:-}" != debian ] || [ "$debian_major" -ne 13 ] || [ "${VERSION_CODENAME:-}" != trixie ]; then
+    echo "This installer supports Debian 13 (trixie) only." >&2
     exit 1
 fi
 

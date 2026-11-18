@@ -42,7 +42,7 @@ You can access a list of shortcuts with `Super+H` or by launching the `Shortcuts
 
 ## Installation
 
-The installer supports **Debian 13 (Trixie) and newer Debian releases**. From a regular user shell with `curl` installed, paste:
+The installer supports **Debian 13 (Trixie) only**. From a regular user shell with `curl` installed, paste:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/TrudeEH/TruDE/master/bootstrap.sh | sh
