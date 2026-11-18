@@ -44,8 +44,9 @@ security_updates_enabled() {
         $1 == "APT::Periodic::Unattended-Upgrade" { upgrades=($2 != "\"0\";") }
         END { exit !(enabled && lists && upgrades) }
     ' || return 1
-    systemctl is-enabled --quiet apt-daily.timer apt-daily-upgrade.timer &&
-        systemctl is-active --quiet apt-daily.timer apt-daily-upgrade.timer
+    for timer in apt-daily.timer apt-daily-upgrade.timer; do
+        systemctl is-enabled --quiet "$timer" && systemctl is-active --quiet "$timer" || return 1
+    done
 }
 
 toggle_security_updates() {
@@ -59,13 +60,12 @@ toggle_security_updates() {
     dialog --yesno "$security_action automatic Debian security updates?" 9 72 || return
     clear
     if (
-        set -e
         if [ "$security_value" = 1 ]; then
-            sudo apt-get install -y unattended-upgrades
-            sudo install -m 0644 "$trude_repo/configs/apt/90TruDE-security" /etc/apt/apt.conf.d/90TruDE-security
+            sudo apt-get install -y unattended-upgrades || exit 1
+            sudo install -m 0644 "$trude_repo/configs/apt/90TruDE-security" /etc/apt/apt.conf.d/90TruDE-security || exit 1
         fi
-        printf 'APT::Periodic::Enable "1";\nAPT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "%s";\n' "$security_value" > "$temp_dir/auto-upgrades"
-        sudo install -m 0644 "$temp_dir/auto-upgrades" /etc/apt/apt.conf.d/99TruDE-auto-upgrades
+        printf 'APT::Periodic::Enable "1";\nAPT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "%s";\n' "$security_value" > "$temp_dir/auto-upgrades" || exit 1
+        sudo install -m 0644 "$temp_dir/auto-upgrades" /etc/apt/apt.conf.d/99TruDE-auto-upgrades || exit 1
         if [ "$security_value" = 1 ]; then
             sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
         fi
@@ -267,7 +267,7 @@ update_system() {
                 printf '\nReloading Hyprland…\n\n'
                 hyprctl reload || update_failed=1
                 printf '\nRestarting the TruDE bar…\n\n'
-                systemctl --user restart TruDE-bar.service || update_failed=1
+                systemctl --user try-restart TruDE-bar.service || update_failed=1
             else
                 printf '\nThe TruDE installer failed; skipping desktop reload.\n'
                 update_failed=1
@@ -287,7 +287,7 @@ update_system() {
     printf 'Press Enter to return to maintenance status.'
     IFS= read -r _
     rm -f "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/TruDE-bar-maintenance.json"
-    systemctl --user kill --signal=USR1 TruDE-bar.service 2>/dev/null || :
+    systemctl --user kill --kill-whom=main --signal=USR1 TruDE-bar.service 2>/dev/null || :
     collect_status
 }
 

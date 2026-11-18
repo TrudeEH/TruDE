@@ -19,14 +19,14 @@ The included tools cover package management, system maintenance, app launching, 
 | --- | --- |
 | ![TruDE terminal tools for maintenance, power, and sensors](assets/screenshots/tui-scripts.webp) | ![TruDE application launcher](assets/screenshots/launcher.webp) |
 
-## APT, Backports and Flatpacks
+## APT, Backports and Flatpaks
 
 TruDE configures Debian Backports and Flathub. You can easily install, uninstall and update packages, and be notified when updates are needed.
 ![Package manager](assets/screenshots/package-manager.png)
 
 ## Customize the desktop from one panel
 
-Easily configure your system without manually editing configuration files. Adjust display layout, keyboard and touchpad behavior, wallpaper, animations, blur, gaps, borders, Waybar, and idle timeouts. Press `Super+I` to open it; `Super` opens the launcher.
+Easily configure your system without manually editing configuration files. Adjust display layout, keyboard and touchpad behavior, wallpaper, animations, blur, gaps, borders, the TruDE bar, and lid-close behavior. Press `Super+I` to open it; `Super` opens the launcher.
 
 ![TruDE settings panel](assets/screenshots/settings.webp)
 
@@ -38,7 +38,7 @@ You can access a list of shortcuts with `Super+H` or by launching the `Shortcuts
 
 | Customizable Icon | Screen sharing |
 | --- | --- |
-| ![Waybar in its normal state](assets/screenshots/bar-idle.webp) | ![Waybar showing the active screen-sharing indicator](assets/screenshots/bar-streaming.webp) |
+| ![TruDE bar in its normal state](assets/screenshots/bar-idle.webp) | ![TruDE bar showing the active screen-sharing indicator](assets/screenshots/bar-streaming.webp) |
 
 ## Installation
 
@@ -48,4 +48,4 @@ The installer supports **Debian 13 (Trixie) only**. From a regular user shell wi
 curl -fsSL https://raw.githubusercontent.com/TrudeEH/TruDE/master/bootstrap.sh | sh
 ```
 
-The bootstrap installs Git, clones TruDE into `$HOME/TruDE`, and runs the installer. When it finishes, log out and back in to start the TruDE session.
+The bootstrap installs Git, clones TruDE into `$HOME/TruDE`, and runs the installer. Reboot when it finishes to start the TruDE session with NetworkManager managing network connections.

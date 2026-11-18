@@ -20,8 +20,7 @@ model_valid() {
 model=$(jq -r '.dictation.model // "base"' "$preferences_file" 2>/dev/null || printf base)
 model_valid "$model" || model=base
 refresh_launcher() {
-    # Refresh the original center and both dividers with the same realtime signal.
-    systemctl --user kill --signal=USR1 TruDE-bar.service 2>/dev/null || :
+    systemctl --user kill --kill-whom=main --signal=USR1 TruDE-bar.service 2>/dev/null || :
 }
 state() {
     printf '%s\n' "$1" > "$runtime/state.new"

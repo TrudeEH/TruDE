@@ -154,7 +154,7 @@ install_packages() {
     # that must match their versions in the same transaction (APT 3 / Debian 13).
     sudo apt-get install -y --allow-downgrades --solver 3.0 --no-strict-pinning \
         "hyprland/$backports_suite" "hyprland-guiutils/$backports_suite" \
-        "hyprlock/$backports_suite" \
+        swayidle "hyprlock/$backports_suite" \
         "uwsm/$backports_suite" "xdg-desktop-portal-hyprland/$backports_suite" \
         build-essential pkg-config libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev librsvg2-dev libpulse-dev libsystemd-dev libpipewire-0.3-dev libjson-c-dev libcurl4-openssl-dev libssl-dev atool bat ca-certificates curl fdisk foot micro imv cmus lazygit ncdu p7zip-full \
         xz-utils less libglib2.0-bin gsettings-desktop-schemas adwaita-icon-theme pkexec \
@@ -317,78 +317,7 @@ configure_hardware_services() {
 
 configure_networking() {
     sudo systemctl enable --now avahi-daemon.service
-    networkmanager_config=/etc/NetworkManager/NetworkManager.conf
-    if [ -f "$networkmanager_config" ] && ! awk '
-        /^[[:space:]]*\[ifupdown\][[:space:]]*$/ { in_section=1; next }
-        /^[[:space:]]*\[/ { in_section=0 }
-        in_section && /^[[:space:]]*managed[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { found=1 }
-        END { exit !found }
-    ' "$networkmanager_config"; then
-        sudo cp -a "$networkmanager_config" "$networkmanager_config.backup-$(date +%Y%m%d-%H%M%S-%N)"
-        networkmanager_temporary=$(mktemp)
-        if grep -q '^[[:space:]]*\[ifupdown\][[:space:]]*$' "$networkmanager_config"; then
-            awk '
-                function finish_section() {
-                    if (in_section && !wrote_managed) print "managed=true"
-                }
-                /^[[:space:]]*\[ifupdown\][[:space:]]*$/ {
-                    finish_section()
-                    in_section=1
-                    wrote_managed=0
-                    print
-                    next
-                }
-                /^[[:space:]]*\[/ {
-                    finish_section()
-                    in_section=0
-                }
-                in_section && /^[[:space:]]*managed[[:space:]]*=/ {
-                    if (!wrote_managed) print "managed=true"
-                    wrote_managed=1
-                    next
-                }
-                { print }
-                END { finish_section() }
-            ' "$networkmanager_config" > "$networkmanager_temporary"
-        else
-            cat "$networkmanager_config" > "$networkmanager_temporary"
-            printf '\n[ifupdown]\nmanaged=true\n' >> "$networkmanager_temporary"
-        fi
-        if sudo install -m 0644 "$networkmanager_temporary" "$networkmanager_config"; then
-            networkmanager_status=0
-        else
-            networkmanager_status=$?
-        fi
-        rm -f "$networkmanager_temporary"
-        [ "$networkmanager_status" -eq 0 ] || return "$networkmanager_status"
-    fi
-
-    interfaces_file=/etc/network/interfaces
-    if [ -f "$interfaces_file" ] && awk '$1 == "iface" && $2 != "lo" { found=1 } END { exit !found }' "$interfaces_file"; then
-        sudo cp -a "$interfaces_file" "$interfaces_file.backup-$(date +%Y%m%d-%H%M%S-%N)"
-        interfaces_temporary=$(mktemp)
-        awk '
-            $1 == "auto" || $1 == "allow-hotplug" {
-                for (field=2; field <= NF; field++) {
-                    if ($field == "lo") {
-                        print $1 " lo"
-                        break
-                    }
-                }
-                next
-            }
-            $1 == "iface" { skip = ($2 != "lo") }
-            skip { next }
-            { print }
-        ' "$interfaces_file" > "$interfaces_temporary"
-        if sudo install -m 0644 "$interfaces_temporary" "$interfaces_file"; then
-            interfaces_status=0
-        else
-            interfaces_status=$?
-        fi
-        rm -f "$interfaces_temporary"
-        [ "$interfaces_status" -eq 0 ] || return "$interfaces_status"
-    fi
+    sudo "$repo_dir/scripts/network/configure-networkmanager"
 }
 
 configure_theme() {
@@ -434,6 +363,10 @@ link_configs() {
     fi
 
     link_config "$repo_dir/configs/hypr/hyprland.lua" "$config_dir/hypr/hyprland.lua"
+    sleep_unit=$repo_dir/configs/systemd/user/TruDE-lock-before-sleep.service
+    link_config "$repo_dir/scripts/hypr/lock-session" "$HOME/.local/bin/TruDE-lock-session"
+    link_config "$sleep_unit" "$config_dir/systemd/user/TruDE-lock-before-sleep.service"
+    link_config "$sleep_unit" "$config_dir/systemd/user/graphical-session.target.wants/TruDE-lock-before-sleep.service"
     link_config "$repo_dir/configs/hypr/hyprlock.conf" "$config_dir/hypr/hyprlock.conf"
     link_config "$repo_dir/configs/uwsm/env-hyprland" "$config_dir/uwsm/env-hyprland"
     link_config "$repo_dir/assets/wallpapers/default.jpg" "$HOME/.local/share/backgrounds/TruDE-wallpaper.jpg"
@@ -473,10 +406,29 @@ link_configs() {
     link_config "$repo_dir/scripts/superfile/open" "$HOME/.local/bin/TruDE-superfile-open"
     link_config "$repo_dir/scripts/bar/status-menu" "$HOME/.local/bin/TruDE-bar-status-menu"
     link_config "$repo_dir/scripts/bar/maintenance-status" "$HOME/.local/bin/TruDE-bar-maintenance-status"
-    link_config "$repo_dir/scripts/bar/start" "$HOME/.local/bin/TruDE-bar"
-    link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/TruDE-bar.service"
-    link_config "$repo_dir/configs/systemd/user/TruDE-bar.service" "$config_dir/systemd/user/graphical-session.target.wants/TruDE-bar.service"
-    link_config "$repo_dir/configs/autostart/TruDE-task-notifications.desktop" "$config_dir/autostart/TruDE-task-notifications.desktop"
+    bar_launcher=$HOME/.local/bin/TruDE-bar
+    bar_unit=$repo_dir/configs/systemd/user/TruDE-bar.service
+    bar_wanted=$config_dir/systemd/user/graphical-session.target.wants/TruDE-bar.service
+    link_config "$bar_unit" "$config_dir/systemd/user/TruDE-bar.service"
+    bar_enabled=true
+    bar_preferences=$config_dir/TruDE/settings.json
+    if [ -f "$bar_preferences" ]; then
+        bar_enabled=$(jq -er 'if .waybar.enabled == false then "false" else "true" end' "$bar_preferences")
+    fi
+    # systemctl disable also removes the wants link if the user used Autostart.
+    if [ -L "$bar_launcher" ] && [ ! -L "$bar_wanted" ] && [ ! -e "$bar_wanted" ]; then
+        bar_enabled=false
+    fi
+    if [ "$bar_enabled" = true ]; then
+        link_config "$bar_unit" "$bar_wanted"
+    elif [ -L "$bar_wanted" ]; then
+        rm -f -- "$bar_wanted"
+    fi
+    link_config "$repo_dir/scripts/bar/start" "$bar_launcher"
+    reminder=$config_dir/autostart/TruDE-task-notifications.desktop
+    if [ ! -e "$reminder" ]; then
+        link_config "$repo_dir/configs/autostart/TruDE-task-notifications.desktop" "$reminder"
+    fi
     link_config "$repo_dir/configs/mako/config" "$config_dir/mako/config"
     link_config "$repo_dir/configs/systemd/user/mako.service.d/override.conf" "$config_dir/systemd/user/mako.service.d/override.conf"
     link_config "$repo_dir/configs/btop/themes/TruDE.theme" "$config_dir/btop/themes/TruDE.theme"
@@ -549,7 +501,15 @@ main() {
 
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
         systemctl --user daemon-reload || :
-        systemctl --user enable --now foot-server.socket TruDE-bar.service mako.service || :
+        systemctl --user enable --now foot-server.socket mako.service || :
+        if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+            systemctl --user start TruDE-lock-before-sleep.service
+            if [ "$bar_enabled" = true ]; then
+                systemctl --user start TruDE-bar.service || :
+            else
+                systemctl --user stop TruDE-bar.service || :
+            fi
+        fi
         systemctl --user try-restart hyprpolkitagent.service xdg-desktop-portal-hyprland.service || :
     fi
 

@@ -1,0 +1,109 @@
+#!/bin/sh
+# Run as root during installation. Keep the running connection until reboot.
+set -eu
+umask 077
+base=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+interfaces=/etc/network/interfaces
+profiles=/etc/NetworkManager/system-connections
+config_dir=/etc/NetworkManager/conf.d
+handoff=$config_dir/90-TruDE-networking.conf
+[ -d "$config_dir" ] || install -d -m 0755 "$config_dir"
+[ -d "$profiles" ] || install -d -m 0700 "$profiles"
+exec 9<"$profiles"
+flock -x 9
+
+# ifupdown includes are relative to the including file. Expand only filename
+# patterns, never shell commands. Keep each file's stanza boundaries intact.
+read_interfaces() (
+    file=$1
+    depth=$2
+    [ "$depth" -lt 32 ] || { echo "Too many nested ifupdown includes at $file" >&2; exit 1; }
+    cd -- "$(dirname -- "$file")"
+    while IFS= read -r line || [ -n "$line" ]; do
+        set -f
+        set -- $line
+        case ${1:-} in
+            source|source-directory)
+                directive=$1
+                shift
+                printf '\n%s\n' '@end'
+                [ "$#" -gt 0 ] || { echo "Missing $directive path in $file" >&2; exit 1; }
+                for pattern do
+                    # ifupdown accepts shell-style paths. Stop for expressions
+                    # we cannot expand literally and safely.
+                    case $pattern in
+                        *\\*|*\$*|*\`*|*\"*|*\'*|\~*)
+                            echo "Unsupported $directive path in $file" >&2
+                            exit 1 ;;
+                    esac
+                    set +f
+                    for child in $pattern; do
+                        if [ "$directive" = source-directory ]; then
+                            for entry in "$child"/*; do
+                                case ${entry##*/} in *[!a-zA-Z0-9_-]*) continue ;; esac
+                                [ ! -f "$entry" ] || read_interfaces "$entry" "$((depth+1))"
+                            done
+                        elif [ -f "$child" ]; then
+                            read_interfaces "$child" "$((depth+1))"
+                        fi
+                    done
+                done
+                printf '%s\n' '@end'
+                ;;
+            *) printf '%s\n' "$line" ;;
+        esac
+    done < "./${file##*/}"
+)
+
+if [ ! -e "$handoff" ]; then
+    # The private staging directory shares the destination filesystem, so each
+    # validated profile can be published atomically.
+    work=$(mktemp -d "$profiles/.TruDE.XXXXXX")
+    trap 'rm -rf -- "$work"' EXIT
+    trap 'exit 1' HUP INT TERM
+    if [ -f "$interfaces" ]; then
+        read_interfaces "$interfaces" 0 > "$work/interfaces"
+        LC_ALL=C awk -v dir="$work" -f "$base/ifupdown.awk" "$work/interfaces"
+    fi
+    for args in "$work"/*.args; do
+        [ -f "$args" ] || continue
+        iface=${args##*/}
+        iface=${iface%.args}
+        set -- type ethernet
+        if [ -f "$args.wifi" ]; then
+            IFS= read -r ssid < "$args.wifi"
+            set -- type wifi ssid "$ssid"
+        fi
+        while IFS= read -r key && IFS= read -r value; do
+            set -- "$@" "$key" "$value"
+        done < "$args"
+        name=TruDE-ifupdown-$iface.nmconnection
+        nmcli --offline connection add "$@" ifname "$iface" con-name "ifupdown ($iface)" > "$work/$name"
+        if [ -f "$args.psk" ]; then
+            # Secrets stay in private files, outside the process argument list.
+            sed -e '/^\[wifi-security\]$/r '"$args.psk" "$work/$name" > "$work/secured"
+            nmcli --offline connection modify < "$work/secured" > "$work/$name"
+        fi
+        if [ -e "$profiles/$name" ]; then
+            # Resume a previously interrupted publication only for the same profile.
+            sed '/^uuid=/d' "$profiles/$name" > "$work/existing"
+            sed '/^uuid=/d' "$work/$name" > "$work/new"
+            cmp -s "$work/existing" "$work/new" || { echo "Conflicting NetworkManager profile: $profiles/$name" >&2; exit 1; }
+        fi
+    done
+    for profile in "$work"/*.nmconnection; do
+        [ -f "$profile" ] || continue
+        [ -e "$profiles/${profile##*/}" ] || mv "$profile" "$profiles/"
+    done
+    printf '%s\n' '[main]' 'plugins-=ifupdown' > "$work/handoff"
+    chmod 0644 "$work/handoff"
+    mv -T -- "$work/handoff" "$handoff"
+fi
+
+systemctl enable --now NetworkManager.service
+nmcli connection reload
+# ifupdown's boot service and udev-triggered instances can otherwise claim the
+# same interfaces. Mask for subsequent starts without stopping a live link.
+if [ -f /usr/lib/systemd/system/ifup@.service ]; then
+    systemctl mask networking.service ifup@.service ifupdown-wait-online.service
+fi

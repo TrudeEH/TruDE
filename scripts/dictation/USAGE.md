@@ -7,9 +7,8 @@ No audio uploads, automatic downloads, persistent inference server, or GPU loade
 The clipboard owner runs in a separate transient user service so it survives
 recognition completion. Paste targets the focused Hyprland window explicitly,
 using Ctrl+Shift+V for terminals and Ctrl+V elsewhere. It uses the Hyprland 0.55+ Lua dispatcher API and never presses Enter.
-The original launcher and both powerline modules refresh immediately on
-recording, transcription, and cleanup via the shared Waybar signal 9. The one-second poll
-remains for screen-sharing detection and recovery from an unhandled worker kill.
+The worker sends `SIGUSR1` to the TruDE bar when recording starts, transcription
+begins, and cleanup finishes. The bar also checks launcher state every second.
 
 ## Models
 

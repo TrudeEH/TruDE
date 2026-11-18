@@ -17,8 +17,10 @@
 #define RAISED "\033[48;2;56;56;60m\033[38;2;255;255;255m"
 #define ACCENT "\033[48;2;255;190;111m\033[38;2;34;34;38m"
 #define MUTED "\033[38;2;170;170;170m"
-typedef struct { char id[128],name[TEXT]; } Project;
-typedef struct { char id[128],project[128],title[TEXT],description[TEXT],due[TEXT],labels[TEXT],date[32]; int priority,done; } Task;
+typedef struct { char *id, *name; } Project;
+typedef struct { char *id, *project, *title, *description, *due, *labels, *date; int priority,done; } Task;
+/* Project and task strings point into the last decoded snapshot. */
+static char *snapshot;
 static Project projects[MAX]; static Task tasks[MAX];
 static int np,nt,visible[MAX],nv,project,selected,focus=1,completed,offset,poffset,view,nav;
 static const char *views[]={"All Tasks","Today","Upcoming","Completed"};
@@ -123,19 +125,22 @@ static int refresh(void) {
     char current[128]="",taskid[128]="";
     if(project && project<=np)copy(current,projects[project-1].id,sizeof current);
     if(nv && selected<nv)copy(taskid,tasks[visible[selected]].id,sizeof taskid);
+    free(snapshot);
+    snapshot=output;
     np=nt=0;
     char *save=NULL;
     for(char *row=strtok_r(output,"\n",&save);row;row=strtok_r(NULL,"\n",&save)) {
         char *fields[11];int nf=0; fields[nf++]=row;
         for(char *p=row;*p && nf<11;p++) if(*p=='\t') { *p=0;fields[nf++]=p+1; }
         for(int i=0;i<nf;i++)decode(fields[i]);
-        if(nf==3 && !strcmp(fields[0],"P") && np<MAX) { copy(projects[np].id,fields[1],128);copy(projects[np++].name,fields[2],TEXT); }
+        if(nf==3 && !strcmp(fields[0],"P") && np<MAX) { projects[np++]=(Project){.id=fields[1], .name=fields[2]}; }
         if(nf==10 && !strcmp(fields[0],"T") && nt<MAX) {
-            Task *t=&tasks[nt++];copy(t->id,fields[1],128);copy(t->project,fields[2],128);copy(t->title,fields[3],TEXT);
-            copy(t->description,fields[4],TEXT);copy(t->due,fields[5],TEXT);copy(t->labels,fields[6],TEXT);t->priority=atoi(fields[7]);t->done=atoi(fields[8]);copy(t->date,fields[9],sizeof t->date);
+            tasks[nt++]=(Task){.id=fields[1], .project=fields[2], .title=fields[3],
+                .description=fields[4], .due=fields[5], .labels=fields[6],
+                .priority=atoi(fields[7]), .done=atoi(fields[8]), .date=fields[9]};
         }
     }
-    free(output);project=0;
+    project=0;
     for(int i=0;i<np;i++)if(!strcmp(current,projects[i].id))project=i+1;
     nav=project?project+3:view;
     filter();for(int i=0;i<nv;i++)if(!strcmp(taskid,tasks[visible[i]].id))selected=i;
@@ -222,7 +227,7 @@ static int key(void) {
     return c;
 }
 /* Single modal form: all fields visible, no nested selectors. */
-static int form(const char *title,char fields[][TEXT],const char **labels,int count,int secret) {
+static int form(const char *title,char **fields,const char **labels,int count,int secret, size_t *capacities) {
     int field=0;
     while(!stopped) {
         draw();
@@ -251,36 +256,77 @@ static int form(const char *title,char fields[][TEXT],const char **labels,int co
             int p=atoi(fields[5])-1;
             if(k==LEFT)p=(p+np-1)%np;
             else if(k==RIGHT)p=(p+1)%np;
-            snprintf(fields[5],TEXT,"%d",p+1);
+            snprintf(fields[5],capacities[5],"%d",p+1);
         }
         else if(k==21)fields[field][0]=0;
         else if(k==BACK) {size_t n=strlen(fields[field]);
-    if(n) {n--;while(n && ((unsigned char)fields[field][n]&192)==128)n--;fields[field][n]=0;}}
+            if(n) {
+                n--;
+                while(n && ((unsigned char)fields[field][n]&192)==128)n--;
+                fields[field][n]=0;
+            }
+        }
         else if(k>=32 && k<256) {size_t n=strlen(fields[field]);
-    if(n<TEXT-1){fields[field][n]=(char)k;fields[field][n+1]=0;}}
+            if (capacities && n+2 > capacities[field]) {
+                size_t capacity=capacities[field]*2;
+                char *value=realloc(fields[field],capacity);
+                if (!value) { copy(status,"Cannot grow editor field",sizeof status); return 0; }
+                fields[field]=value;
+                capacities[field]=capacity;
+            }
+            if (capacities || n<TEXT-1) { fields[field][n]=(char)k; fields[field][n+1]=0; }
+        }
     }
     return 0;
 }
-static int confirm(const char *message) {char f[1][TEXT]={{0}};const char *l[]={"Type yes to confirm permanent deletion"};
-    return form(message,f,l,1,0) && !strcmp(f[0],"yes");}
+/* Short prompts use a caller-owned buffer. Task fields grow as needed. */
+static int prompt(const char *title,char value[TEXT],const char *label,int secret) {
+    return form(title,&value,&label,1,secret,NULL);
+}
+static int confirm(const char *message) {
+    char answer[TEXT]="";
+    return prompt(message,answer,"Type yes to confirm permanent deletion",0) && !strcmp(answer,"yes");
+}
 static void edit(int existing) {
     if(!np) {copy(status,"No projects loaded. Refresh or change backend first.",TEXT);return;}
     if(existing && !nv)return;
-    Task empty={0},*t=existing?&tasks[visible[selected]]:&empty;
-    char fields[6][TEXT]={{0}},old_due[TEXT];
-    copy(fields[0],t->title,TEXT);copy(fields[1],t->description,TEXT);copy(fields[2],t->due,TEXT);copy(old_due,t->due,TEXT);copy(fields[3],t->labels,TEXT);
-    snprintf(fields[4],TEXT,"%d",existing?t->priority:4);
-    int p=project?project-1:0;for(int i=0;i<np;i++)if(!strcmp(t->project,projects[i].id))p=i;
-    snprintf(fields[5],TEXT,"%d",p+1);
-    const char *labels[]={"Title","Description","Due: YYYY-MM-DD HH:MM [every day/week/month/year]","Labels (comma-separated)","Priority (1 highest, 4 lowest)","Project number (see list below)"};
-    labels[5]="Project (Left / Right to choose)";
-    while(form(existing?"Edit task":"New task",fields,labels,6,0)) {
+    Task *task=existing?&tasks[visible[selected]]:NULL;
+    int p=project?project-1:0;
+    if (task) for (int i=0;i<np;i++) if (!strcmp(task->project,projects[i].id)) p=i;
+    char priority_text[16],project_text[16];
+    snprintf(priority_text,sizeof priority_text,"%d",task?task->priority:4);
+    snprintf(project_text,sizeof project_text,"%d",p+1);
+    const char *initial[]={task?task->title:"", task?task->description:"", task?task->due:"",
+                           task?task->labels:"", priority_text, project_text};
+    const char *labels[]={"Title","Description","Due: YYYY-MM-DD HH:MM [every day/week/month/year]",
+                          "Labels (comma-separated)","Priority (1 highest, 4 lowest)","Project (Left / Right to choose)"};
+    char *fields[6]={0};
+    size_t capacities[6];
+    for (int i=0;i<6;i++) {
+        capacities[i]=strlen(initial[i])+16;
+        fields[i]=malloc(capacities[i]);
+        if (!fields[i]) { copy(status,"Cannot open task editor",sizeof status); goto done; }
+        strcpy(fields[i],initial[i]);
+    }
+    while(form(existing?"Edit task":"New task",fields,labels,6,0,capacities)) {
         int priority=atoi(fields[4]),proj=atoi(fields[5]);
         if(!*fields[0] || priority<1 || priority>4 || proj<1 || proj>np) {copy(status,"Title, priority 1-4 and a valid project number are required",TEXT);continue;}
-        char *args[]={"tasks","save",backend,existing?t->id:"",fields[0],fields[1],projects[proj-1].id,fields[2],fields[3],fields[4],strcmp(old_due,fields[2])?"1":"0",NULL};
-        if(!call(args,NULL))refresh();
-        return;
+        char *changes[6];
+        int changed=0;
+        for (int i=0;i<6;i++) {
+            changes[i]=(!existing || strcmp(initial[i],fields[i])) ? fields[i] : NULL;
+            if (changes[i]) changed=1;
+        }
+        if (changed) {
+            char *args[]={"tasks","save",backend,task?task->id:"",fields[0],changes[1],
+                          changes[5]?projects[proj-1].id:NULL,changes[2],changes[3],changes[4]};
+            if (!existing && !*fields[2]) args[7]=NULL;
+            if (!call(args,NULL)) refresh();
+        }
+        break;
     }
+done:
+    for (int i=0;i<6;i++) free(fields[i]);
 }
 static int setup(void) {
     const char *override=getenv("TASKS_BACKEND");
@@ -316,12 +362,12 @@ static void choose_backend(void) {
     int choice=backend_picker();if(choice<0)return;
     const char *next=choice?"todoist":"local";
     if(choice) {
-        char token[1][TEXT]={{0}};
-        const char *labels[]={"API token: paste to connect; leave empty to use the saved token"};
-        if(!form("Connect Todoist — token saved privately on this computer",token,labels,1,1))return;
-        if(*token[0]) {
+        char token[TEXT]="";
+        const char *label="API token: paste to connect; leave empty to use the saved token";
+        if(!prompt("Connect Todoist — token saved privately on this computer",token,label,1))return;
+        if(*token) {
             char *args[]={"tasks","token",NULL};
-            int failed=call(args,token[0]);memset(token,0,sizeof token);
+            int failed=call(args,token);memset(token,0,sizeof token);
             if(failed)return;
         }
     }
@@ -401,16 +447,25 @@ int main(int argc,char **argv) {
         else if(k=='v') {completed=!completed;copy(status,!strcmp(backend,"todoist")?"Todoist returns active tasks only":"Completed visibility changed",TEXT);}
         else if(k=='r')refresh();
         else if(k=='b')choose_backend();
-        else if(k=='/') {char f[1][TEXT];copy(f[0],search,TEXT);const char *l[]={"Search titles, descriptions and labels (Ctrl-u clears)"};
-    if(form("Search",f,l,1,0)){copy(search,f[0],TEXT);selected=offset=0;}}
+        else if(k=='/') {
+            char query[TEXT];
+            copy(query,search,sizeof query);
+            if (prompt("Search",query,"Search titles, descriptions and labels (Ctrl-u clears)",0)) {
+                copy(search,query,sizeof search);
+                selected=offset=0;
+            }
+        }
         else if(k==ESC)search[0]=0;
         else if(k=='n' || (k==F2 && project)) {
-            char f[1][TEXT]={{0}};
-    if(k==F2)copy(f[0],projects[project-1].name,TEXT);
-    const char *l[]={"Project name"};
-            if(form(k==F2?"Rename project":"New project",f,l,1,0) && *f[0]) {char *a[]={"tasks","project-save",backend,k==F2?projects[project-1].id:"",f[0],NULL};
-    if(!call(a,NULL))refresh();
-    }
+            char *name=strdup(k==F2?projects[project-1].name:"");
+            if (!name) { copy(status,"Cannot open project editor",sizeof status); continue; }
+            size_t capacity=strlen(name)+1;
+            const char *label="Project name";
+            if (form(k==F2?"Rename project":"New project",&name,&label,1,0,&capacity) && *name) {
+                char *args[]={"tasks","project-save",backend,k==F2?projects[project-1].id:"",name,NULL};
+                if (!call(args,NULL)) refresh();
+            }
+            free(name);
         } else if(k=='d') {
             if(!focus && project && confirm(!strcmp(backend,"todoist")?"Delete project AND its tasks permanently?":"Delete project? Tasks will move to Inbox.")) {
                 char *a[]={"tasks","project-delete",backend,projects[project-1].id,NULL};

@@ -13,12 +13,14 @@ if [ "$#" -eq 0 ] && command -v jq >/dev/null 2>&1 \
     children=
     trap 'for pid in $children; do kill "$pid" 2>/dev/null || :; done; wait' 0
     trap 'exit 0' HUP INT TERM
-    trap ':' USR1
+    # Forward refreshes just to our bar processes. A trapped signal interrupts
+    # dash's wait, so resume waiting for the children afterwards.
+    trap 'for pid in $children; do kill -USR1 "$pid" 2>/dev/null || :; done' USR1
     for output in $outputs; do
         "$base/bin/bar" "$output" &
         children="$children $!"
     done
-    wait
+    until wait; do :; done
     exit 0
 fi
 exec "$base/bin/bar" "$@"

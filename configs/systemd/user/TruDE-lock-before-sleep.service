@@ -1,0 +1,13 @@
+[Unit]
+Description=Lock the TruDE session before sleep
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Service]
+ExecStart=/usr/bin/swayidle -w -C /dev/null before-sleep 'exec "$$HOME/.local/bin/TruDE-lock-session"'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

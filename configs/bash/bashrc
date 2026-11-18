@@ -138,5 +138,9 @@ done
 PROMPT_COMMAND=("${__TruDE_prompt_commands[@]}")
 unset __TruDE_prompt_commands __TruDE_command
 
-# opencode
-export PATH=/home/trude/.opencode/bin:$PATH
+if [ -d "$HOME/.opencode/bin" ]; then
+    case :$PATH: in
+        *:"$HOME/.opencode/bin":*) ;;
+        *) PATH=$HOME/.opencode/bin:$PATH ;;
+    esac
+fi

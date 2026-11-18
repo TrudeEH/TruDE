@@ -126,8 +126,7 @@ tasks --local reopen TASK_ID
 ```
 
 `edit ID JSON` uses the same fields as `add`. Include `content` and the target
-`project_id`; omitted fields stay unchanged locally. The TUI supplies all
-editable fields. JSON values are data, never shell commands.
+`project_id`; omitted fields stay unchanged locally. When editing a task, the TUI sends its title and the fields that changed. JSON values are data, never shell commands.
 
 Scope: task CRUD, completion/reopening, projects, moving tasks, descriptions,
 priorities, dates/recurrence (Todoist), labels, and search. This is not a full

@@ -233,7 +233,16 @@ int backend_dispatch(char **args,const char *input,char **output) {
         }jf(projects);jf(tasks);
     }else {
         J *item=NULL;const char *mapped=action;
-        if(!strcmp(action,"save")){mapped="task-save";item=jo();jset(item,"content",js(args[4]));jset(item,"description",js(args[5]));jset(item,"project_id",js(args[6]));jset(item,"labels",labels(args[8]));jset(item,"priority",jnum(5-atoi(args[9])));if(!strcmp(args[10],"1"))jset(item,"due_string",js(args[7]));}
+        if(!strcmp(action,"save")) {
+            mapped="task-save";
+            item=jo();
+            jset(item,"content",js(args[4]));
+            if(args[5]) jset(item,"description",js(args[5]));
+            if(args[6]) jset(item,"project_id",js(args[6]));
+            if(args[7]) jset(item,"due_string",js(args[7]));
+            if(args[8]) jset(item,"labels",labels(args[8]));
+            if(args[9]) jset(item,"priority",jnum(5-atoi(args[9])));
+        }
         else if(!strcmp(action,"complete")){mapped="task-complete";item=jb(!strcmp(args[4],"true"));}
         else if(!strcmp(action,"delete"))mapped="task-delete";
         else if(!strcmp(action,"project-save")){item=jo();jset(item,"name",js(args[4]));}

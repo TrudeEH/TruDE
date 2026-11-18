@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+locked() {
+    hyprctl -j locked | jq -e '.locked == true' >/dev/null
+}
+
+locked && exit 0
+# A separate session lets the lock survive closing the power menu's terminal.
+setsid -f hyprlock --grace 0 --immediate-render --config "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf" </dev/null
+# swayidle holds its logind sleep-delay inhibitor while this command runs.
+attempts=0
+while [ "$attempts" -lt 100 ]; do
+    locked && exit 0
+    sleep 0.1
+    attempts=$((attempts + 1))
+done
+echo 'Unable to confirm that Hyprland locked the session.' >&2
+exit 1
